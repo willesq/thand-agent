@@ -2,6 +2,8 @@
 
 Thand is an open-source agent for privilege access management (PAM) and just-in-time access (JIT) to cloud infrastructure, SaaS applications and local systems. It uses [Serverless Workflows](https://serverlessworkflow.io/) and [Temporal](https://www.temporal.io) to orchestrate and guarantee robust deterministic workflow execution and revocation, of permissions across cloud/on-prem environments and systems. It tasks “agents” to grant access where it needs to be rather than centralising permission stores. Run it locally for sudo, UAC. Or in the cloud for IAM or for individual applications. Connect to Thand Cloud for enterprise features.
 
+[![Watch the Thand demo](https://img.youtube.com/vi/WLJ1Ab0zeno/mqdefault.jpg)](https://youtu.be/WLJ1Ab0zeno)
+
 ## 🎯 What is Thand?
 
 Thand eliminates standing access to critical infrastructure and SaaS apps. Instead of permanent admin rights, users request access when needed, for only as long as needed. The Thand server is extensible, customisable and easy to deploy as a standalone service.
