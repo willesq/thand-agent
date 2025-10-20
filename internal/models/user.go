@@ -26,6 +26,17 @@ func (u *User) GetName() string {
 	return "Unknown"
 }
 
+func (u *User) GetIdentity() string {
+	if len(u.Email) > 0 {
+		return u.Email
+	} else if len(u.Username) > 0 {
+		return u.Username
+	} else if len(u.ID) > 0 {
+		return u.ID
+	}
+	return common.ConvertToSnakeCase(u.Name)
+}
+
 func (u *User) AsMap() map[string]any {
 	// Convert User struct to a map[string]any
 	var mapUser map[string]any

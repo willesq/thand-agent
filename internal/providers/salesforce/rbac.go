@@ -11,7 +11,7 @@ import (
 func (p *salesForceProvider) AuthorizeRole(
 	ctx context.Context,
 	req *models.AuthorizeRoleRequest,
-) (map[string]any, error) {
+) (*models.AuthorizeRoleResponse, error) {
 
 	if !req.IsValid() {
 		return nil, fmt.Errorf("user and role must be provided to authorize salesforce role")
@@ -48,30 +48,30 @@ func (p *salesForceProvider) AuthorizeRole(
 	profileName := strings.TrimPrefix(
 		role.Inherits[0], fmt.Sprintf("%s:", p.GetProvider()))
 
-	profileReesult, err := p.GetRole(ctx, profileName)
+	profileResult, err := p.GetRole(ctx, profileName)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get role profile: %w", err)
 	}
 
 	// We need to store the old profile Id so we can revert it on revoke
-	salesforceProfile := map[string]any{
-		"salesforce": map[string]any{
+	salesforceProfile := &models.AuthorizeRoleResponse{
+		Metadata: map[string]any{
 			"id":              salesforceUserId,
-			"current_profile": profileReesult.Id,
+			"current_profile": profileResult.Id,
 			"prior_profile":   currentProfileId,
 		},
 	}
 
 	// Check if user already has the target profile
-	if currentProfileId == profileReesult.Id {
+	if currentProfileId == profileResult.Id {
 		return salesforceProfile, nil // User already has the correct profile
 	}
 
 	// Update user's profile
 	userObj := client.SObject("User")
 	userObj.Set("Id", salesforceUserId)
-	userObj.Set("ProfileId", profileReesult.Id)
+	userObj.Set("ProfileId", profileResult.Id)
 
 	result := userObj.Update()
 	if result == nil {
@@ -84,11 +84,12 @@ func (p *salesForceProvider) AuthorizeRole(
 // Revoke removes access for a user from a role by reverting to a default profile
 func (p *salesForceProvider) RevokeRole(
 	ctx context.Context,
-	user *models.User,
-	role *models.Role,
-	metadata map[string]any,
-) (map[string]any, error) {
+	req *models.RevokeRoleRequest,
+) (*models.RevokeRoleResponse, error) {
 	client := p.client
+
+	user := req.GetUser()
+	role := req.GetRole()
 
 	// First find the user by their email
 	userQuery := "SELECT Id, Name, ProfileId FROM User WHERE Email = ?"

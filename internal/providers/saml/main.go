@@ -202,7 +202,7 @@ func (p *samlProvider) RenewSession(ctx context.Context, session *models.Session
 func (p *samlProvider) AuthorizeRole(
 	ctx context.Context,
 	req *models.AuthorizeRoleRequest,
-) (map[string]any, error) {
+) (*models.AuthorizeRoleResponse, error) {
 
 	if !req.IsValid() {
 		return nil, fmt.Errorf("user and role must be provided to authorize azure role")
@@ -223,16 +223,15 @@ func (p *samlProvider) AuthorizeRole(
 // Revoke removes access for a user from a role
 func (p *samlProvider) RevokeRole(
 	ctx context.Context,
-	user *models.User,
-	role *models.Role,
-	metadata map[string]any,
-) (map[string]any, error) {
-	if user == nil {
-		return nil, fmt.Errorf("user is nil")
+	req *models.RevokeRoleRequest,
+) (*models.RevokeRoleResponse, error) {
+
+	if !req.IsValid() {
+		return nil, fmt.Errorf("user and role must be provided to authorize azure role")
 	}
-	if role == nil {
-		return nil, fmt.Errorf("role is nil")
-	}
+
+	user := req.GetUser()
+	role := req.GetRole()
 
 	// In SAML, revocation typically happens at the IdP level
 	// This is a placeholder for any local cleanup

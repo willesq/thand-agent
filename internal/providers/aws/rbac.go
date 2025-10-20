@@ -11,7 +11,7 @@ import (
 func (p *awsProvider) AuthorizeRole(
 	ctx context.Context,
 	req *models.AuthorizeRoleRequest,
-) (map[string]any, error) {
+) (*models.AuthorizeRoleResponse, error) {
 
 	// Check for nil inputs
 	if !req.IsValid() {
@@ -32,17 +32,15 @@ func (p *awsProvider) AuthorizeRole(
 // Revoke removes access for a user from a role
 func (p *awsProvider) RevokeRole(
 	ctx context.Context,
-	user *models.User,
-	role *models.Role,
-	metadata map[string]any,
-) (map[string]any, error) {
+	req *models.RevokeRoleRequest,
+) (*models.RevokeRoleResponse, error) {
 	// Check for nil inputs
-	if user == nil {
-		return nil, fmt.Errorf("user cannot be nil")
+	if !req.IsValid() {
+		return nil, fmt.Errorf("user and role must be provided to revoke aws role")
 	}
-	if role == nil {
-		return nil, fmt.Errorf("role cannot be nil")
-	}
+
+	user := req.GetUser()
+	role := req.GetRole()
 
 	// Determine if we should use IAM Identity Center or traditional IAM
 	useIdentityCenter := p.shouldUseIdentityCenter(user)

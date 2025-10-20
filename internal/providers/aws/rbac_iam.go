@@ -15,7 +15,9 @@ import (
 
 // authorizeRoleTraditionalIAM handles role authorization for traditional IAM users
 func (p *awsProvider) authorizeRoleTraditionalIAM(
-	ctx context.Context, req *models.AuthorizeRoleRequest) (map[string]any, error) {
+	ctx context.Context,
+	req *models.AuthorizeRoleRequest,
+) (*models.AuthorizeRoleResponse, error) {
 
 	user := req.GetUser()
 	role := req.GetRole()
@@ -46,7 +48,7 @@ func (p *awsProvider) authorizeRoleTraditionalIAM(
 }
 
 // revokeRoleTraditionalIAM handles role revocation for traditional IAM users
-func (p *awsProvider) revokeRoleTraditionalIAM(ctx context.Context, user *models.User, role *models.Role) (map[string]any, error) {
+func (p *awsProvider) revokeRoleTraditionalIAM(ctx context.Context, user *models.User, role *models.Role) (*models.RevokeRoleResponse, error) {
 
 	// Check if the role exists
 	existingRole, err := p.getRole(ctx, role)

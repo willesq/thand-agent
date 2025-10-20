@@ -13,6 +13,8 @@ import (
 	"github.com/thand-io/agent/internal/workflows/functions"
 )
 
+const ThandRevokeFunctionName = "thand.revoke"
+
 // RevokeFunction implements access revocation functionality
 type revokeFunction struct {
 	config *config.Config
@@ -24,7 +26,7 @@ func NewRevokeFunction(config *config.Config) *revokeFunction {
 	return &revokeFunction{
 		config: config,
 		BaseFunction: functions.NewBaseFunction(
-			"thand.revoke",
+			ThandRevokeFunctionName,
 			"Revokes access permissions and terminates sessions",
 			"1.0.0",
 		),
@@ -62,7 +64,7 @@ func (t *revokeFunction) ValidateRequest(
 // Execute performs the revocation logic
 func (t *revokeFunction) Execute(
 	workflowTask *models.WorkflowTask,
-	call *model.CallFunction,
+	_ *model.CallFunction,
 	input any,
 ) (any, error) {
 
@@ -72,7 +74,17 @@ func (t *revokeFunction) Execute(
 		return nil, errors.New("request cannot be nil")
 	}
 
-	// Right - we ned to take the role, polciy and provide and make the request to
+	return RevokeAuthorization(t.config, workflowTask, req)
+
+}
+
+func RevokeAuthorization(
+	config *config.Config,
+	workflowTask *models.WorkflowTask,
+	req map[string]any,
+) (any, error) {
+
+	// Right - we need to take the role, policy and provider and make the request to
 	// the provider to elevate.
 
 	var elevateRequest models.ElevateRequestInternal
@@ -105,7 +117,7 @@ func (t *revokeFunction) Execute(
 	// First lets call the provider to execute the role request.
 	primaryProvider := elevateRequest.Providers[0]
 
-	providerCall, err := t.config.GetProviderByName(primaryProvider)
+	providerCall, err := config.GetProviderByName(primaryProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}
@@ -114,16 +126,39 @@ func (t *revokeFunction) Execute(
 		"revoked": true,
 	}
 
+	var authorizeResponse *models.AuthorizeRoleResponse
+
+	// See if we can hydrate the authorization response
+	if authorizationsMap, ok := req["authorizations"].(map[string]any); ok {
+		if identityMap, ok := authorizationsMap[user.GetIdentity()].(map[string]any); ok {
+			authorizeResponse = &models.AuthorizeRoleResponse{}
+			if err := common.ConvertMapToInterface(identityMap, authorizeResponse); err != nil {
+				return nil, fmt.Errorf("failed to convert authorize response: %w", err)
+			}
+		}
+	}
+
 	revokeOut, err := providerCall.GetClient().RevokeRole(
-		workflowTask.GetContext(), user, role, req)
+		workflowTask.GetContext(), &models.RevokeRoleRequest{
+			RoleRequest: &models.RoleRequest{
+				User: user,
+				Role: role,
+			},
+			AuthorizeRoleResponse: authorizeResponse,
+		},
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to revoke user: %w", err)
 	}
 
 	// If the revoke returned any output, merge it into modelOutput
-	if len(revokeOut) > 0 {
-		maps.Copy(modelOutput, revokeOut)
+	if revokeOut != nil {
+		maps.Copy(modelOutput, map[string]any{
+			"revocations": map[string]any{
+				user.GetIdentity(): revokeOut,
+			},
+		})
 	}
 
 	return &modelOutput, nil
