@@ -8,6 +8,7 @@ import (
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	models "github.com/thand-io/agent/internal/models"
+	"github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
 	"go.temporal.io/sdk/activity"
 )
@@ -102,40 +103,19 @@ func (m *WorkflowManager) registerActivities() error {
 			return nil, fmt.Errorf("failed to hydrate workflow task: %w", err)
 		}
 
-		elevateRequest, err := workflowTask.GetContextAsElevationRequest()
+		if approved := workflowTask.IsApproved(); approved == nil || !*approved {
+			logrus.Info("Workflow not approved, skipping cleanup activity.")
+			return nil, nil
+		}
+
+		output, err := thand.RevokeAuthorization(
+			m.config,
+			workflowTask,
+			workflowTask.GetContextAsMap(),
+		)
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to get elevate request from context: %w", err)
-		}
-
-		if elevateRequest == nil || !elevateRequest.IsValid() {
-			log.Info("No valid elevate request found, skipping cleanup")
-			return nil, fmt.Errorf("no valid elevate request found in workflow context")
-		}
-
-		providers := elevateRequest.Providers
-		user := elevateRequest.User
-		role := elevateRequest.Role
-
-		if len(providers) == 0 {
-			log.Info("No providers found in elevate request, skipping cleanup")
-			return nil, fmt.Errorf("no providers found in elevate request")
-		}
-
-		primaryProvider := elevateRequest.Providers[0]
-
-		providerHandler, err := m.config.GetProviderByName(primaryProvider)
-
-		if err != nil {
-			log.Info("No valid provider found, skipping cleanup")
-			return nil, fmt.Errorf("no valid provider found: %w", err)
-		}
-
-		output, err := providerHandler.GetClient().RevokeRole(
-			ctx, user, role, workflowTask.GetContextAsMap())
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to revoke role: %w", err)
+			return nil, fmt.Errorf("failed to revoke authorization during cleanup: %w", err)
 		}
 
 		// Perform any necessary cleanup here

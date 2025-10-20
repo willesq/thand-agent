@@ -68,7 +68,7 @@ func (p *terraformProvider) Initialize(provider models.Provider) error {
 func (p *terraformProvider) AuthorizeRole(
 	ctx context.Context,
 	req *models.AuthorizeRoleRequest,
-) (map[string]any, error) {
+) (*models.AuthorizeRoleResponse, error) {
 
 	if !req.IsValid() {
 		return nil, fmt.Errorf("user and role must be provided to authorize terraform role")
@@ -104,10 +104,12 @@ func (p *terraformProvider) AuthorizeRole(
 // Revoke removes access for a user from a role
 func (p *terraformProvider) RevokeRole(
 	ctx context.Context,
-	user *models.User,
-	role *models.Role,
-	metadata map[string]any,
-) (map[string]any, error) {
+	req *models.RevokeRoleRequest,
+) (*models.RevokeRoleResponse, error) {
+
+	user := req.GetUser()
+	role := req.GetRole()
+
 	// Loop over all resources in role.Resources.Allow as workspace IDs
 	if len(role.Resources.Allow) == 0 {
 		return nil, fmt.Errorf("no workspace IDs found in role.Resources.Allow")

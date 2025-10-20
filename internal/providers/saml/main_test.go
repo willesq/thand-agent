@@ -120,8 +120,10 @@ func TestSAMLProvider_Authorization(t *testing.T) {
 
 	// Test authorization with nil user
 	_, err := provider.AuthorizeRole(ctx, &models.AuthorizeRoleRequest{
-		User: nil,
-		Role: role,
+		RoleRequest: &models.RoleRequest{
+			User: nil,
+			Role: role,
+		},
 	})
 	if err == nil {
 		t.Error("Expected error for nil user")
@@ -129,15 +131,22 @@ func TestSAMLProvider_Authorization(t *testing.T) {
 
 	// Test authorization with nil role
 	_, err = provider.AuthorizeRole(ctx, &models.AuthorizeRoleRequest{
-		User: user,
-		Role: nil,
+		RoleRequest: &models.RoleRequest{
+			User: user,
+			Role: nil,
+		},
 	})
 	if err == nil {
 		t.Error("Expected error for nil role")
 	}
 
 	// Test revocation
-	_, err = provider.RevokeRole(ctx, user, role, nil)
+	_, err = provider.RevokeRole(ctx, &models.RevokeRoleRequest{
+		RoleRequest: &models.RoleRequest{
+			User: user,
+			Role: role,
+		},
+	})
 	if err != nil {
 		t.Errorf("Unexpected error in revocation: %v", err)
 	}
