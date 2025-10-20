@@ -13,17 +13,16 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	models "github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/functions"
+	"github.com/thand-io/agent/internal/workflows/tasks"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
 // ResumableWorkflowRunner implements a workflow runner that can pause and resume
 type ResumableWorkflowRunner struct {
-	config    *config.Config
-	functions *functions.FunctionRegistry
-	// interpolator *internalExpr.StringInterpolator
-
-	// extensions *WorkflowExtensionManager - register custom types
+	config       *config.Config
+	functions    *functions.FunctionRegistry
+	tasks        *tasks.TaskRegistry
 	workflowTask *models.WorkflowTask
 }
 

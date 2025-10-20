@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	swctx "github.com/serverlessworkflow/sdk-go/v3/impl/ctx"
@@ -11,7 +12,7 @@ import (
 )
 
 func (r *ResumableWorkflowRunner) executeDoRunner(
-	doTask *model.DoTask, input any) (any, error) {
+	_ string, doTask *model.DoTask, input any) (any, error) {
 	return r.resumeTasks(doTask.Do, 0, input)
 }
 
@@ -197,6 +198,12 @@ func (r *ResumableWorkflowRunner) dispatchTaskExecution(
 	input any,
 ) (any, error) {
 	taskName := task.Key
+	taskType := reflect.TypeOf(task.Task)
+
+	// First, check for custom handlers
+	if handler, exists := r.tasks.GetTaskHandler(taskType); exists {
+		return handler(r.GetWorkflowTask(), task, input)
+	}
 
 	switch t := task.Task.(type) {
 	case *model.CallFunction:
@@ -228,7 +235,7 @@ func (r *ResumableWorkflowRunner) dispatchTaskExecution(
 	case *model.ForkTask:
 		return r.executeForkTask(taskName, task.AsForkTask(), input)
 	case *model.DoTask:
-		return r.executeDoRunner(task.AsDoTask(), input)
+		return r.executeDoRunner(taskName, task.AsDoTask(), input)
 	default:
 		return nil, fmt.Errorf("unsupported task type %T", t)
 	}

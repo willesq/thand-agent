@@ -18,6 +18,7 @@ import (
 	"github.com/thand-io/agent/internal/workflows/functions/providers/slack"
 	"github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	"github.com/thand-io/agent/internal/workflows/runner"
+	"github.com/thand-io/agent/internal/workflows/tasks"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 )
@@ -26,6 +27,7 @@ import (
 type WorkflowManager struct {
 	config    *config.Config
 	functions *functions.FunctionRegistry
+	tasks     *tasks.TaskRegistry
 }
 
 // NewWorkflowManager creates a new workflow manager
@@ -34,10 +36,13 @@ func NewWorkflowManager(cfg *config.Config) *WorkflowManager {
 	wm := WorkflowManager{
 		config:    cfg,
 		functions: functions.NewFunctionRegistry(cfg),
+		tasks:     tasks.NewTaskRegistry(cfg),
 	}
 
-	for _, provider := range []functions.FunctionCollection{
+	// Register all custom tasks
 
+	// Register all built-in function providers
+	for _, provider := range []functions.FunctionCollection{
 		thand.NewThandCollection(cfg),
 		slack.NewSlackCollection(cfg),
 		gcp.NewGCPCollection(cfg),
