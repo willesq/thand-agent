@@ -46,7 +46,7 @@ func (p *azureProvider) RevokeRole(
 ) (*models.RevokeRoleResponse, error) {
 
 	if !req.IsValid() {
-		return nil, fmt.Errorf("user and role must be provided to authorize azure role")
+		return nil, fmt.Errorf("user and role must be provided to revoke azure role")
 	}
 
 	user := req.GetUser()

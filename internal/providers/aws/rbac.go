@@ -36,7 +36,7 @@ func (p *awsProvider) RevokeRole(
 ) (*models.RevokeRoleResponse, error) {
 	// Check for nil inputs
 	if !req.IsValid() {
-		return nil, fmt.Errorf("user and role must be provided to authorize aws role")
+		return nil, fmt.Errorf("user and role must be provided to revoke aws role")
 	}
 
 	user := req.GetUser()
