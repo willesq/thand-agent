@@ -84,7 +84,7 @@ func RevokeAuthorization(
 	req map[string]any,
 ) (any, error) {
 
-	// Right - we ned to take the role, polciy and provide and make the request to
+	// Right - we need to take the role, policy and provider and make the request to
 	// the provider to elevate.
 
 	var elevateRequest models.ElevateRequestInternal
