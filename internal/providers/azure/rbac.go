@@ -11,7 +11,7 @@ import (
 func (p *azureProvider) AuthorizeRole(
 	ctx context.Context,
 	req *models.AuthorizeRoleRequest,
-) (map[string]any, error) {
+) (*models.AuthorizeRoleResponse, error) {
 
 	if !req.IsValid() {
 		return nil, fmt.Errorf("user and role must be provided to authorize azure role")
@@ -42,10 +42,16 @@ func (p *azureProvider) AuthorizeRole(
 // Revoke removes access for a user from a role
 func (p *azureProvider) RevokeRole(
 	ctx context.Context,
-	user *models.User,
-	role *models.Role,
-	metadata map[string]any,
-) (map[string]any, error) {
+	req *models.RevokeRoleRequest,
+) (*models.RevokeRoleResponse, error) {
+
+	if !req.IsValid() {
+		return nil, fmt.Errorf("user and role must be provided to authorize azure role")
+	}
+
+	user := req.GetUser()
+	role := req.GetRole()
+
 	// Get the role definition
 	roleDefinition, err := p.getRoleDefinition(ctx, role.Name)
 	if err != nil {

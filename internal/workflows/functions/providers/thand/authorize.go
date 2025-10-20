@@ -180,16 +180,22 @@ func (t *authorizeFunction) executeAuthorization(
 
 	authOut, err := providerCall.GetClient().AuthorizeRole(
 		workflowTask.GetContext(), &models.AuthorizeRoleRequest{
-			User:     elevateRequest.User,
-			Role:     elevateRequest.Role,
-			Duration: &durationParsed,
+			RoleRequest: &models.RoleRequest{
+				User:     elevateRequest.User,
+				Role:     elevateRequest.Role,
+				Duration: &durationParsed,
+			},
 		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to authorize user: %w", err)
 	}
 
-	maps.Copy(modelOutput, authOut)
+	maps.Copy(modelOutput, map[string]any{
+		"authorizations": map[string]any{
+			elevateRequest.User.GetIdentity(): authOut,
+		},
+	})
 
 	maps.Copy(modelOutput, map[string]any{
 		models.VarsContextApproved: true,

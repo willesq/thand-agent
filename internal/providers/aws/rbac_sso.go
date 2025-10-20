@@ -19,7 +19,7 @@ import (
 func (p *awsProvider) authorizeRoleIdentityCenter(
 	ctx context.Context,
 	req *models.AuthorizeRoleRequest,
-) (map[string]any, error) {
+) (*models.AuthorizeRoleResponse, error) {
 
 	user := req.GetUser()
 	role := req.GetRole()
@@ -48,11 +48,13 @@ func (p *awsProvider) authorizeRoleIdentityCenter(
 		return nil, fmt.Errorf("failed to create account assignment: %w", err)
 	}
 
-	return map[string]any{
-		"instanceArn":      instanceArn,
-		"permissionSetArn": permissionSetArn,
-		"principalId":      principalId,
-		"accountId":        p.GetAccountID(),
+	return &models.AuthorizeRoleResponse{
+		Metadata: map[string]any{
+			"instanceArn":      instanceArn,
+			"permissionSetArn": permissionSetArn,
+			"principalId":      principalId,
+			"accountId":        p.GetAccountID(),
+		},
 	}, nil
 }
 

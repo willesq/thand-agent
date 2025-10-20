@@ -141,7 +141,7 @@ type AuthorizeSessionResponse struct {
 	Url string `json:"url"`
 }
 
-type AuthorizeRoleRequest struct {
+type RoleRequest struct {
 	User     *User          `json:"user"`
 	Role     *Role          `json:"role"`
 	Duration *time.Duration `json:"duration,omitempty"` // Optional duration for temporary access
@@ -149,23 +149,36 @@ type AuthorizeRoleRequest struct {
 
 // IsValid checks if any of the fields are nil
 // if they are then it returns false
-func (r *AuthorizeRoleRequest) IsValid() bool {
+func (r *RoleRequest) IsValid() bool {
 	return r.User != nil && r.Role != nil && r.Duration != nil
 }
 
-func (r *AuthorizeRoleRequest) GetUser() *User {
+func (r *RoleRequest) GetUser() *User {
 	return r.User
 }
 
-func (r *AuthorizeRoleRequest) GetRole() *Role {
+func (r *RoleRequest) GetRole() *Role {
 	return r.Role
 }
 
-func (r *AuthorizeRoleRequest) GetDuration() *time.Duration {
+func (r *RoleRequest) GetDuration() *time.Duration {
 	return r.Duration
 }
 
+type AuthorizeRoleRequest struct {
+	*RoleRequest
+}
+
 type AuthorizeRoleResponse struct {
+	Metadata map[string]any `json:"metadata,omitempty"` // Any metadata returned from the provider
+}
+
+type RevokeRoleRequest struct {
+	*RoleRequest
+	AuthorizeRoleResponse *AuthorizeRoleResponse `json:"response,omitempty"`
+}
+
+type RevokeRoleResponse struct {
 }
 
 type ProviderAuthorizor interface {
@@ -197,15 +210,13 @@ type ProviderRoleBasedAccessControl interface {
 		ctx context.Context,
 		req *AuthorizeRoleRequest,
 	) (
-		map[string]any, // Return any custom metadata the provider wants to store
+		*AuthorizeRoleResponse, // Return any custom metadata the provider wants to store
 		error,
 	)
 	RevokeRole(
 		ctx context.Context,
-		user *User,
-		role *Role,
-		metadata map[string]any, // Any metadata returned from AuthorizeRole
-	) (map[string]any, error)
+		req *RevokeRoleRequest, // Any metadata returned from AuthorizeRole
+	) (*RevokeRoleResponse, error)
 }
 
 type BaseProvider struct {
@@ -340,12 +351,15 @@ func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]
 func (p *BaseProvider) AuthorizeRole(
 	ctx context.Context,
 	req *AuthorizeRoleRequest,
-) (map[string]any, error) {
+) (*AuthorizeRoleResponse, error) {
 	// Default implementation does nothing
 	return nil, fmt.Errorf("the provider '%s' does not implement AuthorizeRole", p.GetProvider())
 }
 
-func (p *BaseProvider) RevokeRole(ctx context.Context, user *User, role *Role, metadata map[string]any) (map[string]any, error) {
+func (p *BaseProvider) RevokeRole(
+	ctx context.Context,
+	req *RevokeRoleRequest,
+) (*RevokeRoleResponse, error) {
 	// Default implementation does nothing
 	return nil, fmt.Errorf("the provider '%s' does not implement RevokeRole", p.GetProvider())
 }

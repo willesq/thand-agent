@@ -105,6 +105,12 @@ func (m *WorkflowManager) runCleanup(
 	workflowTask *models.WorkflowTask,
 	temporalService interface{ GetTaskQueue() string },
 ) error {
+
+	if approved := workflowTask.IsApproved(); approved == nil || !*approved {
+		logrus.Info("Workflow not approved, skipping cleanup activity.")
+		return nil
+	}
+
 	// Check if a user or role is associated with the workflow
 	elevationRequest, err := workflowTask.GetContextAsElevationRequest()
 	if err != nil || !elevationRequest.IsValid() {
