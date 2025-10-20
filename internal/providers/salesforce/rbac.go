@@ -48,7 +48,7 @@ func (p *salesForceProvider) AuthorizeRole(
 	profileName := strings.TrimPrefix(
 		role.Inherits[0], fmt.Sprintf("%s:", p.GetProvider()))
 
-	profileReesult, err := p.GetRole(ctx, profileName)
+	profileResult, err := p.GetRole(ctx, profileName)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get role profile: %w", err)
@@ -58,20 +58,20 @@ func (p *salesForceProvider) AuthorizeRole(
 	salesforceProfile := &models.AuthorizeRoleResponse{
 		Metadata: map[string]any{
 			"id":              salesforceUserId,
-			"current_profile": profileReesult.Id,
+			"current_profile": profileResult.Id,
 			"prior_profile":   currentProfileId,
 		},
 	}
 
 	// Check if user already has the target profile
-	if currentProfileId == profileReesult.Id {
+	if currentProfileId == profileResult.Id {
 		return salesforceProfile, nil // User already has the correct profile
 	}
 
 	// Update user's profile
 	userObj := client.SObject("User")
 	userObj.Set("Id", salesforceUserId)
-	userObj.Set("ProfileId", profileReesult.Id)
+	userObj.Set("ProfileId", profileResult.Id)
 
 	result := userObj.Update()
 	if result == nil {
