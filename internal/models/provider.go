@@ -150,7 +150,7 @@ type RoleRequest struct {
 // IsValid checks if any of the fields are nil
 // if they are then it returns false
 func (r *RoleRequest) IsValid() bool {
-	return r.User != nil && r.Role != nil && r.Duration != nil
+	return r.User != nil && r.Role != nil
 }
 
 func (r *RoleRequest) GetUser() *User {
