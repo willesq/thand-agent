@@ -5,67 +5,17 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/internal/workflows/functions"
 )
 
-const ThandRevokeFunctionName = "thand.revoke"
+const ThandRevokeTask = "revoke"
 
-// RevokeFunction implements access revocation functionality
-type revokeFunction struct {
-	config *config.Config
-	*functions.BaseFunction
-}
-
-// NewRevokeFunction creates a new revocation Function
-func NewRevokeFunction(config *config.Config) *revokeFunction {
-	return &revokeFunction{
-		config: config,
-		BaseFunction: functions.NewBaseFunction(
-			ThandRevokeFunctionName,
-			"Revokes access permissions and terminates sessions",
-			"1.0.0",
-		),
-	}
-}
-
-// GetRequiredParameters returns the required parameters for revocation
-func (t *revokeFunction) GetRequiredParameters() []string {
-	return []string{}
-}
-
-// GetOptionalParameters returns optional parameters with defaults
-func (t *revokeFunction) GetOptionalParameters() map[string]any {
-	return map[string]any{
-		"reason": "Manual revocation",
-	}
-}
-
-// ValidateRequest validates the input parameters
-func (t *revokeFunction) ValidateRequest(
+// ThandRevokeTask represents a custom task for Thand revocation
+func (t *thandTask) executeRevokeTask(
 	workflowTask *models.WorkflowTask,
-	call *model.CallFunction,
-	input any,
-) error {
-
-	req := workflowTask.GetContextAsMap()
-
-	if req == nil {
-		return errors.New("request cannot be nil")
-	}
-
-	return nil
-}
-
-// Execute performs the revocation logic
-func (t *revokeFunction) Execute(
-	workflowTask *models.WorkflowTask,
-	_ *model.CallFunction,
-	input any,
 ) (any, error) {
 
 	req := workflowTask.GetContextAsMap()

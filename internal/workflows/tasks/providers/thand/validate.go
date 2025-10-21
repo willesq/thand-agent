@@ -7,65 +7,34 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
-	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/internal/workflows/functions"
+	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
 )
 
-// ValidateFunction implements access request validation using LLM or user input
-type validateFunction struct {
-	config *config.Config
-	*functions.BaseFunction
-}
+const ThandValidateTask = "validate"
 
 var VALIDATOR_STATIC = "static"
 var VALIDATOR_LLM = "llm"
 
-// NewValidateFunction creates a new validation Function
-func NewValidateFunction(config *config.Config) *validateFunction {
-	return &validateFunction{
-		config: config,
-		BaseFunction: functions.NewBaseFunction(
-			"thand.validate",
-			"This validates the incoming access requests. To ensure the provided roles and providers are authorized.",
-			"1.0.0",
-		),
-	}
-}
-
-// GetRequiredParameters returns the required parameters for validation
-func (t *validateFunction) GetRequiredParameters() []string {
-	return []string{} // No parameters are strictly required
-}
-
-// GetOptionalParameters returns optional parameters with defaults
-func (t *validateFunction) GetOptionalParameters() map[string]any {
-	return map[string]any{
-		"validator": "strict",
-	}
-}
-
-// ValidateRequest validates the input parameters
-func (t *validateFunction) ValidateRequest(
+// ThandValidateTask represents a custom task for Thand validation
+func (t *thandTask) executeValidateTask(
 	workflowTask *models.WorkflowTask,
-	call *model.CallFunction,
-	input any,
-) error {
+	call *taskModel.ThandTask,
+	input any) (any, error) {
 
 	req := workflowTask.GetContextAsMap()
 
 	if req == nil {
-		return errors.New("request cannot be nil")
+		return nil, errors.New("request cannot be nil")
 	}
 
 	// The request should always map to an Elevate Request object
 
-	var elevateRequest models.ElevateRequest
+	var elevateRequest models.ElevateRequestInternal
 	if err := common.ConvertMapToInterface(req, &elevateRequest); err != nil {
-		return fmt.Errorf("failed to convert request: %w", err)
+		return nil, fmt.Errorf("failed to convert request: %w", err)
 	}
 
 	duration := strings.ToLower(elevateRequest.Duration)
@@ -73,11 +42,11 @@ func (t *validateFunction) ValidateRequest(
 	reason := elevateRequest.Reason
 
 	if role == nil {
-		return errors.New("role must be provided")
+		return nil, errors.New("role must be provided")
 	}
 
 	if len(reason) == 0 {
-		return errors.New("reason must be provided")
+		return nil, errors.New("reason must be provided")
 	}
 
 	if len(duration) == 0 {
@@ -100,21 +69,13 @@ func (t *validateFunction) ValidateRequest(
 
 	// Convert duration to ISO 8601 format from string
 	if _, err := elevateRequest.AsDuration(); err != nil {
-		return fmt.Errorf("invalid duration format: %s got: %w", duration, err)
+		return nil, fmt.Errorf("invalid duration format: %s got: %w", duration, err)
 	}
 
-	return nil
-}
-
-// Execute performs the validation logic
-func (t *validateFunction) Execute(
-	workflowTask *models.WorkflowTask,
-	call *model.CallFunction,
-	input any,
-) (any, error) {
-
 	ctx := workflowTask.GetContext()
+
 	with := call.With
+
 	validator, exists := with["validator"].(string)
 
 	// Validate validator type
@@ -125,14 +86,6 @@ func (t *validateFunction) Execute(
 	logrus.WithFields(logrus.Fields{
 		"validator": validator,
 	}).Info("Executing validation")
-
-	req := workflowTask.GetContextAsMap()
-
-	// Convert req to ElevateRequest
-	var elevateRequest models.ElevateRequestInternal
-	if err := common.ConvertMapToInterface(req, &elevateRequest); err != nil {
-		return nil, fmt.Errorf("failed to convert request: %w", err)
-	}
 
 	if len(elevateRequest.Providers) == 0 {
 		return nil, errors.New("no providers specified in elevate request")
@@ -198,9 +151,9 @@ func (t *validateFunction) Execute(
 }
 
 // executeLLMValidation performs AI/LLM-based validation
-func (t *validateFunction) executeLLMValidation(
+func (t *thandTask) executeLLMValidation(
 	ctx context.Context,
-	call *model.CallFunction,
+	call *taskModel.ThandTask,
 	elevateRequest models.ElevateRequestInternal,
 ) (map[string]any, error) {
 
@@ -224,9 +177,9 @@ func (t *validateFunction) executeLLMValidation(
 	return nil, nil
 }
 
-func (t *validateFunction) executeStaticValidation(
+func (t *thandTask) executeStaticValidation(
 	_ context.Context,
-	_ *model.CallFunction,
+	_ *taskModel.ThandTask,
 	elevateRequest models.ElevateRequestInternal,
 ) (map[string]any, error) {
 

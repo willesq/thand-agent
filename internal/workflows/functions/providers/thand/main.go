@@ -20,12 +20,7 @@ func (c *thandCollection) RegisterFunctions(r *functions.FunctionRegistry) {
 
 	// Register functions
 	r.RegisterFunctions(
-		NewApprovalsFunction(c.config),
-		NewAuthorizeFunction(c.config),
-		NewMonitorFunction(c.config),
 		NewNotifyFunction(c.config),
-		NewRevokeFunction(c.config),
-		NewValidateFunction(c.config),
 	)
 
 }

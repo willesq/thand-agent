@@ -11,6 +11,7 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/functions"
+	"github.com/thand-io/agent/internal/workflows/tasks"
 )
 
 func NewDefaultRunner(workflow *model.Workflow) (*ResumableWorkflowRunner, error) {
@@ -19,6 +20,9 @@ func NewDefaultRunner(workflow *model.Workflow) (*ResumableWorkflowRunner, error
 
 	// create functions registry
 	functions := functions.NewFunctionRegistry(config)
+
+	// create tasks registry
+	taskRegistry := tasks.NewTaskRegistry(config)
 
 	wkflw, err := models.NewWorkflowContext(&models.Workflow{
 		Name:        workflow.Document.Name,
@@ -31,7 +35,7 @@ func NewDefaultRunner(workflow *model.Workflow) (*ResumableWorkflowRunner, error
 		return nil, err
 	}
 
-	return NewResumableRunner(config, functions, wkflw), nil
+	return NewResumableRunner(config, functions, taskRegistry, wkflw), nil
 }
 
 // runWorkflowTest is a reusable test function for workflows

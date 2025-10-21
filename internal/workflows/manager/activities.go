@@ -8,8 +8,8 @@ import (
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	models "github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
+	"github.com/thand-io/agent/internal/workflows/tasks/providers/thand"
 	"go.temporal.io/sdk/activity"
 )
 

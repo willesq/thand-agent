@@ -51,6 +51,7 @@ func (r *ResumableWorkflowRunner) CloneWithContext(ctx context.Context) *Resumab
 	return &ResumableWorkflowRunner{
 		config:    r.config,
 		functions: r.functions,
+		tasks:     r.tasks,
 		// interpolator: internalExpr.NewStringInterpolator(),
 		workflowTask: wf,
 	}
@@ -69,11 +70,11 @@ func (m *ResumableWorkflowRunner) GetWorkflow() *model.Workflow {
 }
 
 // NewResumableRunner creates a new resumable workflow runner
-func NewResumableRunner(config *config.Config, functions *functions.FunctionRegistry, workflow *models.WorkflowTask) *ResumableWorkflowRunner {
+func NewResumableRunner(config *config.Config, functions *functions.FunctionRegistry, tasks *tasks.TaskRegistry, workflow *models.WorkflowTask) *ResumableWorkflowRunner {
 	return &ResumableWorkflowRunner{
-		config:    config,
-		functions: functions,
-		// interpolator: internalExpr.NewStringInterpolator(),
+		config:       config,
+		functions:    functions,
+		tasks:        tasks,
 		workflowTask: workflow,
 	}
 }

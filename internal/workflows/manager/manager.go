@@ -13,12 +13,13 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	models "github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/functions"
-	"github.com/thand-io/agent/internal/workflows/functions/providers/aws"
-	"github.com/thand-io/agent/internal/workflows/functions/providers/gcp"
-	"github.com/thand-io/agent/internal/workflows/functions/providers/slack"
-	"github.com/thand-io/agent/internal/workflows/functions/providers/thand"
+	providerAws "github.com/thand-io/agent/internal/workflows/functions/providers/aws"
+	providerGcp "github.com/thand-io/agent/internal/workflows/functions/providers/gcp"
+	providerSlack "github.com/thand-io/agent/internal/workflows/functions/providers/slack"
+	providerThand "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	"github.com/thand-io/agent/internal/workflows/runner"
 	"github.com/thand-io/agent/internal/workflows/tasks"
+	taskThand "github.com/thand-io/agent/internal/workflows/tasks/providers/thand"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 )
@@ -40,13 +41,18 @@ func NewWorkflowManager(cfg *config.Config) *WorkflowManager {
 	}
 
 	// Register all custom tasks
+	for _, task := range []tasks.TaskCollection{
+		taskThand.NewThandCollection(cfg),
+	} {
+		task.RegisterTasks(wm.tasks)
+	}
 
 	// Register all built-in function providers
 	for _, provider := range []functions.FunctionCollection{
-		thand.NewThandCollection(cfg),
-		slack.NewSlackCollection(cfg),
-		gcp.NewGCPCollection(cfg),
-		aws.NewAWSCollection(cfg),
+		providerThand.NewThandCollection(cfg),
+		providerSlack.NewSlackCollection(cfg),
+		providerGcp.NewGCPCollection(cfg),
+		providerAws.NewAWSCollection(cfg),
 	} {
 		provider.RegisterFunctions(wm.functions)
 	}
@@ -323,7 +329,7 @@ func (m *WorkflowManager) ResumeWorkflowTask(
 // createCustomRunner creates a workflow runner that can handle custom functions
 func (m *WorkflowManager) createCustomRunner(workflow *models.WorkflowTask) (*runner.ResumableWorkflowRunner, error) {
 	// Create our custom resumable runner instead of the default runner
-	return runner.NewResumableRunner(m.config, m.functions, workflow), nil
+	return runner.NewResumableRunner(m.config, m.functions, m.tasks, workflow), nil
 }
 
 // RegisterCustomFunction allows external code to register additional functions

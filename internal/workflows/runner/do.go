@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	swctx "github.com/serverlessworkflow/sdk-go/v3/impl/ctx"
@@ -198,11 +197,10 @@ func (r *ResumableWorkflowRunner) dispatchTaskExecution(
 	input any,
 ) (any, error) {
 	taskName := task.Key
-	taskType := reflect.TypeOf(task.Task)
 
 	// First, check for custom handlers
-	if handler, exists := r.tasks.GetTaskHandler(taskType); exists {
-		return handler(r.GetWorkflowTask(), task, input)
+	if handler, exists := r.tasks.GetTaskHandler(task); exists {
+		return handler.Execute(r.GetWorkflowTask(), task, input)
 	}
 
 	switch t := task.Task.(type) {
