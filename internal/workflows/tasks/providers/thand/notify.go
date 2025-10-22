@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
@@ -35,6 +36,7 @@ type NotifierRequest struct {
 
 func (t *thandTask) executeNotifyTask(
 	workflowTask *models.WorkflowTask,
+	taskName string,
 	call *taskModel.ThandTask) (any, error) {
 
 	req := workflowTask.GetContextAsMap()
@@ -134,11 +136,22 @@ func (t *thandTask) executeNotifyTask(
 
 		temporalContext := workflowTask.GetTemporalContext()
 
+		serviceClient := t.config.GetServices()
+
+		ao := workflow.ActivityOptions{
+			TaskQueue:           serviceClient.GetTemporal().GetTaskQueue(),
+			StartToCloseTimeout: time.Minute * 5,
+		}
+		aoctx := workflow.WithActivityOptions(temporalContext, ao)
+
 		// Use Temporal activity to send notification
 		err = workflow.ExecuteActivity(
-			temporalContext,
+			aoctx,
+			thandFunction.ThandNotifyFunction,
+
+			// args
 			workflowTask,
-			workflowTask.GetTaskName(),
+			taskName,
 			model.CallFunction{
 				Call: thandFunction.ThandNotifyFunction,
 				With: call.With,

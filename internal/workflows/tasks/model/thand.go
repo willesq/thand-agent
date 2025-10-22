@@ -17,11 +17,9 @@ func (f *ThandTask) GetBase() *model.TaskBase {
 
 func init() {
 
-	thandTask := ThandTask{}
-
 	// and register with serverlessworkflows
 	err := model.RegisterTask(ThandTaskName, model.TaskConstructor(func() model.Task {
-		return &thandTask
+		return &ThandTask{} // Create a new instance for each task
 	}))
 
 	if err != nil {

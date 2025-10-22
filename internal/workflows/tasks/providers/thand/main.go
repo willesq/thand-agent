@@ -63,6 +63,7 @@ func (t *thandTask) Execute(
 		return nil, fmt.Errorf("task is nil")
 	}
 
+	taskName := task.Key
 	thandTask, ok := task.Task.(*taskModel.ThandTask)
 
 	if !ok {
@@ -70,16 +71,16 @@ func (t *thandTask) Execute(
 	}
 
 	switch thandTask.Thand {
-	case ThandApprovalsTask:
-		return t.executeApprovalsTask(workflowTask, thandTask)
+	case ThandAuthorizeTask:
+		return t.executeAuthorizeTask(workflowTask, taskName, thandTask)
 	case ThandValidateTask:
 		return t.executeValidateTask(workflowTask, thandTask, input)
 	case ThandNotifyTask:
-		return t.executeNotifyTask(workflowTask, thandTask)
+		return t.executeNotifyTask(workflowTask, taskName, thandTask)
 	case ThandRevokeTask:
 		return t.executeRevokeTask(workflowTask)
 	case ThandMonitorTask:
-		return t.executeMonitorTask(workflowTask, thandTask, input)
+		return t.executeMonitorTask(workflowTask, taskName, thandTask, input)
 	default:
 		return nil, fmt.Errorf("unknown thand task type: %s", thandTask.Thand)
 	}

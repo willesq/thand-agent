@@ -8,16 +8,18 @@ import (
 	"time"
 
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/workflow"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
 )
 
-const ThandApprovalsTask = "approvals"
+const ThandAuthorizeTask = "authorize"
 
-// ThandApprovalsTask represents a custom task for Thand approvals
+// ThandAuthorizeTask represents a custom task for Thand authorizations
 
 type ThandAuthorizeRequest struct {
 	Revocation string `json:"revocation"` // This is the state to request the revocation
@@ -27,8 +29,9 @@ func (r *ThandAuthorizeRequest) IsValid() bool {
 	return len(r.Revocation) > 0
 }
 
-func (t *thandTask) executeApprovalsTask(
+func (t *thandTask) executeAuthorizeTask(
 	workflowTask *models.WorkflowTask,
+	taskName string,
 	call *taskModel.ThandTask) (any, error) {
 
 	elevateRequest, authRequest, err := t.validateAndParseRequests(workflowTask, call)
@@ -38,12 +41,13 @@ func (t *thandTask) executeApprovalsTask(
 
 	isApproved := workflowTask.IsApproved()
 
+	// TODO: Check the internal state to see if already approved
 	if isApproved != nil && *isApproved {
 		modelOutput := t.buildBasicModelOutput(elevateRequest)
 		return &modelOutput, nil
 	}
 
-	return t.executeAuthorization(workflowTask, elevateRequest, authRequest)
+	return t.executeAuthorization(workflowTask, taskName, elevateRequest, authRequest)
 }
 
 // validateAndParseRequests validates and parses the incoming requests
@@ -92,6 +96,7 @@ func (t *thandTask) buildBasicModelOutput(elevateRequest *models.ElevateRequestI
 // executeAuthorization performs the main authorization workflow
 func (t *thandTask) executeAuthorization(
 	workflowTask *models.WorkflowTask,
+	taskName string,
 	elevateRequest *models.ElevateRequestInternal,
 	authRequest *ThandAuthorizeRequest,
 ) (any, error) {
@@ -109,65 +114,97 @@ func (t *thandTask) executeAuthorization(
 		"duration":  duration,
 	}).Info("Executing authorization logic")
 
-	// First lets call the provider to execute the role request.
-	primaryProvider := elevateRequest.Providers[0]
-
-	providerCall, err := t.config.GetProviderByName(primaryProvider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get provider: %w", err)
-	}
-
-	modelOutput, err := t.validateRoleAndBuildOutput(providerCall, *elevateRequest)
-	if err != nil {
-		return nil, err
-	}
+	// Right we need to loop over all the role providers and identities in order to
+	// authorize them all.
 
 	authorizedAt := time.Now().UTC()
 	revocationDate := authorizedAt.Add(duration)
 
-	maps.Copy(modelOutput, map[string]any{
-		"authorized_at": authorizedAt.Format(time.RFC3339),
-		"revocation_at": revocationDate.Format(time.RFC3339),
-	})
+	modelOutput := map[string]any{}
+
+	for _, providerName := range elevateRequest.Providers {
+
+		providerCall, err := t.config.GetProviderByName(providerName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get provider: %w", err)
+		}
+
+		modelOutput, err := t.validateRoleAndBuildOutput(providerCall, *elevateRequest)
+		if err != nil {
+			return nil, err
+		}
+
+		maps.Copy(modelOutput, map[string]any{
+			"authorized_at": authorizedAt.Format(time.RFC3339),
+			"revocation_at": revocationDate.Format(time.RFC3339),
+		})
+
+		durationParsed, err := common.ValidateDuration(elevateRequest.Duration)
+
+		if err != nil {
+			return nil, fmt.Errorf("invalid duration format: %w", err)
+		}
+
+		temporalContext := workflowTask.GetTemporalContext()
+
+		serviceClient := t.config.GetServices()
+
+		ao := workflow.ActivityOptions{
+			TaskQueue:           serviceClient.GetTemporal().GetTaskQueue(),
+			StartToCloseTimeout: time.Minute * 5,
+		}
+		aoctx := workflow.WithActivityOptions(temporalContext, ao)
+
+		// Use Temporal activity to send notification
+		err = workflow.ExecuteActivity(
+			aoctx,
+			thandFunction.ThandAuthorizeFunction,
+
+			// args
+			workflowTask,
+			taskName,
+			model.CallFunction{
+				Call: thandFunction.ThandNotifyFunction,
+				With: call.With,
+			},
+			elevateRequest,
+		).Get(temporalContext, nil)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to send notification: %w", err)
+		}
+
+		authOut, err := providerCall.GetClient().AuthorizeRole(
+			workflowTask.GetContext(), &models.AuthorizeRoleRequest{
+				RoleRequest: &models.RoleRequest{
+					User:     elevateRequest.User,
+					Role:     elevateRequest.Role,
+					Duration: &durationParsed,
+				},
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to authorize user: %w", err)
+		}
+
+		maps.Copy(modelOutput, map[string]any{
+			"authorizations": map[string]any{
+				elevateRequest.User.GetIdentity(): authOut,
+			},
+		})
+
+		maps.Copy(modelOutput, map[string]any{
+			models.VarsContextApproved: true,
+		})
+
+	}
+
+	// Shcedule revocation if revocation state provided
 
 	if err := t.scheduleRevocation(workflowTask, *authRequest, revocationDate); err != nil {
 		logrus.WithError(err).Error("Failed to schedule revocation")
 		return nil, fmt.Errorf("failed to schedule revocation: %w", err)
 	}
-
-	durationParsed, err := common.ValidateDuration(elevateRequest.Duration)
-
-	if err != nil {
-		return nil, fmt.Errorf("invalid duration format: %w", err)
-	}
-
-	authOut, err := providerCall.GetClient().AuthorizeRole(
-		workflowTask.GetContext(), &models.AuthorizeRoleRequest{
-			RoleRequest: &models.RoleRequest{
-				User:     elevateRequest.User,
-				Role:     elevateRequest.Role,
-				Duration: &durationParsed,
-			},
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to authorize user: %w", err)
-	}
-
-	maps.Copy(modelOutput, map[string]any{
-		"authorizations": map[string]any{
-			elevateRequest.User.GetIdentity(): authOut,
-		},
-	})
-
-	maps.Copy(modelOutput, map[string]any{
-		models.VarsContextApproved: true,
-	})
-
-	logrus.WithFields(logrus.Fields{
-		"authorized_at": authorizedAt.Format(time.RFC3339),
-		"revocation_at": revocationDate.Format(time.RFC3339),
-	}).Info("Scheduled revocation")
 
 	return modelOutput, nil
 }
@@ -217,10 +254,8 @@ func (t *thandTask) scheduleRevocation(
 	newTask := workflowTask.Clone().(*models.WorkflowTask)
 	newTask.SetEntrypoint(revocationTask)
 
-	serviceClient := t.config.GetServices()
-
 	// If we have a temporal client, we can use that to schedule the revocation
-	if serviceClient.HasTemporal() && serviceClient.GetTemporal().HasClient() {
+	if workflowTask.HasTemporalContext() {
 
 		signalName := models.TemporalResumeSignalName
 		var signalInput any
@@ -239,20 +274,12 @@ func (t *thandTask) scheduleRevocation(
 			signalInput = newTask
 		}
 
-		temporalClient := serviceClient.GetTemporal().GetClient()
-
-		err := temporalClient.SignalWorkflow(
-			workflowTask.GetContext(),
+		workflow.SignalExternalWorkflow(workflowTask.GetTemporalContext(),
 			workflowTask.WorkflowID,
 			models.TemporalEmptyRunId,
 			signalName,
 			signalInput,
 		)
-
-		if err != nil {
-			logrus.WithError(err).Error("Failed to signal workflow for revocation")
-			return fmt.Errorf("failed to signal workflow: %w", err)
-		}
 
 		logrus.WithFields(logrus.Fields{
 			"task": newTask.GetTaskName(),

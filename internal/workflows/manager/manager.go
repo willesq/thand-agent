@@ -249,7 +249,7 @@ func (m *WorkflowManager) ResumeWorkflow(
 		err := m.Hydrate(result)
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to hydrate workflow task: %w", err)
+			return nil, fmt.Errorf("failed to hydrate workflow task: %w for resumption", err)
 		}
 
 		temporalService := serviceClient.GetTemporal()
@@ -295,7 +295,7 @@ func (m *WorkflowManager) ResumeWorkflowTask(
 	err := m.Hydrate(result)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to hydrate workflow task: %w", err)
+		return nil, fmt.Errorf("failed to hydrate resumed workflow task: %w", err)
 	}
 
 	// Set status to pending if not already set
