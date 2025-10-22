@@ -2,6 +2,7 @@ package thand
 
 import (
 	"github.com/serverlessworkflow/sdk-go/v3/model"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
@@ -16,8 +17,7 @@ func (t *thandTask) executeMonitorTask(
 	call *taskModel.ThandTask,
 	input any) (any, error) {
 
-	// Placeholder for monitoring logic
-	// Implement the actual monitoring logic here
+	logrus.Infof("Executing Thand monitor task: %s", taskName)
 
 	return runner.ListenTaskHandler(workflowTask, taskName, &model.ListenTask{
 		Listen: model.ListenTaskConfiguration{
