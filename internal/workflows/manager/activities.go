@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 	models "github.com/thand-io/agent/internal/models"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
-	"github.com/thand-io/agent/internal/workflows/tasks/providers/thand"
 	"go.temporal.io/sdk/activity"
 )
 
@@ -78,54 +77,6 @@ func (m *WorkflowManager) registerActivities() error {
 			Name: fn,
 		})
 	}
-
-	/*
-		Cleanup Activity
-		This activity is responsible for cleaning up resources after a workflow execution.
-		It checks for an elevation request in the workflow context and revokes any roles assigned
-		during the workflow execution.
-	*/
-	worker.RegisterActivityWithOptions(func(
-		ctx context.Context,
-		workflowTask *models.WorkflowTask,
-	) (any, error) {
-
-		if workflowTask == nil {
-			return nil, fmt.Errorf("workflow task is nil")
-		}
-
-		log := activity.GetLogger(ctx)
-		log.Info("Executing cleanup activity", "cleanupID", workflowTask.WorkflowID)
-
-		err := m.Hydrate(workflowTask)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to hydrate workflow task: %w", err)
-		}
-
-		if approved := workflowTask.IsApproved(); approved == nil || !*approved {
-			logrus.Info("Workflow not approved, skipping cleanup activity.")
-			return nil, nil
-		}
-
-		output, err := thand.RevokeAuthorization(
-			m.config,
-			workflowTask,
-			workflowTask.GetContextAsMap(),
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to revoke authorization during cleanup: %w", err)
-		}
-
-		// Perform any necessary cleanup here
-		log.Info("Cleanup activity completed successfully", "cleanupID", workflowTask.WorkflowID)
-
-		return output, nil
-
-	}, activity.RegisterOptions{
-		Name: models.TemporalCleanupActivityName,
-	})
 
 	/*
 		HTTP Activity

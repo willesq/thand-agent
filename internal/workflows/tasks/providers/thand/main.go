@@ -78,7 +78,7 @@ func (t *thandTask) Execute(
 	case ThandNotifyTask:
 		return t.executeNotifyTask(workflowTask, taskName, thandTask)
 	case ThandRevokeTask:
-		return t.executeRevokeTask(workflowTask)
+		return t.executeRevokeTask(workflowTask, taskName, thandTask)
 	case ThandMonitorTask:
 		return t.executeMonitorTask(workflowTask, taskName, thandTask, input)
 	default:

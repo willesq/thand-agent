@@ -3,12 +3,16 @@ package thand
 import (
 	"errors"
 	"fmt"
-	"maps"
+	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
+	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
+	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
+	"go.temporal.io/sdk/workflow"
 )
 
 const ThandRevokeTask = "revoke"
@@ -16,100 +20,250 @@ const ThandRevokeTask = "revoke"
 // ThandRevokeTask represents a custom task for Thand revocation
 func (t *thandTask) executeRevokeTask(
 	workflowTask *models.WorkflowTask,
-) (any, error) {
+	taskName string,
+	call *taskModel.ThandTask) (any, error) {
 
-	req := workflowTask.GetContextAsMap()
+	elevateRequest, err := workflowTask.GetContextAsElevationRequest()
 
-	if req == nil {
-		return nil, errors.New("request cannot be nil")
+	if err != nil {
+		return nil, err
 	}
 
-	return RevokeAuthorization(t.config, workflowTask, req)
-
+	return t.executeRevocationTask(workflowTask, taskName, call, elevateRequest)
 }
 
-func RevokeAuthorization(
-	config *config.Config,
+// revokeResult holds the result of a revocation operation
+type revokeResult struct {
+	Identity string
+	Output   any
+	Error    error
+}
+
+// revokeTask represents a revocation task with all necessary context
+type revokeTask struct {
+	ProviderName      string
+	Identity          string
+	RevokeReq         models.RevokeRoleRequest
+	AuthorizeResponse *models.AuthorizeRoleResponse
+}
+
+// temporalRevokeResult represents the result of a revocation operation for temporal communication
+type temporalRevokeResult struct {
+	Index    int
+	Identity string
+	Output   any
+	Err      error
+}
+
+func (t *thandTask) executeRevocationTask(
 	workflowTask *models.WorkflowTask,
-	req map[string]any,
+	taskName string,
+	call *taskModel.ThandTask,
+	elevateRequest *models.ElevateRequestInternal,
 ) (any, error) {
-
-	// Right - we need to take the role, policy and provider and make the request to
-	// the provider to elevate.
-
-	var elevateRequest models.ElevateRequestInternal
-	if err := common.ConvertMapToInterface(req, &elevateRequest); err != nil {
-		return nil, fmt.Errorf("failed to convert request: %w", err)
-	}
 
 	if !elevateRequest.IsValid() {
 		return nil, errors.New("invalid elevate request")
 	}
 
-	user := elevateRequest.User
-	role := elevateRequest.Role
-	providers := elevateRequest.Providers
 	duration, err := elevateRequest.AsDuration()
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to get duration: %w", err)
 	}
 
-	// TODO use the duration to revoke the request
-
-	logrus.WithFields(logrus.Fields{
-		"user":     user,
-		"role":     role,
-		"provider": providers,
-		"duration": duration,
-	}).Info("Executing authorization logic")
-
-	// First lets call the provider to execute the role request.
-	primaryProvider := elevateRequest.Providers[0]
-
-	providerCall, err := config.GetProviderByName(primaryProvider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get provider: %w", err)
-	}
+	revokedAt := time.Now().UTC()
 
 	modelOutput := map[string]any{
-		"revoked": true,
+		"revoked":    true,
+		"revoked_at": revokedAt.Format(time.RFC3339),
 	}
 
-	var authorizeResponse *models.AuthorizeRoleResponse
+	// Collect all revocation tasks
+	var revokeTasks []revokeTask
 
-	// See if we can hydrate the authorization response
-	if authorizationsMap, ok := req["authorizations"].(map[string]any); ok {
-		if identityMap, ok := authorizationsMap[user.GetIdentity()].(map[string]any); ok {
-			authorizeResponse = &models.AuthorizeRoleResponse{}
-			if err := common.ConvertMapToInterface(identityMap, authorizeResponse); err != nil {
-				return nil, fmt.Errorf("failed to convert authorize response: %w", err)
+	for _, providerName := range elevateRequest.Providers {
+		for _, identity := range elevateRequest.Identities {
+			var authorizeResponse *models.AuthorizeRoleResponse
+
+			// Try to hydrate the authorization response for this identity
+			req := workflowTask.GetContextAsMap()
+			if req != nil {
+				if authorizationsMap, ok := req["authorizations"].(map[string]any); ok {
+					if identityMap, ok := authorizationsMap[identity].(map[string]any); ok {
+						authorizeResponse = &models.AuthorizeRoleResponse{}
+						if err := common.ConvertMapToInterface(identityMap, authorizeResponse); err != nil {
+							logrus.WithError(err).WithField("identity", identity).Warn("Failed to convert authorize response")
+							authorizeResponse = nil
+						}
+					}
+				}
 			}
+
+			revokeReq := models.RevokeRoleRequest{
+				RoleRequest: &models.RoleRequest{
+					User: &models.User{
+						Email:  identity,
+						Source: "thand",
+					},
+					Role:     elevateRequest.Role,
+					Duration: &duration,
+				},
+				AuthorizeRoleResponse: authorizeResponse,
+			}
+
+			revokeTasks = append(revokeTasks, revokeTask{
+				ProviderName:      providerName,
+				Identity:          identity,
+				RevokeReq:         revokeReq,
+				AuthorizeResponse: authorizeResponse,
+			})
+
+			logrus.WithFields(logrus.Fields{
+				"user":     identity,
+				"role":     elevateRequest.Role.GetName(),
+				"provider": providerName,
+				"duration": duration,
+			}).Info("Preparing revocation logic")
 		}
 	}
 
-	revokeOut, err := providerCall.GetClient().RevokeRole(
-		workflowTask.GetContext(), &models.RevokeRoleRequest{
-			RoleRequest: &models.RoleRequest{
-				User: user,
-				Role: role,
-			},
-			AuthorizeRoleResponse: authorizeResponse,
-		},
-	)
+	var revokeResults []revokeResult
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to revoke user: %w", err)
+	if workflowTask.HasTemporalContext() {
+		revokeResults, err = executeTemporalRevokeParallel(workflowTask, taskName, call, revokeTasks)
+	} else {
+		revokeResults, err = executeGoRevokeParallel(t.config, workflowTask, revokeTasks)
 	}
 
-	// If the revoke returned any output, merge it into modelOutput
-	if revokeOut != nil {
-		maps.Copy(modelOutput, map[string]any{
-			"revocations": map[string]any{
-				user.GetIdentity(): revokeOut,
-			},
+	if err != nil {
+		return nil, err
+	}
+
+	// Process results
+	revocations := make(map[string]any)
+	hasErrors := false
+
+	for _, result := range revokeResults {
+		if result.Error != nil {
+			logrus.WithError(result.Error).WithField("identity", result.Identity).Error("Revocation failed")
+			hasErrors = true
+			continue
+		}
+		revocations[result.Identity] = result.Output
+	}
+
+	if hasErrors && len(revocations) == 0 {
+		return nil, fmt.Errorf("all revocation requests failed")
+	}
+
+	modelOutput["revocations"] = revocations
+
+	return &modelOutput, nil
+}
+
+// executeTemporalRevokeParallel executes revocation tasks in parallel using Temporal
+func executeTemporalRevokeParallel(
+	workflowTask *models.WorkflowTask,
+	taskName string,
+	call *taskModel.ThandTask,
+	revokeTasks []revokeTask,
+) ([]revokeResult, error) {
+
+	temporalContext := workflowTask.GetTemporalContext()
+
+	ao := workflow.ActivityOptions{
+		StartToCloseTimeout: time.Minute * 5,
+	}
+	aoctx := workflow.WithActivityOptions(temporalContext, ao)
+
+	// Create channel and results slice
+	results := make([]revokeResult, len(revokeTasks))
+	resultCh := workflow.NewChannel(temporalContext)
+
+	// Start all tasks in parallel using workflow.Go
+	for i, task := range revokeTasks {
+		taskIndex := i
+		revokeTask := task
+
+		workflow.Go(temporalContext, func(ctx workflow.Context) {
+			var revokeOut any
+
+			thandRevokeReq := thandFunction.ThandRevokeRequest{
+				Provider:          revokeTask.ProviderName,
+				RevokeRoleRequest: revokeTask.RevokeReq,
+			}
+
+			err := workflow.ExecuteActivity(
+				aoctx,
+				thandFunction.ThandRevokeFunction,
+				workflowTask,
+				"revoke", // taskName
+				call,
+				thandRevokeReq,
+			).Get(ctx, &revokeOut)
+
+			// Send result through channel
+			resultCh.Send(ctx, temporalRevokeResult{
+				Index:    taskIndex,
+				Identity: revokeTask.Identity,
+				Output:   revokeOut,
+				Err:      err,
+			})
 		})
 	}
 
-	return &modelOutput, nil
+	// Collect all results
+	for range revokeTasks {
+		var result temporalRevokeResult
+		resultCh.Receive(temporalContext, &result)
+		results[result.Index] = revokeResult{
+			Identity: result.Identity,
+			Output:   result.Output,
+			Error:    result.Err,
+		}
+	}
+
+	return results, nil
+}
+
+// executeGoRevokeParallel executes revocation tasks in parallel using Go routines and WaitGroup
+func executeGoRevokeParallel(
+	config *config.Config,
+	workflowTask *models.WorkflowTask,
+	revokeTasks []revokeTask,
+) ([]revokeResult, error) {
+
+	results := make([]revokeResult, len(revokeTasks))
+	var wg sync.WaitGroup
+
+	for i, task := range revokeTasks {
+		wg.Add(1)
+		go func(index int, revokeTask revokeTask) {
+			defer wg.Done()
+
+			providerCall, err := config.GetProviderByName(revokeTask.ProviderName)
+			if err != nil {
+				results[index] = revokeResult{
+					Identity: revokeTask.Identity,
+					Output:   nil,
+					Error:    fmt.Errorf("failed to get provider: %w", err),
+				}
+				return
+			}
+
+			revokeOut, err := providerCall.GetClient().RevokeRole(
+				workflowTask.GetContext(), &revokeTask.RevokeReq,
+			)
+
+			results[index] = revokeResult{
+				Identity: revokeTask.Identity,
+				Output:   revokeOut,
+				Error:    err,
+			}
+		}(i, task)
+	}
+
+	wg.Wait()
+
+	return results, nil
 }
