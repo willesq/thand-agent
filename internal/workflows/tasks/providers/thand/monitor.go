@@ -62,6 +62,7 @@ func (t *thandTask) executeMonitorTask(
 			if levelStr, ok := level.(string); ok && levelStr == "critical" {
 				logrus.Warnf("Critical alert received in Thand monitor task: %s", taskName)
 				// Handle critical alert (e.g., escalate, notify, etc.)
+				return alertEvent, nil
 			}
 		}
 	}
