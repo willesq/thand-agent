@@ -149,7 +149,6 @@ func (m *WorkflowManager) executeWorkflow(
 	logrus.WithFields(logrus.Fields{
 		"workflow_name": workflowDsl.Document.Name,
 		"request":       request,
-		"functions":     len(workflowDsl.Use.Functions),
 	}).Info("Starting workflow execution")
 
 	authProvider, foundAuthProvider := m.config.GetProviderByName(request.Authenticator)

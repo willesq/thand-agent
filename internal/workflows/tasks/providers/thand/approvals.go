@@ -151,7 +151,7 @@ func (t *thandTask) executeApprovalsTask(
 				{
 					"case2": model.SwitchCase{
 						When: &model.RuntimeExpression{
-							Value: fmt.Sprintf("[$context.approvals[] | select(.approved == true)] | length > %d", threshold),
+							Value: fmt.Sprintf("[$context.approvals[] | select(.approved == true)] | length >= %d", threshold),
 						},
 						Then: &model.FlowDirective{
 							Value: "authorize",
