@@ -132,7 +132,9 @@ func (t *thandTask) executeApprovalsTask(
 	// Create the switch task to handle approval or rejection
 	flowDirective, err := runner.SwitchTaskHandler(
 		workflowTask,
-		approvalData, // make it use the context
+		map[string]any{
+			"approvals": approvals,
+		},
 		fmt.Sprintf("%s.switch", taskName),
 		&model.SwitchTask{
 			Switch: []model.SwitchItem{
