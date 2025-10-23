@@ -27,7 +27,7 @@ type NotifyRequest struct {
 	Notifier  thandFunction.NotifierRequest `json:"notifier"`
 
 	// Internal use only: entrypoint for resuming workflow
-	Entrypoint string `json:"-"`
+	Entrypoint string `json:"entrypoint"`
 }
 
 func (n *NotifyRequest) IsValid() bool {
@@ -45,8 +45,9 @@ func (n *NotifyRequest) IsValid() bool {
 
 func (n *NotifyRequest) AsMap() map[string]any {
 	return map[string]any{
-		"approvals": n.Approvals,
-		"notifier":  n.Notifier.AsMap(),
+		"approvals":  n.Approvals,
+		"notifier":   n.Notifier.AsMap(),
+		"entrypoint": n.Entrypoint,
 	}
 }
 

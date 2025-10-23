@@ -1,6 +1,9 @@
 package thand
 
 import (
+	"fmt"
+
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
@@ -17,9 +20,14 @@ func (t *thandTask) executeMonitorTask(
 	call *taskModel.ThandTask,
 	input any) (any, error) {
 
+	if !workflowTask.HasTemporalContext() {
+		// Only supported within Temporal workflows
+		return nil, fmt.Errorf("Monitoring is only supported with temporal")
+	}
+
 	logrus.Infof("Executing Thand monitor task: %s", taskName)
 
-	return runner.ListenTaskHandler(workflowTask, taskName, &model.ListenTask{
+	thandAlert, err := runner.ListenTaskHandler(workflowTask, taskName, &model.ListenTask{
 		Listen: model.ListenTaskConfiguration{
 			To: &model.EventConsumptionStrategy{
 				Any: []*model.EventFilter{
@@ -32,4 +40,34 @@ func (t *thandTask) executeMonitorTask(
 			},
 		},
 	}, input)
+
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to listen for Thand alert")
+
+		return nil, err
+	}
+
+	logrus.Infof("Received Thand alert in monitor task: %s", taskName)
+
+	var alertData map[string]any
+
+	if alertEvent, ok := thandAlert.(*cloudevents.Event); ok {
+
+		alertEvent.DataAs(&alertData)
+
+		if level, exists := alertData["level"]; exists {
+
+			if levelStr, ok := level.(string); ok && levelStr == "critical" {
+				logrus.Warnf("Critical alert received in Thand monitor task: %s", taskName)
+				// Handle critical alert (e.g., escalate, notify, etc.)
+			}
+		}
+	}
+
+	// Keep llistening for more alerts
+	return &model.FlowDirective{
+		Value: taskName, // loop back to await more approvals
+	}, nil
 }
