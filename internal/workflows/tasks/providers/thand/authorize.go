@@ -165,7 +165,10 @@ func (t *thandTask) executeAuthorization(
 	}
 
 	if err != nil {
+
+		logrus.WithError(err).Error("Failed to execute authorization tasks")
 		return nil, err
+
 	}
 
 	// Process results
@@ -185,14 +188,14 @@ func (t *thandTask) executeAuthorization(
 		return nil, fmt.Errorf("all authorization requests failed")
 	}
 
-	modelOutput["authorizations"] = authorizations
-	modelOutput[models.VarsContextApproved] = true
-
 	// Schedule revocation if revocation state provided
 	if err := t.scheduleRevocation(workflowTask, "", revocationDate); err != nil {
 		logrus.WithError(err).Error("Failed to schedule revocation")
 		return nil, fmt.Errorf("failed to schedule revocation: %w", err)
 	}
+
+	workflowTask.SetContextKeyValue(models.VarsContextApproved, true)
+	workflowTask.SetContextKeyValue("authorizations", authorizations)
 
 	return modelOutput, nil
 }

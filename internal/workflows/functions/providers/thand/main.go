@@ -22,6 +22,7 @@ func (c *thandCollection) RegisterFunctions(r *functions.FunctionRegistry) {
 	r.RegisterFunctions(
 		NewNotifyFunction(c.config),
 		NewAuthorizeFunction(c.config),
+		NewRevokeFunction(c.config),
 	)
 
 }

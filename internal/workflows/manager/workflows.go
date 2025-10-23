@@ -34,7 +34,7 @@ func (m *WorkflowManager) registerWorkflows() error {
 
 	// Register the primary workflow
 	worker.RegisterWorkflowWithOptions(
-		m.createPrimaryWorkflowHandler(temporalService),
+		m.createPrimaryWorkflowHandler(),
 		workflow.RegisterOptions{
 			Name: models.TemporalExecuteElevationWorkflowName,
 		},
@@ -44,9 +44,7 @@ func (m *WorkflowManager) registerWorkflows() error {
 }
 
 // createPrimaryWorkflowHandler creates the main workflow handler function
-func (m *WorkflowManager) createPrimaryWorkflowHandler(
-	temporalService interface{ GetTaskQueue() string },
-) func(workflow.Context, *models.WorkflowTask) (*models.WorkflowTask, error) {
+func (m *WorkflowManager) createPrimaryWorkflowHandler() func(workflow.Context, *models.WorkflowTask) (*models.WorkflowTask, error) {
 	return func(rootCtx workflow.Context, workflowTask *models.WorkflowTask) (outputTask *models.WorkflowTask, outputError error) {
 
 		logrus.WithFields(logrus.Fields{
@@ -59,6 +57,13 @@ func (m *WorkflowManager) createPrimaryWorkflowHandler(
 
 		// Setup cleanup handler
 		defer func() {
+
+			// Handle workflow panic
+			if r := recover(); r != nil {
+				outputError = fmt.Errorf("workflow failed: %s", r)
+				return
+			}
+
 			cleanupErr := m.runCleanup(rootCtx, workflowTask)
 
 			outputTask = workflowTask
@@ -219,15 +224,20 @@ func (m *WorkflowManager) handleTerminationRequest(
 
 	var timerDuration time.Duration
 	if !terminationRequest.ScheduledAt.IsZero() {
-		delay := time.Until(terminationRequest.ScheduledAt)
+		// Use workflow.Now() instead of time.Now() for deterministic time
+		now := workflow.Now(ctx)
+		delay := terminationRequest.ScheduledAt.Sub(now)
 		timerDuration = max(delay, 0)
 	}
 
-	if timerDuration > 0 {
-		timer := workflow.NewTimer(ctx, timerDuration)
-		timer.Get(ctx, nil)
-		logrus.Info("Termination timer completed", "Duration", timerDuration)
+	// New behavior: always create timer, but with minimum duration
+	if timerDuration <= 0 {
+		timerDuration = time.Nanosecond // Minimum timer duration
 	}
+	timer := workflow.NewTimer(ctx, timerDuration)
+	timer.Get(ctx, nil)
+	logrus.Info("Termination timer completed", "Duration", timerDuration)
+
 }
 
 // setupWorkflowSelector creates and configures the workflow selector
