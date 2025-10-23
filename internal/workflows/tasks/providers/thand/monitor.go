@@ -67,8 +67,8 @@ func (t *thandTask) executeMonitorTask(
 		}
 	}
 
-	// Keep llistening for more alerts
+	// Keep listening for more alerts
 	return &model.FlowDirective{
-		Value: taskName, // loop back to await more approvals
+		Value: taskName, // loop back to await more alerts
 	}, nil
 }
