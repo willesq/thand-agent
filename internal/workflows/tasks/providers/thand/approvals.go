@@ -21,18 +21,18 @@ func (t *thandTask) executeApprovalsTask(
 	call *taskModel.ThandTask,
 	input any) (any, error) {
 
+	var notifyReq NotifyRequest
+	common.ConvertInterfaceToInterface(call.With, &notifyReq)
+
+	if !notifyReq.IsValid() {
+		return nil, errors.New("invalid notification request")
+	}
+
 	if common.IsNilOrZero(input) {
 
-		var notifyReq NotifyRequest
-		common.ConvertInterfaceToInterface(call.With, &notifyReq)
+		notifyReq.Entrypoint = taskName
 
-		if !notifyReq.IsValid() {
-			return nil, errors.New("invalid notification request")
-		}
-
-		// Force approvals to be true
-		notifyReq.Notifier.Approvals = true
-		notifyReq.Notifier.Entrypoint = taskName
+		logrus.Infof("Starting Thand approvals task: %s", taskName)
 
 		call.With.SetKeyWithValue("notifier", notifyReq.Notifier.AsMap())
 
@@ -52,8 +52,6 @@ func (t *thandTask) executeApprovalsTask(
 	} else {
 		logrus.Infof("Resuming Thand approvals task: %s", taskName)
 	}
-
-	threshold := call.With.GetIntWithDefault("threshold", 1)
 
 	logrus.Infof("Executing Thand monitor task: %s", taskName)
 
@@ -125,9 +123,16 @@ func (t *thandTask) executeApprovalsTask(
 			when: any($context.approvals[]; .approved == false)
 			then: denied
 		- case2:
-			when: '[$context.approvals[] | select(.approved == true)] | length > 1'
+			when: '[$context.approvals[] | select(.approved == true)] | length >= 1'
 			then: authorize
 	*/
+
+	approvedState, foundApprovedState := call.On.GetString("approved")
+	deniedState, foundDeniedState := call.On.GetString("denied")
+
+	if !foundApprovedState || !foundDeniedState {
+		return nil, errors.New("both approved and denied states must be specified in the on block")
+	}
 
 	// Create the switch task to handle approval or rejection
 	flowDirective, err := runner.SwitchTaskHandler(
@@ -144,17 +149,17 @@ func (t *thandTask) executeApprovalsTask(
 							Value: "any($context.approvals[]; .approved == false)",
 						},
 						Then: &model.FlowDirective{
-							Value: "denied",
+							Value: deniedState, // go to denied state
 						},
 					},
 				},
 				{
 					"case2": model.SwitchCase{
 						When: &model.RuntimeExpression{
-							Value: fmt.Sprintf("[$context.approvals[] | select(.approved == true)] | length >= %d", threshold),
+							Value: fmt.Sprintf("[$context.approvals[] | select(.approved == true)] | length >= %d", notifyReq.Approvals),
 						},
 						Then: &model.FlowDirective{
-							Value: "authorize",
+							Value: approvedState, // proceed to the next state
 						},
 					},
 				},
@@ -162,7 +167,7 @@ func (t *thandTask) executeApprovalsTask(
 					"default": model.SwitchCase{
 						// No When condition = default case (return to await more approvals)
 						Then: &model.FlowDirective{
-							Value: "approvals",
+							Value: taskName, // loop back to await more approvals
 						},
 					},
 				},

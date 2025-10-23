@@ -85,11 +85,9 @@ message: "Workflow validation passed for user ${ $.user.name }"
 approvals: true
 */
 type NotifierRequest struct {
-	Provider   string `json:"provider"`
-	To         string `json:"to"` // Email, channel Id, username etc.
-	Message    string `json:"message"`
-	Approvals  bool   `json:"approvals" default:"false"`
-	Entrypoint string `json:"entrypoint,omitempty"`
+	Provider string `json:"provider"`
+	To       string `json:"to"` // Email, channel Id, username etc.
+	Message  string `json:"message"`
 }
 
 func (r *NotifierRequest) IsValid() bool {
@@ -98,11 +96,9 @@ func (r *NotifierRequest) IsValid() bool {
 
 func (r *NotifierRequest) AsMap() map[string]any {
 	return map[string]any{
-		"provider":   r.Provider,
-		"to":         r.To,
-		"message":    r.Message,
-		"approvals":  r.Approvals,
-		"entrypoint": r.Entrypoint,
+		"provider": r.Provider,
+		"to":       r.To,
+		"message":  r.Message,
 	}
 }
 

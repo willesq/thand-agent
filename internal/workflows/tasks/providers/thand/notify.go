@@ -23,14 +23,16 @@ const ThandNotifyTask = "notify"
 const ThandApprovalEventType = "com.thand.approval"
 
 type NotifyRequest struct {
-	Threshold int                           `json:"threshold" default:"1"`
-	Approval  string                        `json:"approval"`
+	Approvals int                           `json:"approvals" default:"1"`
 	Notifier  thandFunction.NotifierRequest `json:"notifier"`
+
+	// Internal use only: entrypoint for resuming workflow
+	Entrypoint string `json:"-"`
 }
 
 func (n *NotifyRequest) IsValid() bool {
 
-	if n.Threshold == 0 {
+	if n.Approvals == 0 {
 		return false
 	}
 
@@ -43,8 +45,7 @@ func (n *NotifyRequest) IsValid() bool {
 
 func (n *NotifyRequest) AsMap() map[string]any {
 	return map[string]any{
-		"threshold": n.Threshold,
-		"approval":  n.Approval,
+		"approvals": n.Approvals,
 		"notifier":  n.Notifier.AsMap(),
 	}
 }
@@ -52,7 +53,8 @@ func (n *NotifyRequest) AsMap() map[string]any {
 func (t *thandTask) executeNotifyTask(
 	workflowTask *models.WorkflowTask,
 	taskName string,
-	call *taskModel.ThandTask) (any, error) {
+	call *taskModel.ThandTask,
+) (any, error) {
 
 	req := workflowTask.GetContextAsMap()
 
@@ -106,7 +108,7 @@ func (t *thandTask) executeNotifyTask(
 
 	switch providerConfig.Provider {
 	case "slack":
-		blocks := t.createSlackBlocks(workflowTask, elevationReq, &notificationReq)
+		blocks := t.createSlackBlocks(workflowTask, elevationReq, &notifyReq)
 
 		slackReq := slackProvider.SlackNotificationRequest{
 			To: notificationReq.To,
@@ -209,12 +211,12 @@ func hasMatchingProvider(notificationReq thandFunction.NotifierRequest, notifier
 func (t *thandTask) createSlackBlocks(
 	workflowTask *models.WorkflowTask,
 	elevateRequest *models.ElevateRequestInternal,
-	notificationReq *thandFunction.NotifierRequest,
+	notifyReq *NotifyRequest,
 ) []slack.Block {
 	blocks := []slack.Block{}
 
 	// Add the user message section
-	t.addUserMessageSection(&blocks, notificationReq.Message)
+	t.addUserMessageSection(&blocks, notifyReq)
 
 	// Add divider
 	blocks = append(blocks, slack.NewDividerBlock())
@@ -241,18 +243,18 @@ func (t *thandTask) createSlackBlocks(
 	blocks = append(blocks, slack.NewDividerBlock())
 
 	// Add action section
-	t.addActionSection(&blocks, workflowTask, notificationReq)
+	t.addActionSection(&blocks, workflowTask, notifyReq)
 
 	return blocks
 }
 
 // addUserMessageSection adds the user message block if message is provided
-func (t *thandTask) addUserMessageSection(blocks *[]slack.Block, message string) {
-	if len(message) > 0 {
+func (t *thandTask) addUserMessageSection(blocks *[]slack.Block, notifyReq *NotifyRequest) {
+	if len(notifyReq.Notifier.Message) > 0 {
 		*blocks = append(*blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
-				message,
+				notifyReq.Notifier.Message,
 				false,
 				false,
 			),
@@ -435,12 +437,48 @@ func (t *thandTask) addIdentitiesSection(blocks *[]slack.Block, elevateRequest *
 
 // addActionSection adds action buttons section based on approval requirements
 func (t *thandTask) addActionSection(
-	blocks *[]slack.Block, workflowTask *models.WorkflowTask, notificationReq *thandFunction.NotifierRequest) {
-	if notificationReq.Approvals {
+	blocks *[]slack.Block,
+	workflowTask *models.WorkflowTask,
+	notifyReq *NotifyRequest,
+) {
+	if notifyReq.Approvals > 0 {
+		// Get current approvals from workflow context
+		workflowContext := workflowTask.GetContextAsMap()
+		approvals, ok := workflowContext["approvals"].([]any)
+		if !ok {
+			approvals = []any{}
+		}
+
+		// Count existing approved approvals
+		approvedCount := 0
+		for _, approval := range approvals {
+			if approvalMap, ok := approval.(map[string]any); ok {
+				if approved, exists := approvalMap["approved"]; exists {
+					if approvedBool, ok := approved.(bool); ok && approvedBool {
+						approvedCount++
+					}
+				}
+			}
+		}
+
+		remainingApprovals := notifyReq.Approvals - approvedCount
+
+		// Create dynamic message based on approval requirements
+		var actionMessage string
+		if notifyReq.Approvals == 1 {
+			actionMessage = "*Action Required:*\n*One approval is required.* Please review the request and choose an action."
+		} else if remainingApprovals <= 0 {
+			actionMessage = "*Action Required:*\n*Sufficient approvals have been received.* Please review the request and choose an action."
+		} else if remainingApprovals == 1 {
+			actionMessage = fmt.Sprintf("*Action Required:*\n*%d more approval is needed (%d of %d received).* Please review the request and choose an action.", remainingApprovals, approvedCount, notifyReq.Approvals)
+		} else {
+			actionMessage = fmt.Sprintf("*Action Required:*\n*%d more approvals are needed (%d of %d received).* Please review the request and choose an action.", remainingApprovals, approvedCount, notifyReq.Approvals)
+		}
+
 		*blocks = append(*blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
-				"*Action Required:*\nPlease review the request and choose an action.",
+				actionMessage,
 				false,
 				false,
 			),
@@ -448,29 +486,33 @@ func (t *thandTask) addActionSection(
 			nil,
 		))
 
-		*blocks = append(*blocks, slack.NewActionBlock(
-			"",
-			slack.NewButtonBlockElement(
-				"approve",
-				"Approve",
-				slack.NewTextBlockObject(
-					slack.PlainTextType,
-					"✅ Approve",
-					false,
-					false,
-				),
-			).WithURL(t.createCallbackUrl(workflowTask, notificationReq, true)).WithStyle(slack.StylePrimary),
-			slack.NewButtonBlockElement(
-				"revoke",
-				"Revoke",
-				slack.NewTextBlockObject(
-					slack.PlainTextType,
-					"❌ Revoke",
-					false,
-					false,
-				),
-			).WithURL(t.createCallbackUrl(workflowTask, notificationReq, false)).WithStyle(slack.StyleDanger),
-		))
+		if remainingApprovals > 0 {
+
+			*blocks = append(*blocks, slack.NewActionBlock(
+				"",
+				slack.NewButtonBlockElement(
+					"approve",
+					"Approve",
+					slack.NewTextBlockObject(
+						slack.PlainTextType,
+						"✅ Approve",
+						false,
+						false,
+					),
+				).WithURL(t.createCallbackUrl(workflowTask, notifyReq, true)).WithStyle(slack.StylePrimary),
+				slack.NewButtonBlockElement(
+					"revoke",
+					"Revoke",
+					slack.NewTextBlockObject(
+						slack.PlainTextType,
+						"❌ Revoke",
+						false,
+						false,
+					),
+				).WithURL(t.createCallbackUrl(workflowTask, notifyReq, false)).WithStyle(slack.StyleDanger),
+			))
+
+		}
 	} else {
 		*blocks = append(*blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject(
@@ -487,7 +529,7 @@ func (t *thandTask) addActionSection(
 
 func (t *thandTask) createCallbackUrl(
 	workflowTask *models.WorkflowTask,
-	notificationReq *thandFunction.NotifierRequest,
+	notifyReq *NotifyRequest,
 	approve bool,
 ) string {
 
@@ -504,8 +546,8 @@ func (t *thandTask) createCallbackUrl(
 	signaledWorkflow := workflowTask.Clone().(*models.WorkflowTask)
 	signaledWorkflow.SetInput(&event)
 
-	if len(notificationReq.Entrypoint) > 0 {
-		signaledWorkflow.SetEntrypoint(notificationReq.Entrypoint)
+	if len(notifyReq.Entrypoint) > 0 {
+		signaledWorkflow.SetEntrypoint(notifyReq.Entrypoint)
 	}
 
 	callbackUrl := t.config.GetResumeCallbackUrl(signaledWorkflow)

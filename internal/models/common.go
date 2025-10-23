@@ -240,3 +240,15 @@ func (pc *BasicConfig) SetKeyWithValue(key string, value any) {
 	}
 	(*pc)[key] = value
 }
+
+func (pc *BasicConfig) Update(updateMap map[string]any) {
+	if pc == nil {
+		return
+	}
+	if *pc == nil {
+		*pc = BasicConfig{}
+	}
+	for key, value := range updateMap {
+		(*pc)[key] = value
+	}
+}

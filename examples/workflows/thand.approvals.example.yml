@@ -27,10 +27,15 @@ workflows:
             then: approvals
         - approvals:
             thand: approvals
+
+            # Set the next state based on approval decisions
+            on:
+              approved: authorize
+              denied: denied
+
             with:
 
-              threshold: 1 # number of approvals required
-              approval: authorize # state to call on threshold met
+              approvals: 1 # number of approvals required
 
               # 1. The thand notifier simplifies multiple workflow steps down
               #    to a single call.
@@ -47,6 +52,7 @@ workflows:
                 to: C0123456789
                 message: >
                   ${ "The user \($context.user.name) is requesting access." }
+            
             then: denied
         - authorize:
             # Authorize the user for the requested role

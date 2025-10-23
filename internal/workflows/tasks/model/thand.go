@@ -11,6 +11,7 @@ const ThandTaskName = "thand"
 type ThandTask struct {
 	model.TaskBase `json:",inline"`    // Inline TaskBase fields
 	Thand          string              `json:"thand" validate:"required"`
+	On             *models.BasicConfig `json:"on,omitempty"`
 	With           *models.BasicConfig `json:"with,omitempty"`
 }
 

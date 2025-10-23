@@ -70,21 +70,45 @@ func (t *thandTask) Execute(
 		return nil, fmt.Errorf("invalid task type for ServerlessThandTask")
 	}
 
-	switch thandTask.Thand {
+	// Create a copy to preserve the original workflow intent
+	interpolatedTask := *thandTask
+
+	if thandTask.With != nil {
+
+		interpolatedWith, err := workflowTask.TraverseAndEvaluate(
+			thandTask.With.AsMap(), input)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to interpolate call.with: %w", err)
+		}
+
+		withMap, ok := interpolatedWith.(map[string]any)
+
+		if !ok {
+			return nil, fmt.Errorf("interpolated call.with is not a map[string]any")
+		}
+
+		// Create a new BasicConfig with the interpolated values
+		interpolatedConfig := models.BasicConfig(withMap)
+		interpolatedTask.With = &interpolatedConfig
+
+	}
+
+	switch interpolatedTask.Thand {
 	case ThandApprovalsTask:
-		return t.executeApprovalsTask(workflowTask, taskName, thandTask, input)
+		return t.executeApprovalsTask(workflowTask, taskName, &interpolatedTask, input)
 	case ThandAuthorizeTask:
-		return t.executeAuthorizeTask(workflowTask, taskName, thandTask)
+		return t.executeAuthorizeTask(workflowTask, taskName, &interpolatedTask)
 	case ThandValidateTask:
-		return t.executeValidateTask(workflowTask, thandTask, input)
+		return t.executeValidateTask(workflowTask, &interpolatedTask, input)
 	case ThandNotifyTask:
-		return t.executeNotifyTask(workflowTask, taskName, thandTask)
+		return t.executeNotifyTask(workflowTask, taskName, &interpolatedTask)
 	case ThandRevokeTask:
-		return t.executeRevokeTask(workflowTask, taskName, thandTask)
+		return t.executeRevokeTask(workflowTask, taskName, &interpolatedTask)
 	case ThandMonitorTask:
-		return t.executeMonitorTask(workflowTask, taskName, thandTask, input)
+		return t.executeMonitorTask(workflowTask, taskName, &interpolatedTask, input)
 	default:
-		return nil, fmt.Errorf("unknown thand task type: %s", thandTask.Thand)
+		return nil, fmt.Errorf("unknown thand task type: %s", interpolatedTask.Thand)
 	}
 
 }
