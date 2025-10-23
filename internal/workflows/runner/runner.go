@@ -49,10 +49,9 @@ func (r *ResumableWorkflowRunner) CloneWithContext(ctx context.Context) *Resumab
 		wf.SetInternalContext(ctx)
 	}
 	return &ResumableWorkflowRunner{
-		config:    r.config,
-		functions: r.functions,
-		tasks:     r.tasks,
-		// interpolator: internalExpr.NewStringInterpolator(),
+		config:       r.config,
+		functions:    r.functions,
+		tasks:        r.tasks,
 		workflowTask: wf,
 	}
 }
@@ -92,12 +91,10 @@ func (wr *ResumableWorkflowRunner) Run(input any) (output any, err error) {
 		// So we only mark it as Faulted if the error is not ErrAwaitingEvent
 		if err != nil && errors.Is(err, ErrorAwaitSignal) {
 
-			// Commit the current state
-			// maps.Copy(workflowTask.Context.(map[string]any), output.(map[string]any))
-
 			// Mark the workflow as Waiting
 			workflowTask.SetStatus(swctx.WaitingStatus)
 			err = nil
+
 		} else if err != nil {
 
 			// Wrap the error to ensure it has a proper instance reference
@@ -143,6 +140,11 @@ func (wr *ResumableWorkflowRunner) Run(input any) (output any, err error) {
 		workflowTask.GetInput(),
 	)
 
+	logrus.WithFields(logrus.Fields{
+		"resumeTaskListOutput": output,
+		"resumeTaskListError":  err,
+	}).Info("Task list execution completed")
+
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +156,10 @@ func (wr *ResumableWorkflowRunner) Run(input any) (output any, err error) {
 	if output, err = wr.processOutput(output); err != nil {
 		return nil, err
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"processedOutput": output,
+	}).Info("Output processing completed")
 
 	wr.workflowTask.SetOutput(output)
 	wr.workflowTask.SetStatus(swctx.CompletedStatus)

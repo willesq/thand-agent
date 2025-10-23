@@ -46,7 +46,7 @@ workflows:
             # Firstly, check that the following is valid:
             # If with not provided then just staticlly validate it
             # if LLM specified then we can use AI to validate the request
-            call: thand.validate
+            thand: validate
             with:
               validator: static
             then: notify
@@ -106,7 +106,7 @@ workflows:
             #   revocation: revoke # which step to call to revoke access
             then: monitor
         - monitor:
-            call: thand.monitor
+            thand: monitor
             with:
               monitor: llm
               threshold: 10

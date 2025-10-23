@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thand-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: thand-agent
+  namespace: thand-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: thand-agent
+rules:
+# RBAC permissions for managing roles and bindings
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "create", "update", "patch", "delete"]
+# Namespace access
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+# Service account access (for user validation)
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: thand-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: thand-agent
+subjects:
+- kind: ServiceAccount
+  name: thand-agent
+  namespace: thand-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thand-agent
+  namespace: thand-system
+  labels:
+    app: thand-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thand-agent
+  template:
+    metadata:
+      labels:
+        app: thand-agent
+    spec:
+      serviceAccountName: thand-agent
+      containers:
+      - name: thand-agent
+        image: thand/agent:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: THAND_CONFIG_PATH
+          value: "/app/config/config.yaml"
+        - name: THAND_LOG_LEVEL
+          value: "info"
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: thand-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thand-agent
+  namespace: thand-system
+  labels:
+    app: thand-agent
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: thand-agent
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thand-config
+  namespace: thand-system
+data:
+  config.yaml: |
+    server:
+      port: 8080
+      host: "0.0.0.0"
+    
+    providers:
+      - name: kubernetes-cluster
+        description: Current Kubernetes cluster
+        provider: kubernetes
+        config: {}
+        enabled: true
+    
+    # Add your role definitions here
+    roles: []

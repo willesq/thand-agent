@@ -105,7 +105,7 @@ func TestEvaluateSwitchTask_StringMatching(t *testing.T) {
 			}
 
 			// Execute the switch task
-			result, err := runner.evaluateSwitchTask(tt.input, "testSwitch", switchTask)
+			result, err := runner.executeSwitchTask("testSwitch", switchTask, tt.input)
 
 			// Verify the result
 			require.NoError(t, err)
@@ -226,7 +226,7 @@ func TestEvaluateSwitchTask_NumericComparison(t *testing.T) {
 			}
 
 			// Execute the switch task
-			result, err := runner.evaluateSwitchTask(tt.input, "testSwitch", switchTask)
+			result, err := runner.executeSwitchTask("testSwitch", switchTask, tt.input)
 
 			// Verify the result
 			require.NoError(t, err)
@@ -335,7 +335,7 @@ func TestEvaluateSwitchTask_BooleanConditions(t *testing.T) {
 			}
 
 			// Execute the switch task
-			result, err := runner.evaluateSwitchTask(tt.input, "testSwitch", switchTask)
+			result, err := runner.executeSwitchTask("testSwitch", switchTask, tt.input)
 
 			// Verify the result
 			require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestEvaluateSwitchTask_NestedObjectAccess(t *testing.T) {
 			}
 
 			// Execute the switch task
-			result, err := runner.evaluateSwitchTask(tt.input, "testSwitch", switchTask)
+			result, err := runner.executeSwitchTask("testSwitch", switchTask, tt.input)
 
 			// Verify the result
 			require.NoError(t, err)
@@ -496,7 +496,7 @@ func TestEvaluateSwitchTask_DefaultCase(t *testing.T) {
 	}
 
 	// Execute the switch task
-	result, err := runner.evaluateSwitchTask(input, "testSwitch", switchTask)
+	result, err := runner.executeSwitchTask("testSwitch", switchTask, input)
 
 	// Verify the result falls back to default
 	require.NoError(t, err)
@@ -550,7 +550,7 @@ func TestEvaluateSwitchTask_FirstMatchWins(t *testing.T) {
 	}
 
 	// Execute the switch task
-	result, err := runner.evaluateSwitchTask(input, "testSwitch", switchTask)
+	result, err := runner.executeSwitchTask("testSwitch", switchTask, input)
 
 	// Verify first match wins
 	require.NoError(t, err)
@@ -592,7 +592,7 @@ func TestEvaluateSwitchTask_ErrorCases(t *testing.T) {
 			},
 		}
 
-		result, err := runner.evaluateSwitchTask(input, "testSwitch", switchTask)
+		result, err := runner.executeSwitchTask("testSwitch", switchTask, input)
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "no matching switch case")
@@ -607,7 +607,7 @@ func TestEvaluateSwitchTask_ErrorCases(t *testing.T) {
 			Switch: []model.SwitchItem{},
 		}
 
-		result, err := runner.evaluateSwitchTask(input, "testSwitch", switchTask)
+		result, err := runner.executeSwitchTask("testSwitch", switchTask, input)
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "no switch cases defined")
@@ -618,7 +618,7 @@ func TestEvaluateSwitchTask_ErrorCases(t *testing.T) {
 			"value": "test",
 		}
 
-		result, err := runner.evaluateSwitchTask(input, "testSwitch", nil)
+		result, err := runner.executeSwitchTask("testSwitch", nil, input)
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "no switch cases defined")

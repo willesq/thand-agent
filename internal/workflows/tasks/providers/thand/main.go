@@ -71,6 +71,8 @@ func (t *thandTask) Execute(
 	}
 
 	switch thandTask.Thand {
+	case ThandApprovalsTask:
+		return t.executeApprovalsTask(workflowTask, taskName, thandTask, input)
 	case ThandAuthorizeTask:
 		return t.executeAuthorizeTask(workflowTask, taskName, thandTask)
 	case ThandValidateTask:
