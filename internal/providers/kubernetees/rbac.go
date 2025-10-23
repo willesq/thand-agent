@@ -366,8 +366,18 @@ func (p *kubernetesProvider) revokeNamespacedRole(
 	client := p.GetClient()
 	bindingName := fmt.Sprintf("%s-%s", role.GetSnakeCaseName(), p.sanitizeUserIdentifier(user))
 
+	// Check if RoleBinding exists before attempting to delete
+	_, err := client.RbacV1().RoleBindings(namespace).Get(ctx, bindingName, metav1.GetOptions{})
+	if err != nil {
+		// If the binding doesn't exist, consider it already revoked
+		if strings.Contains(err.Error(), "not found") {
+			return &models.RevokeRoleResponse{}, nil
+		}
+		return nil, fmt.Errorf("failed to check role binding existence: %w", err)
+	}
+
 	// Delete RoleBinding
-	err := client.RbacV1().RoleBindings(namespace).Delete(ctx, bindingName, metav1.DeleteOptions{})
+	err = client.RbacV1().RoleBindings(namespace).Delete(ctx, bindingName, metav1.DeleteOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete role binding: %w", err)
 	}

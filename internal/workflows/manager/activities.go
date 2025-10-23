@@ -47,7 +47,7 @@ func (m *WorkflowManager) registerActivities() error {
 			err := m.Hydrate(workflowTask)
 
 			if err != nil {
-				return nil, fmt.Errorf("failed to hydrate workflow task: %w for: %s", err, taskName)
+				return nil, fmt.Errorf("failed to hydrate workflow task: %s for: %w", taskName, err)
 			}
 
 			workflowTask.SetInternalContext(ctx)

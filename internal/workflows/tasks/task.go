@@ -9,7 +9,7 @@ type TaskCollection interface {
 	RegisterTasks(registry *TaskRegistry)
 }
 
-// Function defines the interface that all Thand Functions must implement
+// Task defines the interface that all Thand Tasks must implement
 type Task interface {
 	// GetName returns the unique name/identifier for this Task
 	GetName() string

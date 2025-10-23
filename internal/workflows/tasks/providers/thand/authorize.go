@@ -366,7 +366,7 @@ func (t *thandTask) scheduleRevocation(
 		} else {
 			// Otherwise send the new task as the signal input to resume the workflow
 			// and set an execution timeout
-			// TODO: Fiigure out how to delay the signal until the revocation time
+			// TODO: Figure out how to delay the signal until the revocation time
 			signalInput = newTask
 		}
 
