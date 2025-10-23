@@ -34,7 +34,10 @@ func (t *thandTask) executeApprovalsTask(
 
 		logrus.Infof("Starting Thand approvals task: %s", taskName)
 
-		call.With.SetKeyWithValue("notifier", notifyReq.Notifier.AsMap())
+		newConfig := &models.BasicConfig{}
+		newConfig.Update(notifyReq.AsMap())
+
+		call.With = newConfig
 
 		// First lets notify the approvers
 		_, err := t.executeNotifyTask(
