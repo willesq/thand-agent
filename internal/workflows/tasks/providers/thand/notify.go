@@ -20,18 +20,33 @@ import (
 )
 
 const ThandNotifyTask = "notify"
+const ThandApprovalEventType = "com.thand.approval"
 
-/*
-provider: slack # or slack, email
-to: "#access-requests"
-message: "Workflow validation passed for user ${ $.user.name }"
-approvals: true
-*/
-type NotifierRequest struct {
-	Provider  string `json:"provider"`
-	To        string `json:"to"` // Email, channel Id, username etc.
-	Message   string `json:"message"`
-	Approvals bool   `json:"approvals"`
+type NotifyRequest struct {
+	Threshold int                           `json:"threshold" default:"1"`
+	Approval  string                        `json:"approval"`
+	Notifier  thandFunction.NotifierRequest `json:"notifier"`
+}
+
+func (n *NotifyRequest) IsValid() bool {
+
+	if n.Threshold == 0 {
+		return false
+	}
+
+	if !n.Notifier.IsValid() {
+		return false
+	}
+
+	return true
+}
+
+func (n *NotifyRequest) AsMap() map[string]any {
+	return map[string]any{
+		"threshold": n.Threshold,
+		"approval":  n.Approval,
+		"notifier":  n.Notifier.AsMap(),
+	}
 }
 
 func (t *thandTask) executeNotifyTask(
@@ -45,8 +60,14 @@ func (t *thandTask) executeNotifyTask(
 		return nil, errors.New("request cannot be nil")
 	}
 
-	var notificationReq NotifierRequest
-	common.ConvertMapToInterface(call.With, &notificationReq)
+	var notifyReq NotifyRequest
+	common.ConvertInterfaceToInterface(call.With, &notifyReq)
+
+	if !notifyReq.IsValid() {
+		return nil, errors.New("invalid notification request")
+	}
+
+	notificationReq := notifyReq.Notifier
 
 	notifierProviders := t.config.GetProvidersByCapability(
 		models.ProviderCapabilityNotifier)
@@ -80,14 +101,6 @@ func (t *thandTask) executeNotifyTask(
 	logrus.WithFields(logrus.Fields{
 		"provider": providerConfig.Name,
 	}).Info("Executing notification")
-
-	// Overwrite the notification request with the converted input
-	err = common.ConvertMapToInterface(call.With, &notificationReq)
-
-	if err != nil {
-		logrus.Warn("Failed to convert notification input")
-		return nil, errors.New("failed to convert notification input")
-	}
 
 	var notificationPayload models.NotificationRequest
 
@@ -154,7 +167,7 @@ func (t *thandTask) executeNotifyTask(
 			taskName,
 			model.CallFunction{
 				Call: thandFunction.ThandNotifyFunction,
-				With: call.With,
+				With: notificationReq.AsMap(),
 			},
 			notificationPayload,
 		).Get(temporalContext, nil)
@@ -178,7 +191,7 @@ func (t *thandTask) executeNotifyTask(
 	return nil, nil
 }
 
-func hasMatchingProvider(notificationReq NotifierRequest, notifierProviders map[string]models.Provider) bool {
+func hasMatchingProvider(notificationReq thandFunction.NotifierRequest, notifierProviders map[string]models.Provider) bool {
 
 	// filter out providers to see if the name matches
 	for _, provider := range notifierProviders {
@@ -196,7 +209,7 @@ func hasMatchingProvider(notificationReq NotifierRequest, notifierProviders map[
 func (t *thandTask) createSlackBlocks(
 	workflowTask *models.WorkflowTask,
 	elevateRequest *models.ElevateRequestInternal,
-	notificationReq *NotifierRequest,
+	notificationReq *thandFunction.NotifierRequest,
 ) []slack.Block {
 	blocks := []slack.Block{}
 
@@ -228,7 +241,7 @@ func (t *thandTask) createSlackBlocks(
 	blocks = append(blocks, slack.NewDividerBlock())
 
 	// Add action section
-	t.addActionSection(&blocks, workflowTask, notificationReq.Approvals)
+	t.addActionSection(&blocks, workflowTask, notificationReq)
 
 	return blocks
 }
@@ -421,8 +434,9 @@ func (t *thandTask) addIdentitiesSection(blocks *[]slack.Block, elevateRequest *
 }
 
 // addActionSection adds action buttons section based on approval requirements
-func (t *thandTask) addActionSection(blocks *[]slack.Block, workflowTask *models.WorkflowTask, approvals bool) {
-	if approvals {
+func (t *thandTask) addActionSection(
+	blocks *[]slack.Block, workflowTask *models.WorkflowTask, notificationReq *thandFunction.NotifierRequest) {
+	if notificationReq.Approvals {
 		*blocks = append(*blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
@@ -445,7 +459,7 @@ func (t *thandTask) addActionSection(blocks *[]slack.Block, workflowTask *models
 					false,
 					false,
 				),
-			).WithURL(t.createCallbackUrl(workflowTask, true)).WithStyle(slack.StylePrimary),
+			).WithURL(t.createCallbackUrl(workflowTask, notificationReq, true)).WithStyle(slack.StylePrimary),
 			slack.NewButtonBlockElement(
 				"revoke",
 				"Revoke",
@@ -455,7 +469,7 @@ func (t *thandTask) addActionSection(blocks *[]slack.Block, workflowTask *models
 					false,
 					false,
 				),
-			).WithURL(t.createCallbackUrl(workflowTask, false)).WithStyle(slack.StyleDanger),
+			).WithURL(t.createCallbackUrl(workflowTask, notificationReq, false)).WithStyle(slack.StyleDanger),
 		))
 	} else {
 		*blocks = append(*blocks, slack.NewSectionBlock(
@@ -473,13 +487,14 @@ func (t *thandTask) addActionSection(blocks *[]slack.Block, workflowTask *models
 
 func (t *thandTask) createCallbackUrl(
 	workflowTask *models.WorkflowTask,
+	notificationReq *thandFunction.NotifierRequest,
 	approve bool,
 ) string {
 
 	// Create an Event.
 	event := cloudevents.NewEvent()
 	event.SetSource("thand/agent")
-	event.SetType("com.thand.approval")
+	event.SetType(ThandApprovalEventType)
 	event.SetData(cloudevents.ApplicationJSON, map[string]any{
 		"approved": approve,
 		"user":     "",
@@ -488,14 +503,10 @@ func (t *thandTask) createCallbackUrl(
 	// Setup workflow for the next state
 	signaledWorkflow := workflowTask.Clone().(*models.WorkflowTask)
 	signaledWorkflow.SetInput(&event)
-	_, nextTask := workflowTask.GetNextTask()
 
-	if nextTask == nil {
-		logrus.Warn("Failed to ascertain next task for callback URL")
-		return ""
+	if len(notificationReq.Entrypoint) > 0 {
+		signaledWorkflow.SetEntrypoint(notificationReq.Entrypoint)
 	}
-
-	signaledWorkflow.SetEntrypoint(nextTask.Key)
 
 	callbackUrl := t.config.GetResumeCallbackUrl(signaledWorkflow)
 

@@ -46,7 +46,7 @@ workflows:
                 provider: slack
                 to: C0123456789
                 message: >
-                  ${ "Approval needed for user \($context.user.name) requesting access." }
+                  ${ "The user \($context.user.name) is requesting access." }
             then: denied
         - authorize:
             # Authorize the user for the requested role

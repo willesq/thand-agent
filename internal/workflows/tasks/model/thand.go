@@ -1,14 +1,17 @@
 package model
 
-import "github.com/serverlessworkflow/sdk-go/v3/model"
+import (
+	"github.com/serverlessworkflow/sdk-go/v3/model"
+	"github.com/thand-io/agent/internal/models"
+)
 
 const ThandTaskName = "thand"
 
 // ThandTask defines a custom Thand task
 type ThandTask struct {
-	model.TaskBase `json:",inline"` // Inline TaskBase fields
-	Thand          string           `json:"thand" validate:"required"`
-	With           map[string]any   `json:"with,omitempty"`
+	model.TaskBase `json:",inline"`    // Inline TaskBase fields
+	Thand          string              `json:"thand" validate:"required"`
+	With           *models.BasicConfig `json:"with,omitempty"`
 }
 
 func (f *ThandTask) GetBase() *model.TaskBase {

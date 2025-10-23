@@ -210,7 +210,7 @@ func handleListenTask(
 	taskName string,
 	listen *model.ListenTask,
 	input any,
-) (any, error) {
+) (*cloudevents.Event, error) {
 
 	// Right lets validate the signal and covert it to a cloudevent
 	var signal cloudevents.Event
@@ -234,7 +234,7 @@ func handleListenTask(
 		// Configures the workflow to wait for all defined events before resuming execution.
 		// Required if any and one have not been set.
 		if evaluateListenFilter(workflowTask, oneListener, signal) {
-			return input, nil
+			return &signal, nil
 		}
 
 	} else if anyListener != nil {
@@ -244,7 +244,7 @@ func handleListenTask(
 		// If empty, listens to all incoming events
 
 		if evaluateAnyListener(workflowTask, anyListener, signal) {
-			return input, nil
+			return &signal, nil
 		}
 
 	} else if untilListener != nil {
@@ -253,7 +253,7 @@ func handleListenTask(
 		// Required if all and any have not been set.
 
 		if evaluateUntilEventFilter(workflowTask, untilListener, signal) {
-			return input, nil
+			return &signal, nil
 		}
 
 	} else if allListener != nil {
@@ -263,7 +263,7 @@ func handleListenTask(
 		// If not present, once any event is received, it proceeds to the next task.
 
 		if evaluateAllListener(workflowTask, allListener, signal) {
-			return input, nil
+			return &signal, nil
 		}
 
 	} else {
@@ -327,12 +327,12 @@ func evaluateAnyListener(workflowTask *models.WorkflowTask, anyListener []*model
 	for _, eventFilter := range anyListener {
 
 		if evaluateListenFilter(workflowTask, eventFilter, signal) {
-			return false
+			return true
 		}
 
 	}
 
-	return true
+	return false
 }
 
 func evaluateAllListener(workflowTask *models.WorkflowTask, allListener []*model.EventFilter, signal cloudevents.Event) bool {
@@ -340,10 +340,10 @@ func evaluateAllListener(workflowTask *models.WorkflowTask, allListener []*model
 	for _, eventFilter := range allListener {
 
 		if evaluateListenFilter(workflowTask, eventFilter, signal) {
-			return false
+			return true
 		}
 
 	}
 
-	return true
+	return false
 }

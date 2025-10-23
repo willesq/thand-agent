@@ -76,7 +76,7 @@ func (t *thandTask) executeValidateTask(
 
 	with := call.With
 
-	validator, exists := with["validator"].(string)
+	validator, exists := with.GetString("validator")
 
 	// Validate validator type
 	if !exists {
@@ -165,11 +165,7 @@ func (t *thandTask) executeLLMValidation(
 
 	withOptions := call.With
 
-	modelName, foundModelName := withOptions["model"].(string)
-
-	if !foundModelName {
-		modelName = "gemini-2.5-pro"
-	}
+	modelName := withOptions.GetStringWithDefault("model", "gemini-2.5-pro")
 
 	// TODO validate reason to make sure its valid.
 

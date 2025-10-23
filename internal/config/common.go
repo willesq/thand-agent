@@ -131,6 +131,11 @@ func loadFromDirectory[T WorkflowDefinitions | RoleDefinitions | ProviderDefinit
 		item, err := readFile(path, definition)
 
 		if err != nil {
+
+			logrus.WithFields(logrus.Fields{
+				"path": path,
+			}).WithError(err).Errorln("Failed to read file in directory")
+
 			return err
 		}
 
@@ -139,6 +144,11 @@ func loadFromDirectory[T WorkflowDefinitions | RoleDefinitions | ProviderDefinit
 	})
 
 	if err != nil {
+
+		logrus.WithFields(logrus.Fields{
+			"path": dirPath,
+		}).WithError(err).Errorln("Failed to walk directory")
+
 		return nil, err
 	}
 

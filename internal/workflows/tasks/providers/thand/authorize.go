@@ -235,7 +235,7 @@ func (t *thandTask) executeTemporalParallel(
 				taskName,
 				model.CallFunction{
 					Call: thandFunction.ThandNotifyFunction,
-					With: call.With,
+					With: call.With.AsMap(),
 				},
 				authTask.ThandAuthReq,
 			).Get(ctx, &authOut)

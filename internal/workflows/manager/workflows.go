@@ -131,10 +131,10 @@ func (m *WorkflowManager) runCleanup(
 
 	// Get the taskItem from the workflow spec or create a synthetic one
 	revocationTask := &model.TaskItem{
-		Key: "cleanup",
+		Key: "$cleanup",
 		Task: &thandModel.ThandTask{
 			Thand: thandTask.ThandRevokeTask,
-			With:  map[string]any{},
+			With:  nil,
 		},
 	}
 

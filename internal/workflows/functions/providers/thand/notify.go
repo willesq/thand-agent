@@ -27,7 +27,7 @@ func NewNotifyFunction(config *config.Config) *notifyFunction {
 		config: config,
 		BaseFunction: functions.NewBaseFunction(
 			ThandNotifyFunction,
-			"This notifies an external provider of an elevation",
+			"This provides notification capabilities",
 			"1.0.0",
 		),
 	}
@@ -85,10 +85,25 @@ message: "Workflow validation passed for user ${ $.user.name }"
 approvals: true
 */
 type NotifierRequest struct {
-	Provider  string `json:"provider"`
-	To        string `json:"to"` // Email, channel Id, username etc.
-	Message   string `json:"message"`
-	Approvals bool   `json:"approvals"`
+	Provider   string `json:"provider"`
+	To         string `json:"to"` // Email, channel Id, username etc.
+	Message    string `json:"message"`
+	Approvals  bool   `json:"approvals" default:"false"`
+	Entrypoint string `json:"entrypoint,omitempty"`
+}
+
+func (r *NotifierRequest) IsValid() bool {
+	return len(r.Provider) > 0 && len(r.To) > 0 && len(r.Message) > 0
+}
+
+func (r *NotifierRequest) AsMap() map[string]any {
+	return map[string]any{
+		"provider":   r.Provider,
+		"to":         r.To,
+		"message":    r.Message,
+		"approvals":  r.Approvals,
+		"entrypoint": r.Entrypoint,
+	}
 }
 
 // Execute performs the validation logic

@@ -7,7 +7,6 @@ toolchain go1.25.0
 replace github.com/serverlessworkflow/sdk-go/v3 => github.com/hughneale/serverless-sdk-go/v3 v3.0.0-20251022183658-27de3226307f
 
 require (
-	cloud.google.com/go/iam v1.5.3
 	cloud.google.com/go/kms v1.23.2
 	cloud.google.com/go/secretmanager v1.16.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.19.1
@@ -65,7 +64,6 @@ require (
 	golang.org/x/text v0.30.0
 	google.golang.org/api v0.252.0
 	google.golang.org/genai v1.31.0
-	google.golang.org/genproto v0.0.0-20251020155222-88f65dc88635
 	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
@@ -85,6 +83,7 @@ require (
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
+	cloud.google.com/go/iam v1.5.3 // indirect
 	cloud.google.com/go/longrunning v0.7.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
@@ -304,6 +303,7 @@ require (
 	golang.org/x/term v0.36.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/tools v0.38.0 // indirect
+	google.golang.org/genproto v0.0.0-20251020155222-88f65dc88635 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251020155222-88f65dc88635 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251020155222-88f65dc88635 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
