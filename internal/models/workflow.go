@@ -84,3 +84,10 @@ type WorkflowExecutionInfo struct {
 	Output  any `json:"output,omitempty"`
 	Context any `json:"context,omitempty"`
 }
+
+// TaskHandler defines the signature for task execution functions
+type TaskHandler func(
+	workflowTask *WorkflowTask,
+	task *model.TaskItem,
+	input any,
+) (any, error)

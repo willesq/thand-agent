@@ -7,8 +7,11 @@ import (
 	"time"
 
 	swctx "github.com/serverlessworkflow/sdk-go/v3/impl/ctx"
+	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	models "github.com/thand-io/agent/internal/models"
+	thandModel "github.com/thand-io/agent/internal/workflows/tasks/model"
+	thandTask "github.com/thand-io/agent/internal/workflows/tasks/providers/thand"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
@@ -31,7 +34,7 @@ func (m *WorkflowManager) registerWorkflows() error {
 
 	// Register the primary workflow
 	worker.RegisterWorkflowWithOptions(
-		m.createPrimaryWorkflowHandler(temporalService),
+		m.createPrimaryWorkflowHandler(),
 		workflow.RegisterOptions{
 			Name: models.TemporalExecuteElevationWorkflowName,
 		},
@@ -41,9 +44,7 @@ func (m *WorkflowManager) registerWorkflows() error {
 }
 
 // createPrimaryWorkflowHandler creates the main workflow handler function
-func (m *WorkflowManager) createPrimaryWorkflowHandler(
-	temporalService interface{ GetTaskQueue() string },
-) func(workflow.Context, *models.WorkflowTask) (*models.WorkflowTask, error) {
+func (m *WorkflowManager) createPrimaryWorkflowHandler() func(workflow.Context, *models.WorkflowTask) (*models.WorkflowTask, error) {
 	return func(rootCtx workflow.Context, workflowTask *models.WorkflowTask) (outputTask *models.WorkflowTask, outputError error) {
 
 		logrus.WithFields(logrus.Fields{
@@ -56,7 +57,14 @@ func (m *WorkflowManager) createPrimaryWorkflowHandler(
 
 		// Setup cleanup handler
 		defer func() {
-			cleanupErr := m.runCleanup(rootCtx, workflowTask, temporalService)
+
+			// Handle workflow panic
+			if r := recover(); r != nil {
+				outputError = fmt.Errorf("workflow failed: %s", r)
+				return
+			}
+
+			cleanupErr := m.runCleanup(rootCtx, workflowTask)
 
 			outputTask = workflowTask
 
@@ -103,7 +111,6 @@ func (m *WorkflowManager) createPrimaryWorkflowHandler(
 func (m *WorkflowManager) runCleanup(
 	rootCtx workflow.Context,
 	workflowTask *models.WorkflowTask,
-	temporalService interface{ GetTaskQueue() string },
 ) error {
 
 	if approved := workflowTask.IsApproved(); approved == nil || !*approved {
@@ -120,27 +127,34 @@ func (m *WorkflowManager) runCleanup(
 
 	// Use a disconnected context for cleanup to ensure it runs even if workflow is cancelled
 	newCtx, _ := workflow.NewDisconnectedContext(rootCtx)
+	workflowTask = workflowTask.WithTemporalContext(newCtx)
 
-	ao := workflow.ActivityOptions{
-		TaskQueue:              temporalService.GetTaskQueue(),
-		ScheduleToCloseTimeout: time.Minute * 5,
-		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 3,
+	// Get the taskItem from the workflow spec or create a synthetic one
+	revocationTask := &model.TaskItem{
+		Key: "$cleanup",
+		Task: &thandModel.ThandTask{
+			Thand: thandTask.ThandRevokeTask,
+			With:  nil,
 		},
-		WaitForCancellation: true,
 	}
 
-	cleanupCtx := workflow.WithActivityOptions(newCtx, ao)
+	// Run the revocation task
+	revokeTask, foundTask := m.tasks.GetTaskHandler(revocationTask)
 
-	err = workflow.ExecuteActivity(
-		cleanupCtx,
-		models.TemporalCleanupActivityName,
+	if !foundTask {
+		logrus.WithError(err).Error("Failed to get revoke task handler for cleanup")
+		return err
+	}
+
+	_, err = revokeTask.Execute(
 		workflowTask,
-	).Get(cleanupCtx, nil)
+		revocationTask,
+		nil,
+	)
 
 	if err != nil {
-		logrus.Error("Cleanup activity failed", "error", err)
-		return fmt.Errorf("cleanup failed: %w", err)
+		logrus.WithError(err).Error("Cleanup activity failed")
+		return err
 	}
 
 	logrus.Info("Cleanup completed successfully")
@@ -210,15 +224,20 @@ func (m *WorkflowManager) handleTerminationRequest(
 
 	var timerDuration time.Duration
 	if !terminationRequest.ScheduledAt.IsZero() {
-		delay := time.Until(terminationRequest.ScheduledAt)
+		// Use workflow.Now() instead of time.Now() for deterministic time
+		now := workflow.Now(ctx)
+		delay := terminationRequest.ScheduledAt.Sub(now)
 		timerDuration = max(delay, 0)
 	}
 
-	if timerDuration > 0 {
-		timer := workflow.NewTimer(ctx, timerDuration)
-		timer.Get(ctx, nil)
-		logrus.Info("Termination timer completed", "Duration", timerDuration)
+	// New behavior: always create timer, but with minimum duration
+	if timerDuration <= 0 {
+		timerDuration = time.Nanosecond // Minimum timer duration
 	}
+	timer := workflow.NewTimer(ctx, timerDuration)
+	timer.Get(ctx, nil)
+	logrus.Info("Termination timer completed", "Duration", timerDuration)
+
 }
 
 // setupWorkflowSelector creates and configures the workflow selector

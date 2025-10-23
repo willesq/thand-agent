@@ -9,6 +9,7 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/functions"
+	"github.com/thand-io/agent/internal/workflows/tasks"
 )
 
 // TestProcessTaskOutput tests the processTaskOutput function which transforms
@@ -25,6 +26,9 @@ func TestProcessTaskOutput_TransformToApprovalsList(t *testing.T) {
 
 	// Create function registry
 	functionRegistry := functions.NewFunctionRegistry(cfg)
+
+	// Create task registry
+	taskRegistry := tasks.NewTaskRegistry(cfg)
 
 	// Create a mock workflow
 	workflow := &model.Workflow{
@@ -44,7 +48,7 @@ func TestProcessTaskOutput_TransformToApprovalsList(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the runner
-	runner := NewResumableRunner(cfg, functionRegistry, workflowCtx)
+	runner := NewResumableRunner(cfg, functionRegistry, taskRegistry, workflowCtx)
 
 	// Create task output configuration that transforms the raw output
 	// Raw output: {"data": {"approved": true}}
@@ -85,6 +89,9 @@ func TestProcessTaskOutput_TransformToApprovalsListWithExport(t *testing.T) {
 	// Create function registry
 	functionRegistry := functions.NewFunctionRegistry(cfg)
 
+	// Create task registry
+	taskRegistry := tasks.NewTaskRegistry(cfg)
+
 	// Create a mock workflow
 	workflow := &model.Workflow{
 		Document: model.Document{
@@ -103,7 +110,7 @@ func TestProcessTaskOutput_TransformToApprovalsListWithExport(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the runner
-	runner := NewResumableRunner(cfg, functionRegistry, workflowCtx)
+	runner := NewResumableRunner(cfg, functionRegistry, taskRegistry, workflowCtx)
 
 	// Create task output configuration that transforms the raw output
 	// Raw output: {"data": {"approved": true}}
@@ -172,6 +179,9 @@ func TestProcessTaskOutput_WithoutOutput(t *testing.T) {
 	// Create function registry
 	functionRegistry := functions.NewFunctionRegistry(cfg)
 
+	// Create task registry
+	taskRegistry := tasks.NewTaskRegistry(cfg)
+
 	// Create a mock workflow
 	workflow := &model.Workflow{
 		Document: model.Document{
@@ -190,7 +200,7 @@ func TestProcessTaskOutput_WithoutOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the runner
-	runner := NewResumableRunner(cfg, functionRegistry, workflowCtx)
+	runner := NewResumableRunner(cfg, functionRegistry, taskRegistry, workflowCtx)
 
 	// Create task base without output
 	taskBase := &model.TaskBase{
@@ -217,6 +227,9 @@ func TestProcessTaskOutput_TransformStructure(t *testing.T) {
 	// Create function registry
 	functionRegistry := functions.NewFunctionRegistry(cfg)
 
+	// Create task registry
+	taskRegistry := tasks.NewTaskRegistry(cfg)
+
 	// Create a mock workflow
 	workflow := &model.Workflow{
 		Document: model.Document{
@@ -235,7 +248,7 @@ func TestProcessTaskOutput_TransformStructure(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the runner
-	runner := NewResumableRunner(cfg, functionRegistry, workflowCtx)
+	runner := NewResumableRunner(cfg, functionRegistry, taskRegistry, workflowCtx)
 
 	// Create task output configuration that transforms the raw output structure
 	taskOutput := &model.Output{
@@ -276,6 +289,9 @@ func TestProcessTaskOutput_IdentityTransform(t *testing.T) {
 	// Create function registry
 	functionRegistry := functions.NewFunctionRegistry(cfg)
 
+	// Create task registry
+	taskRegistry := tasks.NewTaskRegistry(cfg)
+
 	// Create a mock workflow
 	workflow := &model.Workflow{
 		Document: model.Document{
@@ -294,7 +310,7 @@ func TestProcessTaskOutput_IdentityTransform(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the runner
-	runner := NewResumableRunner(cfg, functionRegistry, workflowCtx)
+	runner := NewResumableRunner(cfg, functionRegistry, taskRegistry, workflowCtx)
 
 	// Create task output configuration using identity transform (the default)
 	taskOutput := &model.Output{

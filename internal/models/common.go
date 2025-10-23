@@ -148,6 +148,16 @@ func (pc *BasicConfig) GetInt(key string) (int, bool) {
 	return 0, false
 }
 
+func (pc *BasicConfig) GetIntWithDefault(key string, defaultValue int) int {
+	if pc == nil {
+		return defaultValue
+	}
+	if value, ok := pc.GetInt(key); ok {
+		return value
+	}
+	return defaultValue
+}
+
 func (pc *BasicConfig) GetFloat(key string) (float64, bool) {
 	if pc == nil {
 		return 0, false
@@ -212,4 +222,33 @@ func (pc *BasicConfig) GetStringSlice(key string) ([]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (pc *BasicConfig) AsMap() map[string]any {
+	if pc == nil {
+		return map[string]any{}
+	}
+	return map[string]any(*pc)
+}
+
+func (pc *BasicConfig) SetKeyWithValue(key string, value any) {
+	if pc == nil {
+		return
+	}
+	if *pc == nil {
+		*pc = BasicConfig{}
+	}
+	(*pc)[key] = value
+}
+
+func (pc *BasicConfig) Update(updateMap map[string]any) {
+	if pc == nil {
+		return
+	}
+	if *pc == nil {
+		*pc = BasicConfig{}
+	}
+	for key, value := range updateMap {
+		(*pc)[key] = value
+	}
 }

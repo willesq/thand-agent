@@ -11,7 +11,7 @@ import (
 )
 
 func (r *ResumableWorkflowRunner) executeDoRunner(
-	doTask *model.DoTask, input any) (any, error) {
+	_ string, doTask *model.DoTask, input any) (any, error) {
 	return r.resumeTasks(doTask.Do, 0, input)
 }
 
@@ -47,6 +47,9 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 	currentTask := taskListRef[idx]
 
 	for currentTask != nil {
+
+		taskSupport.SetTaskStatus(currentTask.Key, swctx.PendingStatus)
+
 		if err = taskSupport.SetTaskDef(currentTask); err != nil {
 			return nil, err
 		}
@@ -61,16 +64,33 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 			continue
 		}
 
-		taskSupport.SetTaskStatus(currentTask.Key, swctx.PendingStatus)
+		err := d.updateTemporalSearchAttributes(currentTask, swctx.RunningStatus)
+
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"task":  currentTask,
+				"error": err,
+			}).Warn("Failed to update temporal search attributes")
+		}
+
+		taskSupport.SetTaskStatus(currentTask.Key, swctx.RunningStatus)
+
+		logrus.WithFields(logrus.Fields{
+			"task":  currentTask.Key,
+			"input": input,
+		}).Info("Starting task execution")
+
+		output, err = d.runTaskItem(currentTask, input)
+
+		if err != nil {
+			taskSupport.SetTaskStatus(currentTask.Key, swctx.FaultedStatus)
+			return output, err
+		}
+
+		taskSupport.SetTaskStatus(currentTask.Key, swctx.CompletedStatus)
 
 		// Check if this task is a SwitchTask and handle it
-		if switchTask, ok := currentTask.Task.(*model.SwitchTask); ok {
-			flowDirective, err := d.evaluateSwitchTask(input, currentTask.Key, switchTask)
-			if err != nil {
-				taskSupport.SetTaskStatus(currentTask.Key, swctx.FaultedStatus)
-				return output, err
-			}
-			taskSupport.SetTaskStatus(currentTask.Key, swctx.CompletedStatus)
+		if flowDirective, ok := output.(*model.FlowDirective); ok {
 
 			// Process FlowDirective: update idx/currentTask accordingly
 			idx, currentTask = taskList.KeyAndIndex(flowDirective.Value)
@@ -87,24 +107,13 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 			continue
 		}
 
-		taskSupport.SetTaskStatus(currentTask.Key, swctx.RunningStatus)
-
-		err := d.updateTemporalSearchAttributes(currentTask, swctx.RunningStatus)
-
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"task":  currentTask,
-				"error": err,
-			}).Warn("Failed to update temporal search attributes")
-		}
-
-		if output, err = d.runTaskItem(currentTask, input); err != nil {
-			taskSupport.SetTaskStatus(currentTask.Key, swctx.FaultedStatus)
-			return output, err
-		}
-
-		taskSupport.SetTaskStatus(currentTask.Key, swctx.CompletedStatus)
 		input = utils.DeepCloneValue(output)
+
+		logrus.WithFields(logrus.Fields{
+			"currentTask": currentTask.Key,
+			"taskOutput":  output,
+			"nextInput":   input,
+		}).Info("Task completed, setting input for next task")
 
 		idx, currentTask = taskList.Next(idx)
 
@@ -198,6 +207,11 @@ func (r *ResumableWorkflowRunner) dispatchTaskExecution(
 ) (any, error) {
 	taskName := task.Key
 
+	// First, check for custom handlers
+	if handler, exists := r.tasks.GetTaskHandler(task); exists {
+		return handler.Execute(r.GetWorkflowTask(), task, input)
+	}
+
 	switch t := task.Task.(type) {
 	case *model.CallFunction:
 		return r.executeCallFunction(taskName, task.AsCallFunctionTask(), input)
@@ -228,7 +242,9 @@ func (r *ResumableWorkflowRunner) dispatchTaskExecution(
 	case *model.ForkTask:
 		return r.executeForkTask(taskName, task.AsForkTask(), input)
 	case *model.DoTask:
-		return r.executeDoRunner(task.AsDoTask(), input)
+		return r.executeDoRunner(taskName, task.AsDoTask(), input)
+	case *model.SwitchTask:
+		return r.executeSwitchTask(taskName, task.AsSwitchTask(), input)
 	default:
 		return nil, fmt.Errorf("unsupported task type %T", t)
 	}

@@ -5,9 +5,30 @@ import (
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 )
 
-func (d *ResumableWorkflowRunner) evaluateSwitchTask(input any, taskKey string, switchTask *model.SwitchTask) (*model.FlowDirective, error) {
+func (d *ResumableWorkflowRunner) executeSwitchTask(
+	taskKey string,
+	switchTask *model.SwitchTask,
+	input any,
+) (*model.FlowDirective, error) {
+
+	return SwitchTaskHandler(
+		d.GetWorkflowTask(),
+		input,
+		taskKey,
+		switchTask,
+	)
+
+}
+
+func SwitchTaskHandler(
+	workflowTask *models.WorkflowTask,
+	input any,
+	taskKey string,
+	switchTask *model.SwitchTask,
+) (*model.FlowDirective, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"taskKey": taskKey,
@@ -26,7 +47,7 @@ func (d *ResumableWorkflowRunner) evaluateSwitchTask(input any, taskKey string, 
 				continue
 			}
 
-			result, err := d.GetWorkflowTask().TraverseAndEvaluateBool(
+			result, err := workflowTask.TraverseAndEvaluateBool(
 				model.NormalizeExpr(switchCase.When.String()), input)
 
 			if err != nil {

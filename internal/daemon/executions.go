@@ -136,7 +136,14 @@ func (s *Server) getRunningWorkflow(c *gin.Context) {
 		return
 	}
 
-	workflowExecInfo := workflowExecutionInfo(wkflw.GetWorkflowExecutionInfo())
+	wklwInfo := wkflw.GetWorkflowExecutionInfo()
+
+	if wklwInfo == nil {
+		s.getErrorPage(c, http.StatusNotFound, "Workflow execution not found", nil)
+		return
+	}
+
+	workflowExecInfo := workflowExecutionInfo(wklwInfo)
 
 	var workflowTask models.WorkflowTask
 
@@ -196,8 +203,14 @@ func (s *Server) getRunningWorkflow(c *gin.Context) {
 			workflowExecInfo.Output = workflowTask.Output
 			workflowExecInfo.Context = workflowTask.Context
 
+		} else {
+
+			logrus.WithError(err).Warnln("Failed to query workflow for current state")
+			workflowExecInfo.Output = err.Error()
+
 		}
-	} else {
+
+	} else if wklwInfo.GetStatus() != enums.WORKFLOW_EXECUTION_STATUS_TERMINATED {
 
 		// Otherwise if the workflow has completed then get the last output
 
@@ -207,8 +220,8 @@ func (s *Server) getRunningWorkflow(c *gin.Context) {
 		err := fut.Get(ctx, &workflowTask)
 
 		if err != nil {
-			logrus.WithError(err).Error("Failed to get workflow output")
-			workflowTask.Output = err.Error()
+			logrus.WithError(err).Warnln("Failed to get workflow output")
+			workflowExecInfo.Output = err.Error()
 		}
 
 	}

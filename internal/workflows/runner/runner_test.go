@@ -11,6 +11,7 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/functions"
+	"github.com/thand-io/agent/internal/workflows/tasks"
 )
 
 func NewDefaultRunner(workflow *model.Workflow) (*ResumableWorkflowRunner, error) {
@@ -19,6 +20,9 @@ func NewDefaultRunner(workflow *model.Workflow) (*ResumableWorkflowRunner, error
 
 	// create functions registry
 	functions := functions.NewFunctionRegistry(config)
+
+	// create tasks registry
+	taskRegistry := tasks.NewTaskRegistry(config)
 
 	wkflw, err := models.NewWorkflowContext(&models.Workflow{
 		Name:        workflow.Document.Name,
@@ -31,26 +35,26 @@ func NewDefaultRunner(workflow *model.Workflow) (*ResumableWorkflowRunner, error
 		return nil, err
 	}
 
-	return NewResumableRunner(config, functions, wkflw), nil
+	return NewResumableRunner(config, functions, taskRegistry, wkflw), nil
 }
 
 // runWorkflowTest is a reusable test function for workflows
 func runWorkflowTest(t *testing.T, workflowPath string, input, expectedOutput map[string]any) {
 	// Run the workflow
-	output, err := runWorkflow(t, workflowPath, input, expectedOutput)
+	output, err := runWorkflow(t, workflowPath, input)
 	assert.NoError(t, err)
 
 	assertWorkflowRun(t, expectedOutput, output)
 }
 
 func runWorkflowWithErr(t *testing.T, workflowPath string, input, expectedOutput map[string]any, assertErr func(error)) {
-	output, err := runWorkflow(t, workflowPath, input, expectedOutput)
+	output, err := runWorkflow(t, workflowPath, input)
 	assert.Error(t, err)
 	assertErr(err)
 	assertWorkflowRun(t, expectedOutput, output)
 }
 
-func runWorkflow(t *testing.T, workflowPath string, input, expectedOutput map[string]any) (output any, err error) {
+func runWorkflow(t *testing.T, workflowPath string, input map[string]any) (output any, err error) {
 	// Read the workflow YAML from the testdata directory
 	yamlBytes, err := os.ReadFile(filepath.Clean(workflowPath))
 	assert.NoError(t, err, "Failed to read workflow YAML file")

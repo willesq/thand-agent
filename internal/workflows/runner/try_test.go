@@ -10,6 +10,7 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/functions"
+	"github.com/thand-io/agent/internal/workflows/tasks"
 )
 
 func TestExecuteTryTask_SuccessfulTryBlock(t *testing.T) {
@@ -26,6 +27,9 @@ func TestErrorMatchesFilter(t *testing.T) {
 
 	// Create function registry
 	functionRegistry := functions.NewFunctionRegistry(cfg)
+
+	// Create task registry
+	taskRegistry := tasks.NewTaskRegistry(cfg)
 
 	// Create a mock workflow
 	workflow := &model.Workflow{
@@ -45,7 +49,7 @@ func TestErrorMatchesFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the runner
-	runner := NewResumableRunner(cfg, functionRegistry, workflowCtx)
+	runner := NewResumableRunner(cfg, functionRegistry, taskRegistry, workflowCtx)
 
 	tests := []struct {
 		name     string
@@ -111,6 +115,9 @@ func TestCalculateRetryDelay(t *testing.T) {
 	// Create function registry
 	functionRegistry := functions.NewFunctionRegistry(cfg)
 
+	// Create task registry
+	taskRegistry := tasks.NewTaskRegistry(cfg)
+
 	// Create a mock workflow
 	workflow := &model.Workflow{
 		Document: model.Document{
@@ -129,7 +136,7 @@ func TestCalculateRetryDelay(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create the runner
-	runner := NewResumableRunner(cfg, functionRegistry, workflowCtx)
+	runner := NewResumableRunner(cfg, functionRegistry, taskRegistry, workflowCtx)
 
 	tests := []struct {
 		name        string

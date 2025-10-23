@@ -21,9 +21,18 @@ func (r *ResumableWorkflowRunner) executeListenTask(
 	input any,
 ) (any, error) {
 
-	logrus.Infof("Got signal for: %s", taskName)
+	return ListenTaskHandler(r.workflowTask, taskName, listen, input)
 
-	workflowTask := r.GetWorkflowTask()
+}
+
+func ListenTaskHandler(
+	workflowTask *models.WorkflowTask,
+	taskName string,
+	listen *model.ListenTask,
+	input any,
+) (any, error) {
+
+	logrus.Infof("Got signal for: %s", taskName)
 
 	if workflowTask.HasTemporalContext() {
 
@@ -128,7 +137,7 @@ func (r *ResumableWorkflowRunner) executeListenTask(
 
 			// We now have a signal to process
 
-			out, err := r.handleListenTask(taskName, listen, input)
+			out, err := handleListenTask(workflowTask, taskName, listen, input)
 
 			if err != nil {
 
@@ -171,7 +180,7 @@ func (r *ResumableWorkflowRunner) executeListenTask(
 		}
 
 		// Otherwise we have a signal to process
-		out, err := r.handleListenTask(taskName, listen, input)
+		out, err := handleListenTask(workflowTask, taskName, listen, input)
 
 		if err != nil {
 
@@ -196,11 +205,12 @@ func (r *ResumableWorkflowRunner) executeListenTask(
 
 }
 
-func (r *ResumableWorkflowRunner) handleListenTask(
+func handleListenTask(
+	workflowTask *models.WorkflowTask,
 	taskName string,
 	listen *model.ListenTask,
 	input any,
-) (any, error) {
+) (*cloudevents.Event, error) {
 
 	// Right lets validate the signal and covert it to a cloudevent
 	var signal cloudevents.Event
@@ -223,8 +233,8 @@ func (r *ResumableWorkflowRunner) handleListenTask(
 
 		// Configures the workflow to wait for all defined events before resuming execution.
 		// Required if any and one have not been set.
-		if r.evaluateListenFilter(oneListener, signal) {
-			return input, nil
+		if evaluateListenFilter(workflowTask, oneListener, signal) {
+			return &signal, nil
 		}
 
 	} else if anyListener != nil {
@@ -233,8 +243,8 @@ func (r *ResumableWorkflowRunner) handleListenTask(
 		// Required if all and one have not been set.
 		// If empty, listens to all incoming events
 
-		if r.evaluateAnyListener(anyListener, signal) {
-			return input, nil
+		if evaluateAnyListener(workflowTask, anyListener, signal) {
+			return &signal, nil
 		}
 
 	} else if untilListener != nil {
@@ -242,8 +252,8 @@ func (r *ResumableWorkflowRunner) handleListenTask(
 		// Configures the workflow to wait for the defined event before resuming execution.
 		// Required if all and any have not been set.
 
-		if r.evaluateUntilEventFilter(untilListener, signal) {
-			return input, nil
+		if evaluateUntilEventFilter(workflowTask, untilListener, signal) {
+			return &signal, nil
 		}
 
 	} else if allListener != nil {
@@ -252,8 +262,8 @@ func (r *ResumableWorkflowRunner) handleListenTask(
 		// Only applies if any has been set, otherwise ignored.
 		// If not present, once any event is received, it proceeds to the next task.
 
-		if r.evaluateAllListener(allListener, signal) {
-			return input, nil
+		if evaluateAllListener(workflowTask, allListener, signal) {
+			return &signal, nil
 		}
 
 	} else {
@@ -268,13 +278,15 @@ func (r *ResumableWorkflowRunner) handleListenTask(
 	return nil, nil
 }
 
-func (r *ResumableWorkflowRunner) evaluateUntilEventFilter(listenUntil *model.EventConsumptionUntil, signal cloudevents.Event) bool {
+func evaluateUntilEventFilter(
+	workflowTask *models.WorkflowTask,
+	listenUntil *model.EventConsumptionUntil, signal cloudevents.Event) bool {
 
 	if strings.Compare(listenUntil.Strategy.One.With.Type, signal.Type()) != 0 {
 
 		// Match type now lets check the data
 
-		result, err := r.workflowTask.TraverseAndEvaluateBool(
+		result, err := workflowTask.TraverseAndEvaluateBool(
 			listenUntil.Condition.String(), signal.DataAs(map[string]any{}))
 
 		if err != nil {
@@ -289,7 +301,7 @@ func (r *ResumableWorkflowRunner) evaluateUntilEventFilter(listenUntil *model.Ev
 	return false
 }
 
-func (r *ResumableWorkflowRunner) evaluateListenEvent(with *model.EventProperties, signal cloudevents.Event) bool {
+func evaluateListenEvent(with *model.EventProperties, signal cloudevents.Event) bool {
 
 	logrus.WithFields(logrus.Fields{
 		"expectedType": with.Type,
@@ -299,39 +311,39 @@ func (r *ResumableWorkflowRunner) evaluateListenEvent(with *model.EventPropertie
 	return strings.Compare(with.Type, signal.Type()) == 0
 }
 
-func (r *ResumableWorkflowRunner) evaluateListenFilter(eventFilter *model.EventFilter, signal cloudevents.Event) bool {
+func evaluateListenFilter(workflowTask *models.WorkflowTask, eventFilter *model.EventFilter, signal cloudevents.Event) bool {
 
 	if eventFilter.With != nil {
 
-		return r.evaluateListenEvent(eventFilter.With, signal)
+		return evaluateListenEvent(eventFilter.With, signal)
 
 	}
 
 	return false
 }
 
-func (r *ResumableWorkflowRunner) evaluateAnyListener(anyListener []*model.EventFilter, signal cloudevents.Event) bool {
+func evaluateAnyListener(workflowTask *models.WorkflowTask, anyListener []*model.EventFilter, signal cloudevents.Event) bool {
 
 	for _, eventFilter := range anyListener {
 
-		if r.evaluateListenFilter(eventFilter, signal) {
-			return false
+		if evaluateListenFilter(workflowTask, eventFilter, signal) {
+			return true
 		}
 
 	}
 
-	return true
+	return false
 }
 
-func (r *ResumableWorkflowRunner) evaluateAllListener(allListener []*model.EventFilter, signal cloudevents.Event) bool {
+func evaluateAllListener(workflowTask *models.WorkflowTask, allListener []*model.EventFilter, signal cloudevents.Event) bool {
 
 	for _, eventFilter := range allListener {
 
-		if r.evaluateListenFilter(eventFilter, signal) {
-			return false
+		if evaluateListenFilter(workflowTask, eventFilter, signal) {
+			return true
 		}
 
 	}
 
-	return true
+	return false
 }

@@ -45,7 +45,7 @@ func (p *slackProvider) Initialize(provider models.Provider) error {
 type SlackNotificationRequest struct {
 	To     string       `json:"channel"`
 	Text   string       `json:"text,omitempty"`
-	Blocks slack.Blocks `json:"blocks,omitempty"`
+	Blocks slack.Blocks `json:"blocks"`
 
 	Attachments []slack.Attachment `json:"attachments,omitempty"`
 }
