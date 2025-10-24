@@ -220,10 +220,15 @@ func handleListenTask(
 	err := common.ConvertInterfaceToInterface(input, &signal)
 
 	if err != nil {
+
+		logrus.WithError(err).Error("Failed to convert signal to cloudevent")
 		return nil, fmt.Errorf("failed to convert signal to cloudevent: %w", err)
+
 	}
 
 	if listen.Listen.To == nil {
+
+		logrus.Error("To in listener not defined")
 		return nil, fmt.Errorf("to in listener not defined")
 	}
 

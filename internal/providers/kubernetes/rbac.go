@@ -121,25 +121,39 @@ func (p *kubernetesProvider) authorizeNamespacedRole(
 		},
 	}
 
-	_, err = client.RbacV1().RoleBindings(namespace).Create(ctx, roleBinding, metav1.CreateOptions{})
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"user":      user.GetIdentity(),
-			"role":      role.Name,
-			"namespace": namespace,
-			"error":     err.Error(),
-		}).Error("Failed to create role binding")
-		return nil, fmt.Errorf("failed to create role binding: %w", err)
-	}
-
-	// Log successful authorization
-	logrus.WithFields(logrus.Fields{
+	logFields := logrus.Fields{
 		"user":      user.GetIdentity(),
 		"role":      role.Name,
 		"namespace": namespace,
 		"binding":   bindingName,
-		"scope":     "namespaced",
-	}).Info("Successfully authorized user to namespaced role")
+	}
+
+	_, err = client.RbacV1().
+		RoleBindings(namespace).
+		Create(ctx, roleBinding, metav1.CreateOptions{})
+	if err != nil {
+		// If role binding exists, update it using proper error checking
+		if apierrors.IsAlreadyExists(err) {
+			_, err = client.RbacV1().
+				RoleBindings(namespace).
+				Update(ctx, roleBinding, metav1.UpdateOptions{})
+			if err != nil {
+				logrus.WithError(err).
+					WithFields(logFields).
+					Error("Failed to update role binding")
+				return nil, fmt.Errorf("failed to update role binding: %w", err)
+			}
+		} else {
+			logrus.WithError(err).
+				WithFields(logFields).
+				Error("Failed to create role binding")
+			return nil, fmt.Errorf("failed to create role binding: %w", err)
+		}
+	}
+
+	// Log successful authorization
+	logrus.WithFields(logFields).
+		Info("Successfully authorized user to namespaced role")
 
 	return &models.AuthorizeRoleResponse{
 		Metadata: map[string]any{
@@ -211,12 +225,25 @@ func (p *kubernetesProvider) authorizeClusterRole(
 
 	_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, clusterRoleBinding, metav1.CreateOptions{})
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"user":  user.GetIdentity(),
-			"role":  role.Name,
-			"error": err.Error(),
-		}).Error("Failed to create cluster role binding")
-		return nil, fmt.Errorf("failed to create cluster role binding: %w", err)
+		// If cluster role binding exists, update it using proper error checking
+		if apierrors.IsAlreadyExists(err) {
+			_, err = client.RbacV1().ClusterRoleBindings().Update(ctx, clusterRoleBinding, metav1.UpdateOptions{})
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"user":  user.GetIdentity(),
+					"role":  role.Name,
+					"error": err.Error(),
+				}).Error("Failed to update cluster role binding")
+				return nil, fmt.Errorf("failed to update cluster role binding: %w", err)
+			}
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"user":  user.GetIdentity(),
+				"role":  role.Name,
+				"error": err.Error(),
+			}).Error("Failed to create cluster role binding")
+			return nil, fmt.Errorf("failed to create cluster role binding: %w", err)
+		}
 	}
 
 	// Log successful authorization
