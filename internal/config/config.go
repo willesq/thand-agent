@@ -565,6 +565,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.health.enabled", true)
 	v.SetDefault("server.health.path", "/health")
 
+	// Ready defaults
+	v.SetDefault("server.ready.enabled", true)
+	v.SetDefault("server.ready.path", "/ready")
+
 	// Security defaults
 	v.SetDefault("server.cors.allowed_origins", []string{"https://thand.io", "https://*.thand.io"})
 	v.SetDefault("server.cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})

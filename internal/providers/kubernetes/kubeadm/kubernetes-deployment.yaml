@@ -60,26 +60,43 @@ spec:
       serviceAccountName: thand-agent
       containers:
       - name: thand-agent
-        image: thand/agent:latest
+        image: thand-dev/agent:latest
+        imagePullPolicy: Never  # Added this line to prevent external pulls
         ports:
         - containerPort: 8080
           name: http
+        command: ["./agent", "server", "--config", "/app/config/config.yaml"]
         env:
-        - name: THAND_CONFIG_PATH
-          value: "/app/config/config.yaml"
+        - name: THAND_ROLES_PATH
+          value: "/app/config/roles/"
+        - name: THAND_PROVIDERS_PATH
+          value: "/app/config/providers/"
+        - name: THAND_WORKFLOWS_PATH
+          value: "/app/config/workflows/"
         - name: THAND_LOG_LEVEL
-          value: "info"
+          value: "debug"
+        - name: THAND_LOGIN_ENDPOINT
+          value: http://localhost:8081/
         volumeMounts:
         - name: config
           mountPath: /app/config
           readOnly: true
+        - name: roles-config
+          mountPath: /app/config/roles
+          readOnly: true
+        - name: providers-config
+          mountPath: /app/config/providers
+          readOnly: true
+        - name: workflows-config
+          mountPath: /app/config/workflows
+          readOnly: true
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "50m"
+            memory: "1Gi"
+            cpu: "500m"
           limits:
-            memory: "256Mi"
-            cpu: "200m"
+            memory: "4Gi"
+            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /health
@@ -96,6 +113,18 @@ spec:
       - name: config
         configMap:
           name: thand-config
+      - name: roles-config
+        secret:
+          secretName: thand-roles-config
+          defaultMode: 0644
+      - name: providers-config
+        secret:
+          secretName: thand-providers-config
+          defaultMode: 0644
+      - name: workflows-config
+        secret:
+          secretName: thand-workflows-config
+          defaultMode: 0644
 ---
 apiVersion: v1
 kind: Service
@@ -121,16 +150,38 @@ metadata:
   namespace: thand-system
 data:
   config.yaml: |
+    
+    # Server Configuration
     server:
       port: 8080
       host: "0.0.0.0"
+      health:
+        enabled: true
+        path: "/health"
+      ready:
+        enabled: true
+        path: "/ready"
     
+    # Logging Configuration
+    logging:
+      level: "debug" # debug, info, warn, error
+      format: "json" # json, text
+      output: "stdout" # stdout, stderr, file path
+
+    # Providers Configuration
     providers:
-      - name: kubernetes-cluster
+      kubernetes-cluster:
         description: Current Kubernetes cluster
         provider: kubernetes
         config: {}
         enabled: true
-    
+
     # Add your role definitions here
-    roles: []
+    roles:
+      # Define your roles here
+      path: /app/config/roles/
+
+    # Add your workflow definitions here
+    workflows:
+      # Define your workflows here
+      path: /app/config/workflows/

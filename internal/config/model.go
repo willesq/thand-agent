@@ -192,6 +192,7 @@ type ServerConfig struct {
 	Limits   ServerLimitsConfig `mapstructure:"limits"`
 	Metrics  MetricsConfig      `mapstructure:"metrics"`
 	Health   HealthConfig       `mapstructure:"health"`
+	Ready    ReadyConfig        `mapstructure:"ready"`
 	Security SecurityConfig     `mapstructure:"security"`
 }
 
@@ -222,8 +223,14 @@ type MetricsConfig struct {
 }
 
 type HealthConfig struct {
+	Enabled bool `mapstructure:"enabled" default:"true"`
+	// Don't use /healthz as it conflicts with google k8s health checks
+	Path string `mapstructure:"path" default:"/health"`
+}
+
+type ReadyConfig struct {
 	Enabled bool   `mapstructure:"enabled" default:"true"`
-	Path    string `mapstructure:"path" default:"/healthz"`
+	Path    string `mapstructure:"path" default:"/ready"`
 }
 
 type SecurityConfig struct {

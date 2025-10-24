@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
@@ -190,13 +189,7 @@ func (s *Server) cancelRunningWorkflow(c *gin.Context) {
 		return
 	}
 
-	err = temporalClient.SignalWorkflow(
-		c, workflowId, models.TemporalEmptyRunId,
-		models.TemporalTerminateSignalName, models.TemporalTerminationRequest{
-			Reason:      "Terminated by user " + authenticatedUser.User.Email,
-			ScheduledAt: time.Now(),
-		},
-	)
+	err = temporalClient.CancelWorkflow(c, workflowId, models.TemporalEmptyRunId)
 
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to signal workflow for termination", err)

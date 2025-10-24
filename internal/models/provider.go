@@ -509,6 +509,15 @@ func validatePermissions(providerPermissions []ProviderPermission, permissions [
 			// support wildcarding.
 			validatedPermissions = append(validatedPermissions,
 				expandPermissionsWildcard(providerPermissions, perm)...)
+
+		} else if permission := getCondensedActions(perm); permission != nil {
+
+			// If the last part is delimited by comma, e.g., k8s:pods:get,list,watch
+			// lets use a more complex parsing with regex and then expand those
+			// into individual permissions
+			validatedPermissions = append(validatedPermissions, permission...)
+			// We have a match, now expand it
+
 		} else if !slices.ContainsFunc(providerPermissions, func(p ProviderPermission) bool {
 			found := strings.Compare(p.Name, perm) == 0
 			if found {
@@ -540,4 +549,35 @@ func expandPermissionsWildcard(providerPermissions []ProviderPermission, permiss
 	}
 
 	return expandedPermissions
+}
+
+/*
+k8s:pods:get,list,watch
+*/
+func getCondensedActions(permission string) []string {
+
+	// split on the last colon
+	idx := strings.LastIndex(permission, ":")
+
+	if idx == -1 {
+		return nil
+	}
+
+	resource := permission[:idx]
+	actions := permission[idx+1:]
+
+	// Check if the second part contains a comma
+	actionParts := strings.Split(actions, ",")
+
+	if len(actionParts) == 0 {
+		return nil
+	}
+
+	permissions := []string{}
+
+	for _, action := range actionParts {
+		permissions = append(permissions, fmt.Sprintf("%s:%s", resource, action))
+	}
+
+	return permissions
 }

@@ -22,7 +22,7 @@ var versionCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Thand Agent %s", version)
-		if gitCommit != "unknown" && gitCommit != "" {
+		if gitCommit != "unknown" && len(gitCommit) > 0 {
 			if len(gitCommit) > 8 {
 				fmt.Printf(" (git: %s)", gitCommit[:8])
 			} else {
