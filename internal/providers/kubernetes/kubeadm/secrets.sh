@@ -1,4 +1,4 @@
-
+#!/bin/bash
 NAMESPACE="thand-system"
 
 # Loop through, provider, roles and workflows configs and create secrets

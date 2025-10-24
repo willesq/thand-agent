@@ -227,7 +227,7 @@ func (p *kubernetesProvider) authorizeClusterRole(
 		},
 	}
 
-	logFieds := logrus.Fields{
+	logFields := logrus.Fields{
 		"user":    user.GetIdentity(),
 		"role":    role.Name,
 		"binding": bindingName,
@@ -244,20 +244,20 @@ func (p *kubernetesProvider) authorizeClusterRole(
 				Update(ctx, clusterRoleBinding, metav1.UpdateOptions{})
 			if err != nil {
 				logrus.WithError(err).
-					WithFields(logFieds).
+					WithFields(logFields).
 					Error("Failed to update cluster role binding")
 				return nil, fmt.Errorf("failed to update cluster role binding: %w", err)
 			}
 		} else {
 			logrus.WithError(err).
-				WithFields(logFieds).
+				WithFields(logFields).
 				Error("Failed to create cluster role binding")
 			return nil, fmt.Errorf("failed to create cluster role binding: %w", err)
 		}
 	}
 
 	// Log successful authorization
-	logrus.WithFields(logFieds).
+	logrus.WithFields(logFields).
 		Info("Successfully authorized user to cluster role")
 
 	return &models.AuthorizeRoleResponse{
