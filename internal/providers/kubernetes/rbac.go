@@ -26,7 +26,7 @@ func (p *kubernetesProvider) AuthorizeRole(
 	// Determine scope based on role configuration
 	namespace := p.getNamespaceFromRole(role)
 
-	if namespace != "" {
+	if len(namespace) > 0 {
 		// Create namespaced Role and RoleBinding
 		return p.authorizeNamespacedRole(ctx, user, role, namespace)
 	} else {
@@ -50,7 +50,7 @@ func (p *kubernetesProvider) RevokeRole(
 
 	namespace := p.getNamespaceFromRole(role)
 
-	if namespace != "" {
+	if len(namespace) > 0 {
 		return p.revokeNamespacedRole(ctx, user, role, namespace)
 	} else {
 		return p.revokeClusterRole(ctx, user, role)
@@ -272,7 +272,7 @@ func (p *kubernetesProvider) parsePermission(permission string) *rbacv1.PolicyRu
 // Security helper functions
 func (p *kubernetesProvider) getUserIdentifier(user *models.User) string {
 	// Prefer email for OIDC integration, fallback to username
-	if user.Email != "" {
+	if len(user.Email) > 0 {
 		return user.Email
 	}
 	return user.Username

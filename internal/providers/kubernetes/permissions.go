@@ -194,7 +194,7 @@ func (p *kubernetesProvider) extractPermissionsFromBuiltinRoles() []models.Provi
 						}
 
 						description := fmt.Sprintf("%s %s", cases.Title(language.Und).String(verb), resource)
-						if apiGroup != "" {
+						if len(apiGroup) > 0 {
 							description += fmt.Sprintf(" (%s API group)", apiGroup)
 						}
 						description += fmt.Sprintf(" [from %s ClusterRole]", roleName)
