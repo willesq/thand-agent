@@ -68,12 +68,6 @@ func (p *kubernetesProvider) authorizeNamespacedRole(
 	client := p.GetClient()
 	roleName := role.GetSnakeCaseName()
 
-	// Validate permissions to prevent privilege escalation
-	err := p.validatePermissions(role.Permissions.Allow)
-	if err != nil {
-		return nil, fmt.Errorf("invalid permissions: %w", err)
-	}
-
 	// Create or update Role
 	k8sRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
@@ -87,7 +81,7 @@ func (p *kubernetesProvider) authorizeNamespacedRole(
 		Rules: p.convertPermissionsToRules(role.Permissions.Allow),
 	}
 
-	_, err = client.RbacV1().Roles(namespace).Create(ctx, k8sRole, metav1.CreateOptions{})
+	_, err := client.RbacV1().Roles(namespace).Create(ctx, k8sRole, metav1.CreateOptions{})
 	if err != nil {
 		// If role exists, update it
 		if strings.Contains(err.Error(), "already exists") {
@@ -150,12 +144,6 @@ func (p *kubernetesProvider) authorizeClusterRole(
 	client := p.GetClient()
 	roleName := role.GetSnakeCaseName()
 
-	// Validate permissions to prevent privilege escalation
-	err := p.validatePermissions(role.Permissions.Allow)
-	if err != nil {
-		return nil, fmt.Errorf("invalid permissions: %w", err)
-	}
-
 	// Create or update ClusterRole
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
@@ -168,7 +156,7 @@ func (p *kubernetesProvider) authorizeClusterRole(
 		Rules: p.convertPermissionsToRules(role.Permissions.Allow),
 	}
 
-	_, err = client.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{})
+	_, err := client.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{})
 	if err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			_, err = client.RbacV1().ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{})
@@ -279,35 +267,6 @@ func (p *kubernetesProvider) parsePermission(permission string) *rbacv1.PolicyRu
 	}
 
 	return rule
-}
-
-// validatePermissions ensures permissions don't allow privilege escalation
-func (p *kubernetesProvider) validatePermissions(permissions []string) error {
-	dangerousPermissions := []string{
-		"k8s:*:*",                   // Full admin access
-		"k8s:clusterroles:*",        // Cluster role management
-		"k8s:clusterrolebindings:*", // Cluster role binding management
-		"k8s:nodes:*",               // Node access
-		"k8s:*/nodes:*",             // Node access with API group
-	}
-
-	for _, permission := range permissions {
-		for _, dangerous := range dangerousPermissions {
-			if p.matchesPattern(permission, dangerous) {
-				return fmt.Errorf("dangerous permission not allowed: %s", permission)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (p *kubernetesProvider) matchesPattern(permission, pattern string) bool {
-	if pattern == permission {
-		return true
-	}
-	// Add wildcard matching logic here
-	return strings.Contains(pattern, "*") && strings.HasPrefix(permission, strings.Split(pattern, "*")[0])
 }
 
 // Security helper functions

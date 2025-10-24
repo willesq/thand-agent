@@ -94,9 +94,8 @@ func ListenTaskHandler(
 			// Wait for any of the signals
 			err := workflow.Await(cancelCtx, func() bool {
 
-				logrus.WithError(cancelCtx.Err()).Error("Context listen error")
-
 				if cancelCtx.Err() != nil {
+
 					if errors.Is(cancelCtx.Err(), context.Canceled) {
 						// Context was cancelled
 						logrus.Info("Context was cancelled")
@@ -211,6 +210,10 @@ func handleListenTask(
 	listen *model.ListenTask,
 	input any,
 ) (*cloudevents.Event, error) {
+
+	if common.IsNilOrZero(input) {
+		return nil, fmt.Errorf("no signal input provided")
+	}
 
 	// Right lets validate the signal and covert it to a cloudevent
 	var signal cloudevents.Event

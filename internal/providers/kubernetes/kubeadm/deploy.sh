@@ -20,28 +20,8 @@ elif [[ "$CURRENT_CONTEXT" == *"kind"* ]]; then
     echo "Detected kind - loading image into cluster"
     kind load docker-image thand-dev/agent:latest
 else
-    echo "Remote cluster detected - loading image into nodes..."
-    
-    # Save the image to a tar file
-    echo "Saving image to tar file..."
-    docker save thand-dev/agent:latest -o thand-agent.tar
-    
-    # Get list of all nodes (control plane + workers)
-    NODES=$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}')
-    
-    for node in $NODES; do
-        echo "Loading image into node: $node"
-        
-        # Try to copy and load the image
-        if scp thand-agent.tar $node:/tmp/thand-agent.tar 2>/dev/null; then
-            ssh $node "sudo docker load -i /tmp/thand-agent.tar && rm -f /tmp/thand-agent.tar"
-        else
-            echo "Warning: Could not copy image to node $node"
-        fi
-    done
-    
-    # Clean up local tar file
-    rm -f thand-agent.tar
+    echo "Unknown Kubernetes context: $CURRENT_CONTEXT"
+    exit 0
 fi
 
 # Apply the Kubernetes manifests (fix the path)

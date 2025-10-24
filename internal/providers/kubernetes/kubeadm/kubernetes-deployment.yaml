@@ -74,7 +74,9 @@ spec:
         - name: THAND_WORKFLOWS_PATH
           value: "/app/config/workflows/"
         - name: THAND_LOG_LEVEL
-          value: "info"
+          value: "debug"
+        - name: THAND_LOGIN_ENDPOINT
+          value: http://localhost:8081/
         volumeMounts:
         - name: config
           mountPath: /app/config
@@ -90,11 +92,11 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "50m"
+            memory: "1Gi"
+            cpu: "500m"
           limits:
-            memory: "256Mi"
-            cpu: "200m"
+            memory: "4Gi"
+            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /health
@@ -148,6 +150,8 @@ metadata:
   namespace: thand-system
 data:
   config.yaml: |
+    
+    # Server Configuration
     server:
       port: 8080
       host: "0.0.0.0"
@@ -157,7 +161,14 @@ data:
       ready:
         enabled: true
         path: "/ready"
+    
+    # Logging Configuration
+    logging:
+      level: "debug" # debug, info, warn, error
+      format: "json" # json, text
+      output: "stdout" # stdout, stderr, file path
 
+    # Providers Configuration
     providers:
       kubernetes-cluster:
         description: Current Kubernetes cluster
@@ -170,6 +181,7 @@ data:
       # Define your roles here
       path: /app/config/roles/
 
+    # Add your workflow definitions here
     workflows:
       # Define your workflows here
       path: /app/config/workflows/

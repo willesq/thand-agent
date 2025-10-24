@@ -91,7 +91,7 @@ func (c *Config) processProviderDefinitions(foundProviders []*ProviderDefinition
 // shouldIncludeProvider determines if a provider should be included in the final list
 func (c *Config) shouldIncludeProvider(providerKey string, p models.Provider, existingDefs map[string]models.Provider) bool {
 	if !p.Enabled {
-		logrus.Infoln("Provider disabled:", providerKey)
+		logrus.Infoln("Provider disabled (not marked as enabled):", providerKey)
 		return false
 	}
 
