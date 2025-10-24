@@ -187,10 +187,14 @@ func (p *kubernetesProvider) authorizeClusterRole(
 		Rules: p.convertPermissionsToRules(role.Permissions.Allow),
 	}
 
-	_, err := client.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{})
+	_, err := client.RbacV1().
+		ClusterRoles().
+		Create(ctx, clusterRole, metav1.CreateOptions{})
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
-			_, err = client.RbacV1().ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{})
+			_, err = client.RbacV1().
+				ClusterRoles().
+				Update(ctx, clusterRole, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to update cluster role: %w", err)
 			}
@@ -223,36 +227,38 @@ func (p *kubernetesProvider) authorizeClusterRole(
 		},
 	}
 
-	_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, clusterRoleBinding, metav1.CreateOptions{})
+	logFieds := logrus.Fields{
+		"user":    user.GetIdentity(),
+		"role":    role.Name,
+		"binding": bindingName,
+	}
+
+	_, err = client.RbacV1().
+		ClusterRoleBindings().
+		Create(ctx, clusterRoleBinding, metav1.CreateOptions{})
 	if err != nil {
 		// If cluster role binding exists, update it using proper error checking
 		if apierrors.IsAlreadyExists(err) {
-			_, err = client.RbacV1().ClusterRoleBindings().Update(ctx, clusterRoleBinding, metav1.UpdateOptions{})
+			_, err = client.RbacV1().
+				ClusterRoleBindings().
+				Update(ctx, clusterRoleBinding, metav1.UpdateOptions{})
 			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"user":  user.GetIdentity(),
-					"role":  role.Name,
-					"error": err.Error(),
-				}).Error("Failed to update cluster role binding")
+				logrus.WithError(err).
+					WithFields(logFieds).
+					Error("Failed to update cluster role binding")
 				return nil, fmt.Errorf("failed to update cluster role binding: %w", err)
 			}
 		} else {
-			logrus.WithFields(logrus.Fields{
-				"user":  user.GetIdentity(),
-				"role":  role.Name,
-				"error": err.Error(),
-			}).Error("Failed to create cluster role binding")
+			logrus.WithError(err).
+				WithFields(logFieds).
+				Error("Failed to create cluster role binding")
 			return nil, fmt.Errorf("failed to create cluster role binding: %w", err)
 		}
 	}
 
 	// Log successful authorization
-	logrus.WithFields(logrus.Fields{
-		"user":    user.GetIdentity(),
-		"role":    role.Name,
-		"binding": bindingName,
-		"scope":   "cluster",
-	}).Info("Successfully authorized user to cluster role")
+	logrus.WithFields(logFieds).
+		Info("Successfully authorized user to cluster role")
 
 	return &models.AuthorizeRoleResponse{
 		Metadata: map[string]any{
@@ -432,7 +438,9 @@ func (p *kubernetesProvider) revokeNamespacedRole(
 	bindingName := fmt.Sprintf("%s-%s", role.GetSnakeCaseName(), p.sanitizeUserIdentifier(user))
 
 	// Check if RoleBinding exists before attempting to delete
-	_, err := client.RbacV1().RoleBindings(namespace).Get(ctx, bindingName, metav1.GetOptions{})
+	_, err := client.RbacV1().
+		RoleBindings(namespace).
+		Get(ctx, bindingName, metav1.GetOptions{})
 	if err != nil {
 		// If the binding doesn't exist, consider it already revoked
 		if apierrors.IsNotFound(err) {
@@ -441,27 +449,26 @@ func (p *kubernetesProvider) revokeNamespacedRole(
 		return nil, fmt.Errorf("failed to check role binding existence: %w", err)
 	}
 
-	// Delete RoleBinding
-	err = client.RbacV1().RoleBindings(namespace).Delete(ctx, bindingName, metav1.DeleteOptions{})
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"user":      user.GetIdentity(),
-			"role":      role.Name,
-			"namespace": namespace,
-			"binding":   bindingName,
-			"error":     err.Error(),
-		}).Error("Failed to delete role binding")
-		return nil, fmt.Errorf("failed to delete role binding: %w", err)
-	}
-
-	// Log successful revocation
-	logrus.WithFields(logrus.Fields{
+	logFields := logrus.Fields{
 		"user":      user.GetIdentity(),
 		"role":      role.Name,
 		"namespace": namespace,
 		"binding":   bindingName,
 		"scope":     "namespaced",
-	}).Info("Successfully revoked user access to namespaced role")
+	}
+
+	// Delete RoleBinding
+	err = client.RbacV1().RoleBindings(namespace).Delete(ctx, bindingName, metav1.DeleteOptions{})
+	if err != nil {
+		logrus.WithError(err).
+			WithFields(logFields).
+			Error("Failed to delete role binding")
+		return nil, fmt.Errorf("failed to delete role binding: %w", err)
+	}
+
+	// Log successful revocation
+	logrus.WithFields(logFields).
+		Info("Successfully revoked user access to namespaced role")
 
 	return &models.RevokeRoleResponse{}, nil
 }
@@ -476,7 +483,9 @@ func (p *kubernetesProvider) revokeClusterRole(
 	bindingName := fmt.Sprintf("%s-%s", role.GetSnakeCaseName(), p.sanitizeUserIdentifier(user))
 
 	// Check if ClusterRoleBinding exists before attempting to delete
-	_, err := client.RbacV1().ClusterRoleBindings().Get(ctx, bindingName, metav1.GetOptions{})
+	_, err := client.RbacV1().
+		ClusterRoleBindings().
+		Get(ctx, bindingName, metav1.GetOptions{})
 	if err != nil {
 		// If the binding doesn't exist, consider it already revoked
 		if apierrors.IsNotFound(err) {
@@ -485,25 +494,28 @@ func (p *kubernetesProvider) revokeClusterRole(
 		return nil, fmt.Errorf("failed to check cluster role binding existence: %w", err)
 	}
 
-	// Delete ClusterRoleBinding
-	err = client.RbacV1().ClusterRoleBindings().Delete(ctx, bindingName, metav1.DeleteOptions{})
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"user":    user.GetIdentity(),
-			"role":    role.Name,
-			"binding": bindingName,
-			"error":   err.Error(),
-		}).Error("Failed to delete cluster role binding")
-		return nil, fmt.Errorf("failed to delete cluster role binding: %w", err)
-	}
-
-	// Log successful revocation
-	logrus.WithFields(logrus.Fields{
+	logFields := logrus.Fields{
 		"user":    user.GetIdentity(),
 		"role":    role.Name,
 		"binding": bindingName,
 		"scope":   "cluster",
-	}).Info("Successfully revoked user access to cluster role")
+	}
+
+	// Delete ClusterRoleBinding
+	err = client.RbacV1().
+		ClusterRoleBindings().
+		Delete(ctx, bindingName, metav1.DeleteOptions{})
+	if err != nil {
+		logrus.WithError(err).
+			WithFields(logFields).
+			Error("Failed to delete cluster role binding")
+		return nil, fmt.Errorf("failed to delete cluster role binding: %w", err)
+	}
+
+	// Log successful revocation
+	logrus.WithError(err).
+		WithFields(logFields).
+		Info("Successfully revoked user access to cluster role")
 
 	return &models.RevokeRoleResponse{}, nil
 }
