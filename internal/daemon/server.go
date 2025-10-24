@@ -270,6 +270,11 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 		router.GET(s.Config.Server.Health.Path, s.healthHandler)
 	}
 
+	// Ready endpoint
+	if s.Config.Server.Ready.Enabled {
+		router.GET(s.Config.Server.Ready.Path, s.readyHandler)
+	}
+
 	// Metrics endpoint
 	if s.Config.Server.Metrics.Enabled {
 		router.GET(s.Config.Server.Metrics.Path, s.metricsHandler)
@@ -453,6 +458,17 @@ func (s *Server) healthHandler(c *gin.Context) {
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Version:     s.GetVersion(),
 		Services:    servicesHealth,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// readyHandler handles the readiness check endpoint
+func (s *Server) readyHandler(c *gin.Context) {
+	response := gin.H{
+		"status":    "ready",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"version":   s.GetVersion(),
 	}
 
 	c.JSON(http.StatusOK, response)

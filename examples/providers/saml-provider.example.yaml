@@ -2,7 +2,7 @@
 # This configuration shows how to set up a SAML authentication provider
 
 providers:
-  - name: company-saml
+  company-saml:
     description: Company SAML Identity Provider
     provider: saml
     enabled: true
@@ -27,7 +27,7 @@ providers:
 
 # Example role that can use this SAML provider
 roles:
-  - name: saml-users
+  saml-users:
     description: Users authenticated via SAML
     provider: company-saml
     permissions:

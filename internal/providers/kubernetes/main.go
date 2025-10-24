@@ -1,4 +1,4 @@
-package kubernetees
+package kubernetes
 
 import (
 	"fmt"

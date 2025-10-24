@@ -37,3 +37,9 @@ config.yaml
 
 # Vendor directory (if using go mod, this isn't needed)
 vendor/
+
+examples/
+
+scripts/
+
+config/

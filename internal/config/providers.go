@@ -13,6 +13,7 @@ import (
 	_ "github.com/thand-io/agent/internal/providers/email"
 	_ "github.com/thand-io/agent/internal/providers/gcp"
 	_ "github.com/thand-io/agent/internal/providers/github"
+	_ "github.com/thand-io/agent/internal/providers/kubernetes"
 	_ "github.com/thand-io/agent/internal/providers/oauth2"
 	_ "github.com/thand-io/agent/internal/providers/oauth2.google"
 	_ "github.com/thand-io/agent/internal/providers/salesforce"
