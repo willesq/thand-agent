@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -83,8 +85,8 @@ func (p *kubernetesProvider) authorizeNamespacedRole(
 
 	_, err := client.RbacV1().Roles(namespace).Create(ctx, k8sRole, metav1.CreateOptions{})
 	if err != nil {
-		// If role exists, update it
-		if strings.Contains(err.Error(), "already exists") {
+		// If role exists, update it using proper error checking
+		if apierrors.IsAlreadyExists(err) {
 			_, err = client.RbacV1().Roles(namespace).Update(ctx, k8sRole, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to update role: %w", err)
@@ -121,8 +123,23 @@ func (p *kubernetesProvider) authorizeNamespacedRole(
 
 	_, err = client.RbacV1().RoleBindings(namespace).Create(ctx, roleBinding, metav1.CreateOptions{})
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"user":      user.GetIdentity(),
+			"role":      role.Name,
+			"namespace": namespace,
+			"error":     err.Error(),
+		}).Error("Failed to create role binding")
 		return nil, fmt.Errorf("failed to create role binding: %w", err)
 	}
+
+	// Log successful authorization
+	logrus.WithFields(logrus.Fields{
+		"user":      user.GetIdentity(),
+		"role":      role.Name,
+		"namespace": namespace,
+		"binding":   bindingName,
+		"scope":     "namespaced",
+	}).Info("Successfully authorized user to namespaced role")
 
 	return &models.AuthorizeRoleResponse{
 		Metadata: map[string]any{
@@ -158,7 +175,7 @@ func (p *kubernetesProvider) authorizeClusterRole(
 
 	_, err := client.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{})
 	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
+		if apierrors.IsAlreadyExists(err) {
 			_, err = client.RbacV1().ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to update cluster role: %w", err)
@@ -194,8 +211,21 @@ func (p *kubernetesProvider) authorizeClusterRole(
 
 	_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, clusterRoleBinding, metav1.CreateOptions{})
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"user":  user.GetIdentity(),
+			"role":  role.Name,
+			"error": err.Error(),
+		}).Error("Failed to create cluster role binding")
 		return nil, fmt.Errorf("failed to create cluster role binding: %w", err)
 	}
+
+	// Log successful authorization
+	logrus.WithFields(logrus.Fields{
+		"user":    user.GetIdentity(),
+		"role":    role.Name,
+		"binding": bindingName,
+		"scope":   "cluster",
+	}).Info("Successfully authorized user to cluster role")
 
 	return &models.AuthorizeRoleResponse{
 		Metadata: map[string]any{
@@ -244,12 +274,52 @@ func (p *kubernetesProvider) parsePermission(permission string) *rbacv1.PolicyRu
 
 	parts := strings.Split(permission, ":")
 	if len(parts) != 3 {
+		logrus.WithField("permission", permission).Warn("Invalid permission format, expected 'prefix:resource:verbs'")
 		return nil // Invalid format
+	}
+
+	// Validate prefix
+	if parts[0] != "k8s" {
+		logrus.WithField("permission", permission).Warn("Invalid permission prefix, expected 'k8s'")
+		return nil
 	}
 
 	apiGroup := ""
 	resource := parts[1]
 	verbs := strings.Split(parts[2], ",")
+
+	// Validate verbs are not empty
+	if len(verbs) == 0 || (len(verbs) == 1 && verbs[0] == "") {
+		logrus.WithField("permission", permission).Warn("Invalid permission: no verbs specified")
+		return nil
+	}
+
+	// Validate and sanitize verbs
+	validVerbs := []string{}
+	allowedVerbs := map[string]bool{
+		"get": true, "list": true, "create": true, "update": true,
+		"patch": true, "delete": true, "watch": true, "deletecollection": true,
+	}
+
+	for _, verb := range verbs {
+		verb = strings.TrimSpace(verb)
+		if verb == "" {
+			continue
+		}
+		if !allowedVerbs[verb] {
+			logrus.WithFields(logrus.Fields{
+				"permission": permission,
+				"verb":       verb,
+			}).Warn("Invalid verb in permission")
+			continue
+		}
+		validVerbs = append(validVerbs, verb)
+	}
+
+	if len(validVerbs) == 0 {
+		logrus.WithField("permission", permission).Warn("No valid verbs found in permission")
+		return nil
+	}
 
 	// Parse API group and resource
 	if strings.Contains(resource, "/") {
@@ -257,13 +327,22 @@ func (p *kubernetesProvider) parsePermission(permission string) *rbacv1.PolicyRu
 		if len(groupResource) == 2 {
 			apiGroup = groupResource[0]
 			resource = groupResource[1]
+		} else {
+			logrus.WithField("permission", permission).Warn("Invalid API group/resource format")
+			return nil
 		}
+	}
+
+	// Validate resource name (basic validation)
+	if resource == "" {
+		logrus.WithField("permission", permission).Warn("Empty resource name in permission")
+		return nil
 	}
 
 	rule := &rbacv1.PolicyRule{
 		APIGroups: []string{apiGroup},
 		Resources: []string{resource},
-		Verbs:     verbs,
+		Verbs:     validVerbs,
 	}
 
 	return rule
@@ -329,7 +408,7 @@ func (p *kubernetesProvider) revokeNamespacedRole(
 	_, err := client.RbacV1().RoleBindings(namespace).Get(ctx, bindingName, metav1.GetOptions{})
 	if err != nil {
 		// If the binding doesn't exist, consider it already revoked
-		if strings.Contains(err.Error(), "not found") {
+		if apierrors.IsNotFound(err) {
 			return &models.RevokeRoleResponse{}, nil
 		}
 		return nil, fmt.Errorf("failed to check role binding existence: %w", err)
@@ -338,8 +417,24 @@ func (p *kubernetesProvider) revokeNamespacedRole(
 	// Delete RoleBinding
 	err = client.RbacV1().RoleBindings(namespace).Delete(ctx, bindingName, metav1.DeleteOptions{})
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"user":      user.GetIdentity(),
+			"role":      role.Name,
+			"namespace": namespace,
+			"binding":   bindingName,
+			"error":     err.Error(),
+		}).Error("Failed to delete role binding")
 		return nil, fmt.Errorf("failed to delete role binding: %w", err)
 	}
+
+	// Log successful revocation
+	logrus.WithFields(logrus.Fields{
+		"user":      user.GetIdentity(),
+		"role":      role.Name,
+		"namespace": namespace,
+		"binding":   bindingName,
+		"scope":     "namespaced",
+	}).Info("Successfully revoked user access to namespaced role")
 
 	return &models.RevokeRoleResponse{}, nil
 }
@@ -353,11 +448,35 @@ func (p *kubernetesProvider) revokeClusterRole(
 	client := p.GetClient()
 	bindingName := fmt.Sprintf("%s-%s", role.GetSnakeCaseName(), p.sanitizeUserIdentifier(user))
 
-	// Delete ClusterRoleBinding
-	err := client.RbacV1().ClusterRoleBindings().Delete(ctx, bindingName, metav1.DeleteOptions{})
+	// Check if ClusterRoleBinding exists before attempting to delete
+	_, err := client.RbacV1().ClusterRoleBindings().Get(ctx, bindingName, metav1.GetOptions{})
 	if err != nil {
+		// If the binding doesn't exist, consider it already revoked
+		if apierrors.IsNotFound(err) {
+			return &models.RevokeRoleResponse{}, nil
+		}
+		return nil, fmt.Errorf("failed to check cluster role binding existence: %w", err)
+	}
+
+	// Delete ClusterRoleBinding
+	err = client.RbacV1().ClusterRoleBindings().Delete(ctx, bindingName, metav1.DeleteOptions{})
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"user":    user.GetIdentity(),
+			"role":    role.Name,
+			"binding": bindingName,
+			"error":   err.Error(),
+		}).Error("Failed to delete cluster role binding")
 		return nil, fmt.Errorf("failed to delete cluster role binding: %w", err)
 	}
+
+	// Log successful revocation
+	logrus.WithFields(logrus.Fields{
+		"user":    user.GetIdentity(),
+		"role":    role.Name,
+		"binding": bindingName,
+		"scope":   "cluster",
+	}).Info("Successfully revoked user access to cluster role")
 
 	return &models.RevokeRoleResponse{}, nil
 }
