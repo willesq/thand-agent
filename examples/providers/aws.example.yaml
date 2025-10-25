@@ -1,0 +1,24 @@
+version: "1.0"
+providers:
+  aws-prod:
+    name: AWS Production
+    description: Production AWS environment
+    provider: aws
+    enabled: false
+    config:
+      region: us-east-1
+      profile: aws_profile
+      access_key_id: aws_access_key_id
+      # If the secret access key is not provided IAM will be used.
+      secret_access_key: aws_secret_access_key
+  aws-dev:
+    name: AWS Development
+    description: Development AWS environment
+    provider: aws
+    enabled: false
+    config:
+      region: us-west-2
+      profile: aws_profile
+      access_key_id: aws_access_key_id
+      # If the secret access key is not provided IAM will be used.
+      secret_access_key: aws_secret_access_key

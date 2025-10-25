@@ -1,0 +1,17 @@
+version: 1.0
+providers:
+  github:
+    name: GitHub
+    description: GitHub provider for repository management
+    provider: github
+    enabled: false
+    config:
+      token: github_token
+      api_url: https://api.github.com
+      # Organization name (optional)
+      organization: github_org
+      # Repository access scope
+      scopes:
+        - repo
+        - user
+        - read:org

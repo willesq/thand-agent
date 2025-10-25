@@ -1,0 +1,16 @@
+version: 1.0
+providers:
+  oauth:
+    name: Oauth example
+    description: Oauth example provider
+    provider: oauth2
+    enabled: false
+    config:
+      authority: https://accounts.google.com/o/oauth2
+      endpoints:
+        token: /token
+        auth: /auth
+      grant: client_credentials
+      client:
+        id: google_client_id
+        secret: google_client_secret

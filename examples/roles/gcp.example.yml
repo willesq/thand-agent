@@ -30,7 +30,7 @@ roles:
     providers:  # Only allow these providers for role elevation
       - gcp-prod
       - gcp-dev
-    enabled: true
+    enabled: false
   gcp-user:
     name: GCP user bundle for engineering
     description: Basic access to user resources.
@@ -42,4 +42,4 @@ roles:
         - cloudfunctions.functions.list
     providers:
       - gcp
-    enabled: true
+    enabled: false

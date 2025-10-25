@@ -1,0 +1,25 @@
+version: 1.0
+providers:
+
+  gcp-prod:
+    name: GCP Production
+    description: Production GCP environment
+    provider: gcp
+    enabled: false
+    config:
+      project_id: gcp_project_id
+      region: us-central1
+      service_account_key: gcp_service_account_key
+      # If the service account key is not provided, default credentials will be used
+
+  gcp-dev:
+    name: GCP Development
+    description: Development GCP environment
+    provider: gcp
+    enabled: false
+    config:
+      project_id: gcp_dev_project_id
+      region: us-east1
+      service_account_key: gcp_dev_service_account_key
+      # If the service account key is not provided, default credentials will be used
+

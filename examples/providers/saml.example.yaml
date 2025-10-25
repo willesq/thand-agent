@@ -5,7 +5,7 @@ providers:
   company-saml:
     description: Company SAML Identity Provider
     provider: saml
-    enabled: true
+    enabled: false
     config:
       # Required: URL to fetch IdP metadata
       idp_metadata_url: "https://your-idp.example.com/saml/metadata"
@@ -24,12 +24,3 @@ providers:
       
       # Optional: Whether to sign SAML requests (default: false)
       sign_requests: true
-
-# Example role that can use this SAML provider
-roles:
-  saml-users:
-    description: Users authenticated via SAML
-    provider: company-saml
-    permissions:
-      - name: "saml:authenticate"
-        description: "Can authenticate via SAML"

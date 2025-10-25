@@ -1,0 +1,12 @@
+version: 1.0
+providers:
+  salesforce:
+    name: Salesforce
+    description: Salesforce provider for CRM management
+    provider: salesforce
+    enabled: false
+    config:
+      domain: login.salesforce.com
+      username: salesforce_username
+      password: salesforce_password
+      security_token: salesforce_security_token
