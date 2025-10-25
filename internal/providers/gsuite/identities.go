@@ -49,7 +49,7 @@ func (p *gsuiteProvider) fetchUsers() error {
 			MaxResults(500).
 			OrderBy("email")
 
-		if pageToken != "" {
+		if len(pageToken) > 0 {
 			call = call.PageToken(pageToken)
 		}
 
@@ -76,7 +76,7 @@ func (p *gsuiteProvider) fetchUsers() error {
 			userCount++
 		}
 
-		if resp.NextPageToken == "" {
+		if len(resp.NextPageToken) == 0 {
 			break
 		}
 		pageToken = resp.NextPageToken
@@ -97,7 +97,7 @@ func (p *gsuiteProvider) fetchGroups() error {
 			MaxResults(200).
 			OrderBy("email")
 
-		if pageToken != "" {
+		if len(pageToken) > 0 {
 			call = call.PageToken(pageToken)
 		}
 
@@ -122,7 +122,7 @@ func (p *gsuiteProvider) fetchGroups() error {
 			groupCount++
 		}
 
-		if resp.NextPageToken == "" {
+		if len(resp.NextPageToken) == 0 {
 			break
 		}
 		pageToken = resp.NextPageToken

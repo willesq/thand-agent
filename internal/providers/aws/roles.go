@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -14,18 +13,11 @@ import (
 	"github.com/thand-io/agent/third_party"
 )
 
-type awsManagedPolicies struct {
-	Policies []awsManagedPolicy `json:"policies"`
-}
-
-type awsManagedPolicy struct {
-	Name string `json:"name"`
-}
-
 func (p *awsProvider) LoadRoles() error {
-	var docs awsManagedPolicies
-	if err := json.Unmarshal(third_party.GetEc2Roles(), &docs); err != nil {
-		return fmt.Errorf("failed to unmarshal EC2 roles: %w", err)
+	// Get pre-parsed EC2 roles from third_party package
+	docs, err := third_party.GetParsedEc2Roles()
+	if err != nil {
+		return fmt.Errorf("failed to get parsed EC2 roles: %w", err)
 	}
 
 	var roles []models.ProviderRole

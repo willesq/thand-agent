@@ -96,14 +96,6 @@ func init() {
 	providers.Register("gcp", &gcpProvider{})
 }
 
-type gcpPredefinedRole struct {
-	Description string `json:"description"`
-	Etag        string `json:"etag"`
-	Name        string `json:"name"`
-	Stage       string `json:"stage"`
-	Title       string `json:"title"`
-}
-
 func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, error) {
 	var clientOptions []option.ClientOption
 

@@ -2,7 +2,6 @@ package gcp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -16,9 +15,10 @@ import (
 
 func (p *gcpProvider) LoadRoles(stage string) error {
 
-	var predefinedRoles []gcpPredefinedRole
-	if err := json.Unmarshal(third_party.GetGcpRoles(), &predefinedRoles); err != nil {
-		return fmt.Errorf("failed to unmarshal GCP roles: %w", err)
+	// Get pre-parsed GCP roles from third_party package
+	predefinedRoles, err := third_party.GetParsedGcpRoles()
+	if err != nil {
+		return fmt.Errorf("failed to get parsed GCP roles: %w", err)
 	}
 
 	var roles []models.ProviderRole

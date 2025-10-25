@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -15,11 +14,10 @@ import (
 )
 
 func (p *awsProvider) LoadPermissions() error {
-	var docs map[string]string
-
-	// Load EC2 Permissions
-	if err := json.Unmarshal(third_party.GetEc2Docs(), &docs); err != nil {
-		return fmt.Errorf("failed to unmarshal EC2 permissions: %w", err)
+	// Get pre-parsed EC2 permissions from third_party package
+	docs, err := third_party.GetParsedEc2Docs()
+	if err != nil {
+		return fmt.Errorf("failed to get parsed EC2 permissions: %w", err)
 	}
 
 	var permissions []models.ProviderPermission
