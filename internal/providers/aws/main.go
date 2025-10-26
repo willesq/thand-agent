@@ -50,7 +50,7 @@ func (p *awsProvider) Initialize(provider models.Provider) error {
 		models.ProviderCapabilityRBAC,
 	)
 
-	// Load EC2 Permissions. This loads from internal/data/iam-dataset/aws/docs.json
+	// Load AWS Permissions. This loads from internal/data/iam-dataset/aws/docs.json
 	// this is an embedded resource
 	err := p.LoadPermissions()
 	if err != nil {

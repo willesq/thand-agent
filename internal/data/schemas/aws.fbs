@@ -1,6 +1,6 @@
 namespace aws;
 
-// AWS EC2 Permission - only name and description needed
+// AWS Permission - only name and description needed
 table Permission {
   name: string;
   description: string;
@@ -11,7 +11,7 @@ table ManagedPolicy {
   name: string;
 }
 
-// Container for all AWS EC2 permissions
+// Container for all AWS permissions
 table PermissionsList {
   permissions: [Permission];
 }

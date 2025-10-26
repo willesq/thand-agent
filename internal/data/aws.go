@@ -14,16 +14,16 @@ var awsDocsFb []byte
 var awsRolesFb []byte
 
 var (
-	parsedEc2Docs map[string]string
-	ec2DocsOnce   sync.Once
-	ec2DocsErr    error
+	parsedAwsDocs map[string]string
+	awsDocsOnce   sync.Once
+	awsDocsErr    error
 )
 
 // GetParsedAwsDocs returns the pre-parsed AWS docs map from FlatBuffer
 func GetParsedAwsDocs() (map[string]string, error) {
-	ec2DocsOnce.Do(func() {
+	awsDocsOnce.Do(func() {
 
-		parsedEc2Docs = make(map[string]string)
+		parsedAwsDocs = make(map[string]string)
 
 		// Parse FlatBuffer
 		permissionsList := aws.GetRootAsPermissionsList(awsDocsFb, 0)
@@ -34,11 +34,11 @@ func GetParsedAwsDocs() (map[string]string, error) {
 			if permissionsList.Permissions(&permission, i) {
 				name := string(permission.Name())
 				description := string(permission.Description())
-				parsedEc2Docs[name] = description
+				parsedAwsDocs[name] = description
 			}
 		}
 	})
-	return parsedEc2Docs, ec2DocsErr
+	return parsedAwsDocs, awsDocsErr
 }
 
 type AwsManagedPolicies struct {
@@ -50,14 +50,14 @@ type AwsManagedPolicy struct {
 }
 
 var (
-	parsedEc2Roles AwsManagedPolicies
-	ec2RolesOnce   sync.Once
-	ec2RolesErr    error
+	parsedAwsRoles AwsManagedPolicies
+	awsRolesOnce   sync.Once
+	awsRolesErr    error
 )
 
 // GetParsedAwsRoles returns the pre-parsed AWS roles struct from FlatBuffer
 func GetParsedAwsRoles() (AwsManagedPolicies, error) {
-	ec2RolesOnce.Do(func() {
+	awsRolesOnce.Do(func() {
 		var policies []AwsManagedPolicy
 
 		// Parse FlatBuffer
@@ -72,7 +72,7 @@ func GetParsedAwsRoles() (AwsManagedPolicies, error) {
 			}
 		}
 
-		parsedEc2Roles = AwsManagedPolicies{Policies: policies}
+		parsedAwsRoles = AwsManagedPolicies{Policies: policies}
 	})
-	return parsedEc2Roles, ec2RolesErr
+	return parsedAwsRoles, awsRolesErr
 }
