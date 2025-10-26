@@ -2,16 +2,16 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/third_party"
 )
 
 // GetPermission retrieves a specific permission by name
@@ -36,10 +36,17 @@ func (p *azureProvider) ListPermissions(ctx context.Context, filters ...string) 
 
 // LoadPermissions loads Azure permissions from the embedded provider operations data
 func (p *azureProvider) LoadPermissions() error {
-	var providers []azureResourceProvider
 
-	if err := json.Unmarshal(third_party.GetAzurePermissions(), &providers); err != nil {
-		return fmt.Errorf("failed to unmarshal Azure permissions: %w", err)
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed Azure permissions in %s", elapsed)
+	}()
+
+	// Get pre-parsed Azure permissions from data package
+	azureOperations, err := data.GetParsedAzurePermissions()
+	if err != nil {
+		return fmt.Errorf("failed to get parsed Azure permissions: %w", err)
 	}
 
 	var permissions []models.ProviderPermission
@@ -51,13 +58,11 @@ func (p *azureProvider) LoadPermissions() error {
 		return fmt.Errorf("failed to create search index: %w", err)
 	}
 
-	for _, provider := range providers {
-		for _, operation := range provider.Operations {
-			permissions = append(permissions, models.ProviderPermission{
-				Name:        operation.Name,
-				Description: operation.Description,
-			})
-		}
+	for _, operation := range azureOperations {
+		permissions = append(permissions, models.ProviderPermission{
+			Name:        operation.Name,
+			Description: operation.Description,
+		})
 	}
 
 	p.permissions = permissions

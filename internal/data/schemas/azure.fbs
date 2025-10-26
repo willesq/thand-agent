@@ -1,0 +1,31 @@
+namespace azure;
+
+// Azure Built-in Role
+table BuiltInRole {
+  name: string;
+  description: string;
+}
+
+// Azure Resource Provider Operation (Permission)
+table ResourceProviderOperation {
+  name: string;
+  description: string;
+}
+
+// Azure Resource Provider
+table ResourceProvider {
+  namespace: string;
+  operations: [ResourceProviderOperation];
+}
+
+// Container for all Azure built-in roles
+table BuiltInRolesList {
+  roles: [BuiltInRole];
+}
+
+// Container for all Azure resource providers and their operations
+table ResourceProvidersList {
+  providers: [ResourceProvider];
+}
+
+root_type BuiltInRolesList;

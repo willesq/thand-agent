@@ -1,0 +1,31 @@
+namespace gcp;
+
+// GCP Predefined Role - name, title, description, and stage (needed for filtering)
+table PredefinedRole {
+  name: string;
+  title: string;
+  description: string;
+  stage: string;
+}
+
+// GCP Permission - fields used by the provider
+table Permission {
+  name: string;
+  title: string;
+  description: string;
+  stage: string;
+  api_disabled: bool;
+  only_in_predefined_roles: bool;
+}
+
+// Container for all GCP predefined roles
+table PredefinedRolesList {
+  roles: [PredefinedRole];
+}
+
+// Container for all GCP permissions
+table PermissionsList {
+  permissions: [Permission];
+}
+
+root_type PredefinedRolesList;

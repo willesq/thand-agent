@@ -4,20 +4,28 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/third_party"
 )
 
 func (p *awsProvider) LoadPermissions() error {
-	// Get pre-parsed EC2 permissions from third_party package
-	docs, err := third_party.GetParsedEc2Docs()
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed AWS permissions in %s", elapsed)
+	}()
+
+	// Get pre-parsed AWS permissions from data package
+	docs, err := data.GetParsedAwsDocs()
 	if err != nil {
-		return fmt.Errorf("failed to get parsed EC2 permissions: %w", err)
+		return fmt.Errorf("failed to get parsed AWS permissions: %w", err)
 	}
 
 	var permissions []models.ProviderPermission

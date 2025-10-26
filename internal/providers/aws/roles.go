@@ -4,20 +4,28 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/third_party"
 )
 
 func (p *awsProvider) LoadRoles() error {
-	// Get pre-parsed EC2 roles from third_party package
-	docs, err := third_party.GetParsedEc2Roles()
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed AWS roles in %s", elapsed)
+	}()
+
+	// Get pre-parsed AWS roles from data package
+	docs, err := data.GetParsedAwsRoles()
 	if err != nil {
-		return fmt.Errorf("failed to get parsed EC2 roles: %w", err)
+		return fmt.Errorf("failed to get parsed AWS roles: %w", err)
 	}
 
 	var roles []models.ProviderRole

@@ -38,6 +38,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-resty/resty/v2 v2.16.5
+	github.com/google/flatbuffers v25.9.23+incompatible
 	github.com/google/go-github/v57 v57.0.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-tfe v1.95.0

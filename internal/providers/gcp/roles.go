@@ -4,19 +4,26 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/third_party"
 )
 
 func (p *gcpProvider) LoadRoles(stage string) error {
 
-	// Get pre-parsed GCP roles from third_party package
-	predefinedRoles, err := third_party.GetParsedGcpRoles()
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed GCP roles in %s", elapsed)
+	}()
+
+	// Get pre-parsed GCP roles from data package
+	predefinedRoles, err := data.GetParsedGcpRoles()
 	if err != nil {
 		return fmt.Errorf("failed to get parsed GCP roles: %w", err)
 	}
