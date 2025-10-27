@@ -16,14 +16,6 @@ Complete configuration reference for Thand Agent.
 
 Thand Agent uses YAML configuration files to define behavior, providers, roles, and workflows. Configuration can be provided via:
 
-- Configuration files (`~/.thand/config.yaml`)
-- Environment variables 
-- Command line flags
-
----
-
-## Configuration Hierarchy
-
 Configuration is loaded in this order (later sources override earlier ones):
 
 1. Default values
@@ -45,25 +37,7 @@ server:
 agent:
   listen_port: 8080
   session_timeout: "1h"
-  
-# Logging configuration
-logging:
-  level: "info"      # debug, info, warn, error
-  format: "json"     # json, text
-  file: "/var/log/thand/agent.log"
-  
-# Provider configurations
-providers:
-  aws:
-    region: "us-east-1"
-  gcp:
-    project_id: "my-project"
-    
-# Security settings
-security:
-  tls:
-    cert_file: "/etc/thand/tls.crt"
-    key_file: "/etc/thand/tls.key"
+
 ```
 
 ---
@@ -82,15 +56,15 @@ Nested configuration uses underscores:
 
 ```bash
 export THAND_PROVIDERS_AWS_REGION="us-west-2"
-export THAND_SECURITY_TLS_CERT_FILE="/etc/ssl/thand.crt"
 ```
 
 ---
 
 ## Sections
 
-- **[Server Configuration](server)** - Server connection settings
-- **[Providers](providers)** - Cloud provider configurations  
+- **[Configuration Reference](file)** - Complete reference for all configuration options
+- **[Environment](environment)** - Environment-specific configuration
+- **[CLI](cli)** - Command-line interface configuration
+- **[Providers](providers)** - Provider configurations  
 - **[Roles](roles)** - Role definitions and mappings
 - **[Workflows](workflows)** - Custom approval workflows
-- **[Security](security)** - TLS and authentication settings

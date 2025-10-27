@@ -19,15 +19,28 @@ Get up and running with Thand Agent quickly and easily.
 
 ---
 
+{: .note }
+By default thand will authenticate to **auth.thand.io** but you can specify your own server.
+Your administrator will provide the server URL. If you are setting this up in your own environment you will need to first deploy the Thand server in your environment.
+Please see the [Environment Setup](../environments/) for more information.
+
+---
+
 ## Installation
 
-### Prerequisites
+### Install via script
 
-Before installing Thand Agent, ensure you have:
+```bash
+# Install agent (https://github.com/thand-io/agent/blob/main/scripts/install.sh). Trust but verify!
+curl -sSL https://get.thand.io | sh
+```
 
-- Go 1.21 or later (if building from source)
-- Access to your target infrastructure (GCP, AWS, etc.)
-- Network connectivity to the Thand server
+### Install via Homebrew (macOS/Linux)
+
+```bash
+brew tap thand-io/tap
+brew install thand
+```
 
 ### Install via Binary Release
 
@@ -35,24 +48,30 @@ Download the latest binary for your platform from the [GitHub Releases](https://
 
 ```bash
 # Linux/macOS
-curl -L -o thand-agent https://github.com/thand-io/agent/releases/latest/download/agent-$(uname -s)-$(uname -m)
-chmod +x thand-agent
-sudo mv thand-agent /usr/local/bin/
+curl -L -o thand https://github.com/thand-io/agent/releases/latest/download/agent-$(uname -s)-$(uname -m)
+chmod +x thand
+sudo mv thand /usr/local/bin/
 ```
 
 ```bash
 # Windows (PowerShell)
-Invoke-WebRequest -Uri "https://github.com/thand-io/agent/releases/latest/download/agent-windows-amd64.exe" -OutFile "thand-agent.exe"
+Invoke-WebRequest -Uri "https://github.com/thand-io/agent/releases/latest/download/agent-windows-amd64.exe" -OutFile "thand.exe"
 ```
 
 ### Build from Source
+
+Before installing Thand Agent, ensure you have:
+
+- Go 1.21 or later (if building from source)
+- Access to your target infrastructure (GCP, AWS, etc.)
 
 Clone the repository and build the agent:
 
 ```bash
 git clone https://github.com/thand-io/agent.git
 cd agent
-go build -o bin/agent .
+make submodules
+make build
 ```
 
 The binary will be available at `bin/agent`.
@@ -92,23 +111,25 @@ export THAND_LOG_LEVEL="info"
 
 ## First Steps
 
-### 1. Start the Agent
-
-```bash
-thand-agent start
-```
-
-The agent will start and listen on the configured port (default: 8080).
-
-### 2. Authenticate
+### 1. Authenticate
 
 Initialize your authentication with the Thand server:
 
 ```bash
-thand-agent auth login
+thand login
 ```
 
-This will open your browser for authentication or provide a device code flow.
+Or via a thand login server.
+
+```bash
+thand login --server http://localhost:9090
+```
+
+This will open your browser for authentication or provide a device code flow. Once authenticated, your session will be cached locally. You can view your current session with:
+
+```bash
+thand sessions
+```
 
 ### 3. Request Access
 
@@ -116,10 +137,13 @@ Request access to a resource:
 
 ```bash
 # Request AWS access for 1 hour
-thand-agent request aws --role ReadOnlyAccess --duration 1h
+thand request --provider aws-prod --role Admin --duration 1h --reason "Deploying new version"
 
 # Request GCP access
-thand-agent request gcp --project my-project --role viewer
+thand request --provider gcp --project my-project --role viewer
+
+# Request via natural language
+thand "Get me admin access to AWS production for 2 hours to perform maintenance"
 ```
 
 ### 4. Use Your Access
@@ -145,83 +169,6 @@ Request temporary sudo access on your local machine:
 ```bash
 thand-agent request sudo --duration 30m --reason "System maintenance"
 ```
-
-### Cloud Infrastructure Access
-
-Request cloud access for specific tasks:
-
-```bash
-# AWS - Deploy to production
-thand-agent request aws \
-  --account 123456789012 \
-  --role DeploymentRole \
-  --duration 2h \
-  --reason "Production deployment v1.2.3"
-
-# GCP - Debug application
-thand-agent request gcp \
-  --project production-app \
-  --role roles/logging.viewer \
-  --duration 1h \
-  --reason "Investigating error logs"
-```
-
-### Application Access
-
-Request access to SaaS applications:
-
-```bash
-thand-agent request app \
-  --app salesforce \
-  --role admin \
-  --duration 30m \
-  --reason "User account recovery"
-```
-
----
-
-## Troubleshooting
-
-### Agent Won't Start
-
-1. Check if the port is already in use:
-   ```bash
-   lsof -i :8080
-   ```
-
-2. Verify configuration file syntax:
-   ```bash
-   thand-agent config validate
-   ```
-
-3. Check logs for detailed error messages:
-   ```bash
-   thand-agent logs
-   ```
-
-### Authentication Issues
-
-1. Verify server URL is correct and accessible:
-   ```bash
-   curl -I https://your-thand-server.com/health
-   ```
-
-2. Clear cached authentication and re-login:
-   ```bash
-   thand-agent auth logout
-   thand-agent auth login
-   ```
-
-### Access Requests Denied
-
-1. Check your user permissions with your administrator
-2. Verify the requested role exists and you're eligible
-3. Review audit logs for denial reasons:
-   ```bash
-   thand-agent audit list --user $(whoami)
-   ```
-
----
 
 ## Next Steps
 
