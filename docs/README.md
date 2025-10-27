@@ -41,7 +41,12 @@
 
 ### Platform Support
 
-The Gemfile.lock includes support for:
+The Gemfile.lock is **not committed** to the repository because:
+- Different platforms (macOS, Linux, Windows) have different native gem requirements
+- GitHub Actions resolves dependencies fresh each time for consistency
+- Avoids bundler "frozen mode" conflicts between developers
+
+The setup supports:
 - **macOS** (arm64-darwin, x86_64-darwin)
 - **Linux** (x86_64-linux) - for GitHub Actions
 - **Windows** - for Windows developers
@@ -72,8 +77,18 @@ If you see errors related to Ruby versions or gems:
 rbenv local 3.2.0
 ruby --version  # Should show 3.2.0
 
-# Reinstall gems
-rm Gemfile.lock
+# Remove lock file and reinstall gems
+rm -f Gemfile.lock
+bundle install
+```
+
+#### Bundler Frozen Mode
+If you see "frozen mode" errors:
+
+```bash
+# Unset frozen mode and reinstall
+bundle config unset frozen
+rm -f Gemfile.lock
 bundle install
 ```
 
