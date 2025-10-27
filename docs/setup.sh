@@ -28,9 +28,13 @@ echo "📌 Using Ruby: $RUBY_VERSION"
 # Navigate to docs directory
 cd "$(dirname "$0")"
 
-# Clean up any existing bundle
+# Ensure bundler isn't in frozen mode
+echo "🔓 Ensuring bundler is not in frozen mode..."
+bundle config unset frozen 2>/dev/null || true
+
+# Clean up any existing bundle cache (optional)
 if [ -f "Gemfile.lock" ]; then
-    echo "🧹 Cleaning existing Gemfile.lock..."
+    echo "🧹 Removing existing Gemfile.lock for fresh dependency resolution..."
     rm -f Gemfile.lock
 fi
 
@@ -47,10 +51,6 @@ bundle update --bundler
 # Install dependencies
 echo "📦 Installing Jekyll dependencies..."
 bundle install
-
-# Add Linux platform for GitHub Actions
-echo "🐧 Adding Linux platform support..."
-bundle lock --add-platform x86_64-linux
 
 echo "✅ Setup complete! You can now run:"
 echo "   bundle exec jekyll serve"
