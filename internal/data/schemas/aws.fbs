@@ -1,0 +1,24 @@
+namespace aws;
+
+// AWS Permission - only name and description needed
+table Permission {
+  name: string;
+  description: string;
+}
+
+// AWS Managed Policy - only name needed
+table ManagedPolicy {
+  name: string;
+}
+
+// Container for all AWS permissions
+table PermissionsList {
+  permissions: [Permission];
+}
+
+// Container for all AWS managed policies
+table ManagedPoliciesList {
+  policies: [ManagedPolicy];
+}
+
+root_type PermissionsList;

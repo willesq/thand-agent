@@ -1,0 +1,18 @@
+version: 1.0
+providers:
+  gsuite:
+    name: gsuite-corp
+    description: Corporate Google Workspace (GSuite) provider
+    provider: gsuite
+    enabled: false
+    config:
+      # Path to the service account key file with domain-wide delegation enabled
+      service_account_key_path: "/path/to/service-account-key.json"
+      
+      # The domain to manage (e.g., your company's domain)
+      domain: "example.com"
+      
+      # Admin email for domain-wide delegation
+      # This must be a super admin in your Google Workspace
+      admin_email: "admin@example.com"
+

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
@@ -14,7 +15,7 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-// Get embedded permissions.json can't use third_party
+// Get embedded permissions.json can't use data package as it uses Bleve indexing
 // as it does not include the stage information or
 // whether the permission is deprecated etc
 
@@ -43,6 +44,12 @@ type gcpPermissionMap []struct {
 
 func (p *gcpProvider) LoadPermissions(stage string) error {
 	var permissionMap gcpPermissionMap
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed GCP permissions in %s", elapsed)
+	}()
 
 	// Load GCP Permissions
 	if err := json.Unmarshal(GetGcpPermissions(), &permissionMap); err != nil {

@@ -1,0 +1,13 @@
+version: 1.0
+providers:
+  google_oauth2:
+    name: Google OAuth2
+    description: Google OAuth2 provider
+    provider: oauth2.google
+    enabled: false
+    config:
+      # client_id: google_client_id - gets it from environment variable, see .env.example
+      # client_secret: google_client_secret - gets it from environment variable, see .env.example
+      scopes:
+        - email
+        - profile

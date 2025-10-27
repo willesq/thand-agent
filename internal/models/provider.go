@@ -89,6 +89,7 @@ const (
 	ProviderCapabilityRBAC       ProviderCapability = "rbac"
 	ProviderCapabilityAuthorizor ProviderCapability = "authorizor"
 	ProviderCapabilityNotifier   ProviderCapability = "notifier"
+	ProviderCapabilityIdentities ProviderCapability = "identities" // Provider can return users, groups, etc.
 )
 
 func GetCapabilityFromString(cap string) (ProviderCapability, error) {
@@ -127,6 +128,7 @@ type ProviderImpl interface {
 	ProviderNotifier
 	ProviderAuthorizor
 	ProviderRoleBasedAccessControl
+	ProviderIdentities
 }
 
 type NotificationRequest map[string]any
@@ -217,6 +219,12 @@ type ProviderRoleBasedAccessControl interface {
 		ctx context.Context,
 		req *RevokeRoleRequest, // Any metadata returned from AuthorizeRole
 	) (*RevokeRoleResponse, error)
+}
+
+type ProviderIdentities interface {
+	GetIdentity(ctx context.Context, identity string) (*Identity, error)
+	ListIdentities(ctx context.Context, filters ...string) ([]Identity, error)
+	RefreshIdentities(ctx context.Context) error
 }
 
 type BaseProvider struct {
@@ -362,6 +370,23 @@ func (p *BaseProvider) RevokeRole(
 ) (*RevokeRoleResponse, error) {
 	// Default implementation does nothing
 	return nil, fmt.Errorf("the provider '%s' does not implement RevokeRole", p.GetProvider())
+}
+
+/* Default implementation for ValidateRole */
+
+func (p *BaseProvider) GetIdentity(ctx context.Context, identity string) (*Identity, error) {
+	// Default implementation does nothing
+	return nil, fmt.Errorf("the provider '%s' does not implement GetIdentity", p.GetProvider())
+}
+
+func (p *BaseProvider) ListIdentities(ctx context.Context, filters ...string) ([]Identity, error) {
+	// Default implementation does nothing
+	return nil, fmt.Errorf("the provider '%s' does not implement ListIdentities", p.GetProvider())
+}
+
+func (p *BaseProvider) RefreshIdentities(ctx context.Context) error {
+	// Default implementation does nothing
+	return fmt.Errorf("the provider '%s' does not implement RefreshIdentities", p.GetProvider())
 }
 
 func (p *BaseProvider) ValidateRole(ctx context.Context, user *User, role *Role) (map[string]any, error) {

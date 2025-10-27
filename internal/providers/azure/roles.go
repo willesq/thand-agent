@@ -2,9 +2,9 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
 	"github.com/blevesearch/bleve/v2"
@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/third_party"
 )
 
 // getRoleDefinition retrieves a custom role definition by name
@@ -206,10 +206,17 @@ func (p *azureProvider) ListRoles(ctx context.Context, filters ...string) ([]mod
 
 // LoadRoles loads Azure built-in roles from the embedded roles data
 func (p *azureProvider) LoadRoles() error {
-	var rolesData azureBuiltInRoles
 
-	if err := json.Unmarshal(third_party.GetAzureRoles(), &rolesData); err != nil {
-		return fmt.Errorf("failed to unmarshal Azure roles: %w", err)
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed Azure roles in %s", elapsed)
+	}()
+
+	// Get pre-parsed Azure roles from data package
+	azureRoles, err := data.GetParsedAzureRoles()
+	if err != nil {
+		return fmt.Errorf("failed to get parsed Azure roles: %w", err)
 	}
 
 	var roles []models.ProviderRole
@@ -221,7 +228,7 @@ func (p *azureProvider) LoadRoles() error {
 		return fmt.Errorf("failed to create roles search index: %w", err)
 	}
 
-	for _, role := range rolesData.Roles {
+	for _, role := range azureRoles {
 		roles = append(roles, models.ProviderRole{
 			Name:        role.Name,
 			Description: role.Description,

@@ -56,4 +56,14 @@ run: submodules
 test: submodules
 	go test ./...
 
-.PHONY: all build build-all clean install run test submodules update-submodules compress
+# Generate FlatBuffers from JSON data
+generate-data:
+	@echo "Generating FlatBuffer schemas..."
+	flatc --go -o internal/data/generated internal/data/schemas/aws.fbs
+	flatc --go -o internal/data/generated internal/data/schemas/gcp.fbs
+	flatc --go -o internal/data/generated internal/data/schemas/azure.fbs
+	@echo "Generating FlatBuffer data files..."
+	go run tools/generate-iam-dataset/main.go
+	@echo "Data generation complete!"
+
+.PHONY: all build build-all clean install run test submodules update-submodules compress generate-data

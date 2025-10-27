@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
@@ -30,10 +31,16 @@ type awsProvider struct {
 	stsService          *sts.Client
 	ssoAdminService     *ssoadmin.Client
 	identityStoreClient *identitystore.Client
-	permissions         []models.ProviderPermission
-	permissionsIndex    bleve.Index
-	roles               []models.ProviderRole
-	rolesIndex          bleve.Index
+
+	permissions      []models.ProviderPermission
+	permissionsMap   map[string]*models.ProviderPermission
+	permissionsIndex bleve.Index
+
+	roles      []models.ProviderRole
+	rolesMap   map[string]*models.ProviderRole
+	rolesIndex bleve.Index
+
+	indexMu sync.RWMutex
 }
 
 func (p *awsProvider) Initialize(provider models.Provider) error {
@@ -42,7 +49,7 @@ func (p *awsProvider) Initialize(provider models.Provider) error {
 		models.ProviderCapabilityRBAC,
 	)
 
-	// Load EC2 Permissions. This loads from third_party/iam-dataset/aws/docs.json
+	// Load AWS Permissions. This loads from internal/data/iam-dataset/aws/docs.json
 	// this is an embedded resource
 	err := p.LoadPermissions()
 	if err != nil {
@@ -53,6 +60,9 @@ func (p *awsProvider) Initialize(provider models.Provider) error {
 	if err != nil {
 		return fmt.Errorf("failed to load roles: %w", err)
 	}
+
+	// Start background indexing
+	go p.buildSearchIndexAsync()
 
 	// Right lets figure out how to initialize the AWS SDK
 	awsConfig := p.GetConfig()

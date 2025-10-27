@@ -2,23 +2,30 @@ package gcp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/third_party"
 )
 
 func (p *gcpProvider) LoadRoles(stage string) error {
 
-	var predefinedRoles []gcpPredefinedRole
-	if err := json.Unmarshal(third_party.GetGcpRoles(), &predefinedRoles); err != nil {
-		return fmt.Errorf("failed to unmarshal GCP roles: %w", err)
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed GCP roles in %s", elapsed)
+	}()
+
+	// Get pre-parsed GCP roles from data package
+	predefinedRoles, err := data.GetParsedGcpRoles()
+	if err != nil {
+		return fmt.Errorf("failed to get parsed GCP roles: %w", err)
 	}
 
 	var roles []models.ProviderRole

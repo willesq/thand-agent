@@ -40,13 +40,13 @@ func (p *azureProvider) Initialize(provider models.Provider) error {
 		models.ProviderCapabilityRBAC,
 	)
 
-	// Load Azure Permissions from third_party/iam-dataset/azure/provider-operations.json
+	// Load Azure Permissions from internal/data/iam-dataset/azure/provider-operations.json
 	err := p.LoadPermissions()
 	if err != nil {
 		return fmt.Errorf("failed to load permissions: %w", err)
 	}
 
-	// Load Azure Roles from third_party/iam-dataset/azure/built-in-roles.json
+	// Load Azure Roles from internal/data/iam-dataset/azure/built-in-roles.json
 	err = p.LoadRoles()
 	if err != nil {
 		return fmt.Errorf("failed to load roles: %w", err)

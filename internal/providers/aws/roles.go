@@ -2,79 +2,89 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
-	"github.com/thand-io/agent/third_party"
 )
 
-type awsManagedPolicies struct {
-	Policies []awsManagedPolicy `json:"policies"`
-}
-
-type awsManagedPolicy struct {
-	Name string `json:"name"`
-}
-
 func (p *awsProvider) LoadRoles() error {
-	var docs awsManagedPolicies
-	if err := json.Unmarshal(third_party.GetEc2Roles(), &docs); err != nil {
-		return fmt.Errorf("failed to unmarshal EC2 roles: %w", err)
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed AWS roles in %s", elapsed)
+	}()
+
+	// Get pre-parsed AWS roles from data package
+	docs, err := data.GetParsedAwsRoles()
+	if err != nil {
+		return fmt.Errorf("failed to get parsed AWS roles: %w", err)
 	}
 
 	var roles []models.ProviderRole
+	rolesMap := make(map[string]*models.ProviderRole, len(docs.Policies))
 
-	// Create in-memory Bleve index for roles
-	mapping := bleve.NewIndexMapping()
-	rolesIndex, err := bleve.NewMemOnly(mapping)
-	if err != nil {
-		return fmt.Errorf("failed to create roles search index: %w", err)
-	}
-
-	// Index roles
+	// Convert to slice and create fast lookup map
 	for _, policy := range docs.Policies {
 		role := models.ProviderRole{
 			Name: policy.Name,
 		}
 		roles = append(roles, role)
-
-		// Index the role for full-text search
-		if err := rolesIndex.Index(policy.Name, role); err != nil {
-			return fmt.Errorf("failed to index role %s: %w", policy.Name, err)
-		}
+		rolesMap[policy.Name] = &roles[len(roles)-1] // Reference to the slice element
 	}
 
 	p.roles = roles
-	p.rolesIndex = rolesIndex
+	p.rolesMap = rolesMap
 
 	logrus.WithFields(logrus.Fields{
 		"roles": len(roles),
-	}).Debug("Loaded and indexed EC2 roles")
+	}).Debug("Loaded AWS roles, building search index in background")
 
 	return nil
 }
 
 func (p *awsProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
-
-	// loop over and match role by name
-	for _, r := range p.roles {
-		if strings.Compare(r.Name, role) == 0 {
-			return &r, nil
-		}
+	// Fast map lookup
+	if r, exists := p.rolesMap[role]; exists {
+		return r, nil
 	}
 	return nil, fmt.Errorf("role not found")
 }
 
 func (p *awsProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
+	// If no filters, return all roles
+	if len(filters) == 0 {
+		return p.roles, nil
+	}
 
-	return common.BleveListSearch(ctx, p.rolesIndex, func(a *search.DocumentMatch, b models.ProviderRole) bool {
-		return strings.Compare(a.ID, b.Name) == 0
-	}, p.roles, filters...)
+	// Check if search index is ready
+	p.indexMu.RLock()
+	rolesIndex := p.rolesIndex
+	p.indexMu.RUnlock()
 
+	if rolesIndex != nil {
+		// Use Bleve search for better search capabilities
+		return common.BleveListSearch(ctx, rolesIndex, func(a *search.DocumentMatch, b models.ProviderRole) bool {
+			return strings.Compare(a.ID, b.Name) == 0
+		}, p.roles, filters...)
+	}
+
+	// Fallback to simple substring filtering while index is being built
+	var filtered []models.ProviderRole
+	filterText := strings.ToLower(strings.Join(filters, " "))
+
+	for _, role := range p.roles {
+		// Check if any filter matches the role name
+		if strings.Contains(strings.ToLower(role.Name), filterText) {
+			filtered = append(filtered, role)
+		}
+	}
+
+	return filtered, nil
 }

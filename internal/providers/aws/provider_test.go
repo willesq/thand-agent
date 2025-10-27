@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -75,8 +76,8 @@ func TestAWSProviderPermissions(t *testing.T) {
 		// Verify all returned permissions relate to S3
 		for _, perm := range s3Permissions {
 			// Check if permission name or description contains S3-related keywords
-			nameContainsS3 := contains(perm.Name, "S3") || contains(perm.Name, "s3")
-			descContainsS3 := contains(perm.Description, "S3") || contains(perm.Description, "s3")
+			nameContainsS3 := common.ContainsInsensitive(perm.Name, "S3")
+			descContainsS3 := common.ContainsInsensitive(perm.Description, "S3")
 			assert.True(t, nameContainsS3 || descContainsS3,
 				"Permission %s should be S3-related", perm.Name)
 		}
@@ -90,7 +91,7 @@ func TestAWSProviderPermissions(t *testing.T) {
 		// Verify results contain EC2 related permissions
 		hasEC2Related := false
 		for _, perm := range permissions {
-			if contains(perm.Name, "EC2") || contains(perm.Description, "EC2") {
+			if common.ContainsInsensitive(perm.Name, "EC2") || common.ContainsInsensitive(perm.Description, "EC2") {
 				hasEC2Related = true
 				break
 			}
@@ -173,7 +174,7 @@ func TestAWSProviderRoles(t *testing.T) {
 
 		// Verify all returned roles relate to Admin
 		for _, role := range adminRoles {
-			assert.True(t, contains(role.Name, "Admin"),
+			assert.True(t, common.ContainsInsensitive(role.Name, "Admin"),
 				"Role %s should contain 'Admin'", role.Name)
 		}
 	})
@@ -185,7 +186,7 @@ func TestAWSProviderRoles(t *testing.T) {
 
 		// Verify all returned roles relate to ReadOnly
 		for _, role := range readOnlyRoles {
-			assert.True(t, contains(role.Name, "ReadOnly"),
+			assert.True(t, common.ContainsInsensitive(role.Name, "ReadOnly"),
 				"Role %s should contain 'ReadOnly'", role.Name)
 		}
 	})
@@ -201,22 +202,4 @@ func TestAWSProviderRoles(t *testing.T) {
 		assert.Equal(t, len(allRoles), len(filteredRoles),
 			"Empty filter should return all roles")
 	})
-}
-
-// Helper function to check if a string contains a substring (case-insensitive)
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr ||
-		len(s) > len(substr) && (s[:len(substr)] == substr ||
-			s[len(s)-len(substr):] == substr ||
-			indexOf(s, substr) >= 0))
-}
-
-// Simple indexOf implementation
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
 }
