@@ -37,7 +37,14 @@
    bundle exec jekyll serve
    ```
 
-4. **View your site** at: http://localhost:4000/agent/
+4. **View your site** at: http://localhost:4000/
+
+### Platform Support
+
+The Gemfile.lock includes support for:
+- **macOS** (arm64-darwin, x86_64-darwin)
+- **Linux** (x86_64-linux) - for GitHub Actions
+- **Windows** - for Windows developers
 
 ### Common Commands
 
