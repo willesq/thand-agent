@@ -180,6 +180,6 @@ type GcpConfigurationProvider struct {
 	Stage         string
 	ClientOptions []option.ClientOption
 
-	// Do not allow exporting these fields
+	// Unexported: only accessible within this package
 	credentialsData []byte
 }
