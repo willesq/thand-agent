@@ -65,11 +65,10 @@ func (p *awsProvider) ListRoles(ctx context.Context, filters ...string) ([]model
 
 	// Check if search index is ready
 	p.indexMu.RLock()
-	indexReady := p.indexReady
 	rolesIndex := p.rolesIndex
 	p.indexMu.RUnlock()
 
-	if indexReady && rolesIndex != nil {
+	if rolesIndex != nil {
 		// Use Bleve search for better search capabilities
 		return common.BleveListSearch(ctx, rolesIndex, func(a *search.DocumentMatch, b models.ProviderRole) bool {
 			return strings.Compare(a.ID, b.Name) == 0

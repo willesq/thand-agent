@@ -66,11 +66,10 @@ func (p *awsProvider) ListPermissions(ctx context.Context, filters ...string) ([
 
 	// Check if search index is ready
 	p.indexMu.RLock()
-	indexReady := p.indexReady
 	permissionsIndex := p.permissionsIndex
 	p.indexMu.RUnlock()
 
-	if indexReady && permissionsIndex != nil {
+	if permissionsIndex != nil {
 		// Use Bleve search for better search capabilities
 		return common.BleveListSearch(ctx, permissionsIndex, func(a *search.DocumentMatch, b models.ProviderPermission) bool {
 			return strings.Compare(a.ID, b.Name) == 0

@@ -64,7 +64,7 @@ func generateAWSPermissions() error {
 
 	// Finish and write
 	builder.Finish(permissionsList)
-	return os.WriteFile("third_party/iam-dataset/aws/docs.fb", builder.FinishedBytes(), 0644)
+	return os.WriteFile("internal/data/iam-dataset/aws/docs.fb", builder.FinishedBytes(), 0644)
 }
 
 func generateAWSRoles() error {

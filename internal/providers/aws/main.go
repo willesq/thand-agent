@@ -40,8 +40,7 @@ type awsProvider struct {
 	rolesMap   map[string]*models.ProviderRole
 	rolesIndex bleve.Index
 
-	indexMu    sync.RWMutex
-	indexReady bool
+	indexMu sync.RWMutex
 }
 
 func (p *awsProvider) Initialize(provider models.Provider) error {

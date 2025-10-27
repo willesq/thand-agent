@@ -50,7 +50,6 @@ func (p *awsProvider) buildSearchIndexAsync() {
 	p.indexMu.Lock()
 	p.permissionsIndex = permissionsIndex
 	p.rolesIndex = rolesIndex
-	p.indexReady = true
 	p.indexMu.Unlock()
 
 	logrus.WithFields(logrus.Fields{
