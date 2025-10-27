@@ -52,8 +52,9 @@ func (s *Server) getIdentities(c *gin.Context) {
 		} else {
 			identities = []models.Identity{
 				{
-					Name: foundUser.User.Name,
-					User: foundUser.User,
+					ID:    foundUser.User.Email,
+					Label: foundUser.User.Name,
+					User:  foundUser.User,
 				},
 			}
 		}
@@ -91,10 +92,10 @@ func (s *Server) getIdentities(c *gin.Context) {
 				// Add identities to the map (thread-safe)
 				mu.Lock()
 				for _, identity := range identities {
-					// Use identity name as key to avoid duplicates
+					// Use identity ID as key to avoid duplicates
 					// If the same identity exists from multiple providers, keep the first one
-					if _, exists := identityMap[identity.Name]; !exists {
-						identityMap[identity.Name] = identity
+					if _, exists := identityMap[identity.GetId()]; !exists {
+						identityMap[identity.GetId()] = identity
 					}
 				}
 				mu.Unlock()

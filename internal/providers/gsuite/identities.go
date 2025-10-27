@@ -60,7 +60,8 @@ func (p *gsuiteProvider) fetchUsers() error {
 
 		for _, user := range resp.Users {
 			identity := &models.Identity{
-				Name: user.PrimaryEmail,
+				ID:    user.PrimaryEmail,
+				Label: user.Name.FullName,
 				User: &models.User{
 					ID:       user.Id,
 					Username: strings.Split(user.PrimaryEmail, "@")[0],
@@ -108,7 +109,8 @@ func (p *gsuiteProvider) fetchGroups() error {
 
 		for _, group := range resp.Groups {
 			identity := &models.Identity{
-				Name: group.Name,
+				ID:    group.Email,
+				Label: group.Name,
 				Group: &models.Group{
 					ID:    group.Id,
 					Name:  group.Name,
@@ -137,9 +139,9 @@ func (p *gsuiteProvider) indexIdentities() error {
 	batch := p.identitiesIndex.NewBatch()
 
 	for _, identity := range p.identities {
-		err := batch.Index(identity.Name, identity)
+		err := batch.Index(identity.GetLabel(), identity)
 		if err != nil {
-			return fmt.Errorf("failed to index identity %s: %w", identity.Name, err)
+			return fmt.Errorf("failed to index identity %s: %w", identity.GetLabel(), err)
 		}
 	}
 
@@ -168,6 +170,6 @@ func (p *gsuiteProvider) GetIdentity(ctx context.Context, identity string) (*mod
 // ListIdentities returns all cached identities with optional filtering
 func (p *gsuiteProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
 	return common.BleveListSearch(ctx, p.identitiesIndex, func(a *search.DocumentMatch, b models.Identity) bool {
-		return strings.Compare(a.ID, b.Name) == 0
+		return strings.Compare(a.ID, b.GetLabel()) == 0
 	}, p.identities, filters...)
 }

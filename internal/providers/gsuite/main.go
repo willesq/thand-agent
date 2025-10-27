@@ -3,15 +3,14 @@ package gsuite
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/blevesearch/bleve/v2"
-	"golang.org/x/oauth2/google"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/option"
 
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
+	"github.com/thand-io/agent/internal/providers/gcp"
 )
 
 // gsuiteProvider implements the ProviderImpl interface for Google Workspace (GSuite)
@@ -35,8 +34,8 @@ func (p *gsuiteProvider) Initialize(provider models.Provider) error {
 	// Get configuration
 	config := p.GetConfig()
 
-	// Get required configuration values
-	serviceAccountKeyPath, foundKeyPath := config.GetString("service_account_key_path")
+	// Get required configuration values - service account key path will be handled by GCP config
+	_, foundKeyPath := config.GetString("service_account_key_path")
 	if !foundKeyPath {
 		return fmt.Errorf("service_account_key_path is required for GSuite provider")
 	}
@@ -58,14 +57,14 @@ func (p *gsuiteProvider) Initialize(provider models.Provider) error {
 	// Create admin service with domain-wide delegation
 	ctx := context.Background()
 
-	// Read service account credentials
-	credentialsData, err := os.ReadFile(serviceAccountKeyPath)
+	// Use shared GCP configuration to handle credentials
+	gcpClient, err := gcp.CreateGcpConfig(config)
 	if err != nil {
-		return fmt.Errorf("failed to read service account key file: %w", err)
+		return fmt.Errorf("failed to create GCP config: %w", err)
 	}
 
 	// Create JWT config for domain-wide delegation
-	conf, err := google.JWTConfigFromJSON(credentialsData,
+	conf, err := gcpClient.CreateJWTConfig(
 		admin.AdminDirectoryUserReadonlyScope,
 		admin.AdminDirectoryGroupReadonlyScope,
 	)

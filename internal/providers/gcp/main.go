@@ -5,9 +5,12 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/jwt"
 
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
@@ -98,6 +101,7 @@ func init() {
 
 func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, error) {
 	var clientOptions []option.ClientOption
+	var credentialsData []byte
 
 	projectId, foundProjectId := gcpConfig.GetString("project_id")
 
@@ -116,18 +120,28 @@ func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, 
 
 	if foundKeyPath {
 		logrus.Info("Using GCP service account key file")
+
+		// Read service account credentials
+		var err error
+		credentialsData, err = os.ReadFile(serviceAccountKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read service account key file: %w", err)
+		}
+
 		clientOptions = append(clientOptions, option.WithCredentialsFile(serviceAccountKeyPath))
 	} else if foundKey {
 		logrus.Info("Using GCP service account key from config")
-		clientOptions = append(clientOptions, option.WithCredentialsJSON([]byte(serviceAccountKey)))
+		credentialsData = []byte(serviceAccountKey)
+		clientOptions = append(clientOptions, option.WithCredentialsJSON(credentialsData))
 	} else if foundCredentials {
 		logrus.Info("Using GCP service account credentials from config")
 		// Convert the credentials map to JSON
-		credentialsJSON, err := json.Marshal(credentials)
+		var err error
+		credentialsData, err = json.Marshal(credentials)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal credentials to JSON: %w", err)
 		}
-		clientOptions = append(clientOptions, option.WithCredentialsJSON(credentialsJSON))
+		clientOptions = append(clientOptions, option.WithCredentialsJSON(credentialsData))
 	} else {
 		logrus.Info("No GCP credentials provided, using Application Default Credentials (ADC)")
 		// No explicit credentials provided, will use Application Default Credentials
@@ -139,14 +153,33 @@ func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, 
 	}
 
 	return &GcpConfigurationProvider{
-		ProjectID:     projectId,
-		Stage:         projectStage,
-		ClientOptions: clientOptions,
+		ProjectID:       projectId,
+		Stage:           projectStage,
+		ClientOptions:   clientOptions,
+		credentialsData: credentialsData, // do not allow exporting this field
 	}, nil
+}
+
+// CreateJWTConfig creates a JWT config for domain-wide delegation with the given scopes
+func (g *GcpConfigurationProvider) CreateJWTConfig(scopes ...string) (*jwt.Config, error) {
+	if g.credentialsData == nil {
+		return nil, fmt.Errorf("no credentials data available for JWT config creation")
+	}
+
+	// Create JWT config for domain-wide delegation
+	conf, err := google.JWTConfigFromJSON(g.credentialsData, scopes...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create JWT config: %w", err)
+	}
+
+	return conf, nil
 }
 
 type GcpConfigurationProvider struct {
 	ProjectID     string
 	Stage         string
 	ClientOptions []option.ClientOption
+
+	// Do not allow exporting these fields
+	credentialsData []byte
 }

@@ -1,14 +1,19 @@
 package models
 
 type Identity struct {
-	Name string `json:"name"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
 
 	User  *User  `json:"user"`
 	Group *Group `json:"group"`
 }
 
-func (i *Identity) GetIdentity() string {
-	return i.Name
+func (i *Identity) GetId() string {
+	return i.ID
+}
+
+func (i *Identity) GetLabel() string {
+	return i.Label
 }
 
 func (i *Identity) GetUser() *User {
