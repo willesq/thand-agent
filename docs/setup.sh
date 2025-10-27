@@ -11,7 +11,14 @@ if command -v rbenv &> /dev/null; then
     echo "📋 Initializing rbenv..."
     export PATH="$HOME/.rbenv/bin:$PATH"
     eval "$(rbenv init -)"
-    rbenv rehash
+    
+    # Set local Ruby version
+    if [ -f ".ruby-version" ]; then
+        RUBY_VERSION=$(cat .ruby-version)
+        echo "📌 Setting Ruby version to $RUBY_VERSION..."
+        rbenv local $RUBY_VERSION
+        rbenv rehash
+    fi
 fi
 
 # Check Ruby version
@@ -33,9 +40,17 @@ if ! command -v bundle &> /dev/null; then
     gem install bundler
 fi
 
+# Update bundler to latest
+echo "🔄 Updating bundler..."
+bundle update --bundler
+
 # Install dependencies
 echo "📦 Installing Jekyll dependencies..."
 bundle install
+
+# Add Linux platform for GitHub Actions
+echo "🐧 Adding Linux platform support..."
+bundle lock --add-platform x86_64-linux
 
 echo "✅ Setup complete! You can now run:"
 echo "   bundle exec jekyll serve"
