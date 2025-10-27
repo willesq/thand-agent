@@ -1,7 +1,6 @@
 source "https://rubygems.org"
 
 # Specify minimum Ruby version (3.2.0 or higher)
-ruby ">= 3.2.0"
 
 # Jekyll and plugins
 gem "jekyll", "~> 4.3.2"
