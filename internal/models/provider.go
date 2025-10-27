@@ -372,7 +372,7 @@ func (p *BaseProvider) RevokeRole(
 	return nil, fmt.Errorf("the provider '%s' does not implement RevokeRole", p.GetProvider())
 }
 
-/* Default implementation for ValidateRole */
+/* Default implementations for identity resources */
 
 func (p *BaseProvider) GetIdentity(ctx context.Context, identity string) (*Identity, error) {
 	// Default implementation does nothing
@@ -389,6 +389,7 @@ func (p *BaseProvider) RefreshIdentities(ctx context.Context) error {
 	return fmt.Errorf("the provider '%s' does not implement RefreshIdentities", p.GetProvider())
 }
 
+/* Default implementation for ValidateRole */
 func (p *BaseProvider) ValidateRole(ctx context.Context, user *User, role *Role) (map[string]any, error) {
 	// TODO this won't work as its the base provider. needs to call the actual provider
 	// to validate the role

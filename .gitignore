@@ -57,6 +57,18 @@ Thumbs.db
 *.log
 logs/
 
+# Ruby version managers (except docs/.ruby-version for Jekyll consistency)
+.ruby-version
+.rbenv-version
+!docs/.ruby-version
+
+# Jekyll and docs
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+docs/Gemfile.lock
+docs/.sass-cache/
+
 # Runtime data
 pids
 *.pid
