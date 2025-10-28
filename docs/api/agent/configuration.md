@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Configuration
-parent: API Reference
+parent: Agent
 nav_order: 11
 ---
 

@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Authentication
-parent: API Reference
+parent: Agent
 nav_order: 2
 ---
 

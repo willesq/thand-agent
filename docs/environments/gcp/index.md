@@ -2,8 +2,9 @@
 layout: default
 title: Google Cloud Platform
 parent: Environments
-nav_order: 1
+nav_order: 10
 description: "Deploy Thand Agent on Google Cloud Platform with IAM integration"
+has_children: true
 ---
 
 # Google Cloud Platform Setup
@@ -15,9 +16,6 @@ Complete guide to deploying Thand Agent on Google Cloud Platform with IAM integr
 ## Table of contents
 {: .no_toc .text-delta }
 
-1. TOC
-{:toc}
-
 ---
 
 ## Overview
@@ -28,8 +26,3 @@ This guide walks you through setting up Thand Agent on Google Cloud Platform (GC
 - Configuring IAM roles and service accounts
 - Deploying the Thand server on GCP
 - Setting up agent authentication
-
----
-
-## Prerequisites
-

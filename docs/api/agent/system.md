@@ -1,7 +1,7 @@
 ---
 layout: default
 title: System Endpoints
-parent: API Reference
+parent: Agent
 nav_order: 1
 ---
 

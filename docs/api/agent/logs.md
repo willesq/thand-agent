@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Audit and Logging
-parent: API Reference
+parent: Agent
 nav_order: 10
 ---
 
