@@ -72,22 +72,6 @@ gh_edit_view_mode: "tree" # "tree" or "edit" if you want the user to jump into t
 # ga_tracking: G-XXXXXXXXXX
 # ga_tracking_anonymize_ip: true # Use GDPR compliant Google Analytics settings (true/nil by default)
 
-plugins:
-  - jekyll-feed
-  - jekyll-sitemap
-  - jekyll-analytics
-
-# Analytics configuration
-jekyll_analytics:
-  PostHog:
-    # api_key: YOUR_POSTHOG_API_KEY  # Set your actual PostHog API key here. Do not commit secrets; use environment variables or set locally.
-    # api_host: https://posthog.example.com  # Set your PostHog instance URL here. Do not commit placeholder URLs; configure as needed.
-    # Optional configuration
-    # debug: false  # Set to true for development debugging
-    # capture_pageviews: true  # Automatically capture page views
-    # capture_pageleaves: true  # Automatically capture page leaves
-    # loaded: function() { console.log('PostHog loaded'); }  # Callback when loaded
-
 exclude:
  # from https://github.com/jekyll/jekyll/blob/master/lib/site_template/_config.yml:
    - .sass-cache/

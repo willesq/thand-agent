@@ -11,7 +11,6 @@ gem "just-the-docs", "~> 0.7.0"
 group :jekyll_plugins do
   gem "jekyll-feed", "~> 0.15"
   gem "jekyll-sitemap", "~> 1.4"
-  gem "jekyll-analytics", "~> 0.1.14"
 end
 
 # Fix for protobuf compatibility issues
