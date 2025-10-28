@@ -42,7 +42,7 @@ Thand eliminates standing access to critical infrastructure and SaaS apps. Inste
 
 Get up and running with Thand in just a few steps. If you are ready to request access then simply install the Agent. Otherwise, follow the guides to configure and deploy Thand for your infrastructure.
 
-1. **[Install the Agent](getting-started#installation)** - Download and install the Thand agent
+1. **[Install the Agent](getting-started#installation)** - Download and install the Thand Agent
 2. **[Deploy Thand Server](environments/)** - Set up Thand for your infrastructure
 3. **[Request Access](getting-started#requesting-access)** - Make your first access request
 
