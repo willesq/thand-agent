@@ -58,7 +58,7 @@ Thand Agent  ──HTTPS──▶  Thand Server        ──HTTPS──▶  Tha
 
 ### Option 1:  Use Thand Cloud (SaaS)
 
-Firstly, install the Thand agent on your local machine. You can do this via the install script:
+Firstly, install the Thand Agent on your local machine. You can do this via the install script:
 
 ```bash
 # Install agent (https://github.com/thand-io/agent/blob/main/scripts/install.sh). Trust but verify!

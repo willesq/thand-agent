@@ -44,7 +44,7 @@ Once created, you'll see the repository details page. Note the URI of your repos
 As AWS ECR does not proxy images from external registries, you will need to push the Thand Agent image from GHCR to your ECR repository.
 
 ```bash
-# First pull the thand agent image from GHCR
+# First pull the Thand Agent image from GHCR
 docker pull ghcr.io/thand-io/agent:latest
 
 # Use the View push commands button in the ECR console to get the login command for your registry
@@ -194,7 +194,7 @@ In order for your Thand Agent running on App Runner to access KMS and Secrets Ma
 
 Now we've deployed all the necessary AWS resources, we need to configure our Thand Agent App Runner service to make use of them.
 
-- Navigate to the AWS App Runner console. [Aws App Runner Console](https://console.aws.amazon.com/apprunner/)
+- Navigate to the AWS App Runner console. [AWS App Runner Console](https://console.aws.amazon.com/apprunner/)
 - Select your Thand Agent service.
 - Click on "Configuration" tab.
 - Click "Edit" in the "Configure service" section.
@@ -208,13 +208,13 @@ Next, Under **Runtime environment variables**, add the following:
 
 | Variable Name                     | Description                                                                                   | Example Value                                      |
 |----------------------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------------|
-`THAND_ENVIRONMENT_CONFIG_KMS_ARN` | Your KMS key ARN or alias                                                                | `arn:aws:kms:REGION:ACCOUNT_ID:key/KEY_ID`        |
-`THAND_ENVIRONMENT_CONFIG_REGION` | Your AWS region                                                                               | `us-east-1`                                       |
-`THAND_LOGIN_ENDPOINT`            | The endpoint for your deployed Thand agent                                                   | `https://abc123.us-east-1.awsapprunner.com`      |
-`THAND_PROVIDERS_VAULT`           | The name of the Secrets Manager secret containing your providers configuration               | `thand-providers`                                  |
-`THAND_ROLES_VAULT`               | The name of the Secrets Manager secret containing your roles configuration                   | `thand-roles`                                     |
-`THAND_WORKFLOWS_VAULT`           | The name of the Secrets Manager secret containing your workflows configuration               | `thand-workflows`                                 |
-`THAND_ENVIRONMENT_PLATFORM`     | The environment platform for the Thand agent                                                 | `aws`                                             |
+| `THAND_ENVIRONMENT_CONFIG_KMS_ARN` | Your KMS key ARN or alias                                                                | `arn:aws:kms:REGION:ACCOUNT_ID:key/KEY_ID`        |
+| `THAND_ENVIRONMENT_CONFIG_REGION` | Your AWS region                                                                               | `us-east-1`                                       |
+| `THAND_LOGIN_ENDPOINT`            | The endpoint for your deployed Thand Agent                                                   | `https://abc123.us-east-1.awsapprunner.com`      |
+| `THAND_PROVIDERS_VAULT`           | The name of the Secrets Manager secret containing your providers configuration               | `thand-providers`                                  |
+| `THAND_ROLES_VAULT`               | The name of the Secrets Manager secret containing your roles configuration                   | `thand-roles`                                     |
+| `THAND_WORKFLOWS_VAULT`           | The name of the Secrets Manager secret containing your workflows configuration               | `thand-workflows`                                 |
+| `THAND_ENVIRONMENT_PLATFORM`     | The environment platform for the Thand Agent                                                 | `aws`                                             |
 
 Your final environment variables should look something like this:
 

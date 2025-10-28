@@ -184,14 +184,14 @@ This will let the agent know where to find the KMS and Secret Manager resources.
 
 | Variable Name                     | Description                                                                                   | Example Value                                      |
 |----------------------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------------|
-| `THAND_ENVIRONMENT_PLATFORM`             | The environment platform for the Thand agent. This will override detection at startup.                                                 | `gcp`                                             |
+| `THAND_ENVIRONMENT_PLATFORM`             | The environment platform for the Thand Agent. This will override detection at startup.                                                 | `gcp`                                             |
 | `THAND_PROVIDERS_VAULT`       | The name of the Secret Manager secret containing your providers configuration.                | `thand-providers`                                  |
 | `THAND_ROLES_VAULT`   | The name of the Secret Manager secret containing your roles configuration.                | `thand-roles`                              |
 | `THAND_WORKFLOWS_VAULT`   | The name of the Secret Manager secret containing your workflows configuration.                | `thand-workflows`                              |
 | `THAND_ENVIRONMENT_CONFIG_PROJECT_ID` | Your Google Cloud project ID.                                        | `thand-1234` |
 | `THAND_ENVIRONMENT_CONFIG_KEY_RING` | Your Google Cloud key ring name.                                          | `thand-prod`                             |
 | `THAND_ENVIRONMENT_CONFIG_KEY_NAME` | Your Google Cloud key name.                                           | `thand-prod`                                           |
-| `THAND_LOGIN_ENDPOINT` | The endpoint for your deployed Thand agent. Used either the cloud run endpoint or your own custom domain configured separately.                                     | `https://agent-dev-01-1234.europe-west1.run.app`                            |
+| `THAND_LOGIN_ENDPOINT` | The endpoint for your deployed Thand Agent. Used either the cloud run endpoint or your own custom domain configured separately.                                     | `https://agent-dev-01-1234.europe-west1.run.app`                            |
 
 - After adding the environment variables, click "Deploy" to apply the changes.
 

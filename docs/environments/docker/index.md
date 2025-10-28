@@ -345,7 +345,7 @@ The image includes built-in health checks:
 docker exec thand-agent wget --no-verbose --tries=1 --spider http://localhost:8080/health
 
 # View health status
-docker inspect --format='{{.State.Health.Status}}' thand-agent
+docker inspect --format='{% raw %}{{.State.Health.Status}}{% endraw %}' thand-agent
 ```
 
 ### Metrics Collection

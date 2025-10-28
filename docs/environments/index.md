@@ -24,7 +24,7 @@ Thand Agent can be deployed across various platforms and environments. Choose th
 
 ### Container Platforms
 
-- **[Kubernetes](kubernetes)** - Deploy Thand agent and server on Kubernetes
+- **[Kubernetes](kubernetes)** - Deploy Thand Agent and server on Kubernetes
 - **[Docker](docker)** - Run Thand components in Docker containers
 
 ### Local Development
