@@ -70,6 +70,7 @@ agent request access --resource <resource> --role <role> --duration <duration> -
 
 **Options:**
 - `--resource`, `-r` - Resource to access (e.g., `snowflake-prod`, `aws-prod`)
+- `--provider`, `-p` - Provider to access (alias for resource)
 - `--role`, `-o` - Role to assume (e.g., `analyst`, `admin`, `readonly`)
 - `--duration`, `-d` - Duration of access (e.g., `1h`, `4h`, `8h`)
 - `--reason`, `-e` - Reason for access request

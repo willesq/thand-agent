@@ -75,7 +75,18 @@ gh_edit_view_mode: "tree" # "tree" or "edit" if you want the user to jump into t
 plugins:
   - jekyll-feed
   - jekyll-sitemap
-  - jekyll-mermaid
+  - jekyll-analytics
+
+# Analytics configuration
+jekyll_analytics:
+  PostHog:
+    api_key: YOUR_POSTHOG_API_KEY  # Replace with your actual PostHog API key
+    api_host: https://posthog.example.com  # Or your self-hosted PostHog instance URL
+    # Optional configuration
+    # debug: false  # Set to true for development debugging
+    # capture_pageviews: true  # Automatically capture page views
+    # capture_pageleaves: true  # Automatically capture page leaves
+    # loaded: function() { console.log('PostHog loaded'); }  # Callback when loaded
 
 exclude:
  # from https://github.com/jekyll/jekyll/blob/master/lib/site_template/_config.yml:

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -63,6 +64,13 @@ func init() {
 
 	// Add flags for access command
 	accessCmd.Flags().StringP("resource", "r", "", "Resource to access (e.g., snowflake-prod, aws-prod)")
+	accessCmd.Flags().StringP("provider", "p", "", "Provider to access (alias for resource)")
+	accessCmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == "provider" {
+			name = "resource"
+		}
+		return pflag.NormalizedName(name)
+	})
 	accessCmd.Flags().StringP("role", "o", "", "Role to assume (e.g., analyst, admin, readonly)")
 	accessCmd.Flags().StringP("duration", "d", "", "Duration of access (e.g., 1h, 4h, 8h)")
 	accessCmd.Flags().StringP("reason", "e", "", "Reason for access request (e.g., 'Need access for analysis')")

@@ -137,10 +137,10 @@ Request access to a resource:
 
 ```bash
 # Request AWS access for 1 hour
-thand request --provider aws-prod --role Admin --duration 1h --reason "Deploying new version"
+thand request access --provider aws-prod --role Admin --duration 1h --reason "Deploying new version"
 
 # Request GCP access
-thand request --provider gcp --project my-project --role viewer
+thand request access --provider gcp --project my-project --role viewer
 
 # Request via natural language
 thand "Get me admin access to AWS production for 2 hours to perform maintenance"
