@@ -86,9 +86,9 @@ thand request "I need to debug customer data issue"
 
 Thand can be deployed quickly on your infrastructure. The server requires no persistent storage and can be run ephemerally. You can deploy via Docker, Kubernetes or even as an AWS Lambda function or GCP Cloud Function.
 
-A full guide to self-hosting can be found in the [docs](https://github.com/thand-io/agent/wiki/Self-Hosting).
+A full guide to self-hosting can be found in the [docs](https://docs.thand.io/environments/).
 
-To get started quickly you can run the server locally via Docker. This will start your server with the default configuration defined in the examples directory. For production usage you should provide your own configuration file. See the [docs](https://github.com/thand-io/agent/wiki/Configuration) for more details.
+To get started quickly you can run the server locally via Docker. This will start your server with the default configuration defined in the examples directory. For production usage you should provide your own configuration file. See the [docs](https://docs.thand.io/configuration/) for more details.
 
 ```bash
 
@@ -117,16 +117,16 @@ thand login --login-server http://localhost:8080
 
 ## Documentation
 
-Full documentation can be found at [docs](https://github.com/thand-io/agent/wiki).
+Full documentation can be found at [docs](https://docs.thand.io).
 
-- [Quick Start](https://github.com/thand-io/agent/wiki/Getting-started)
-- [Self-Hosting](https://github.com/thand-io/agent/wiki/Self-Hosting)
-- [Roles](https://github.com/thand-io/agent/wiki/Roles)
-- [Providers](https://github.com/thand-io/agent/wiki/Providers)
-- [Workflows](https://github.com/thand-io/agent/wiki/Workflows)
-- [CLI Reference](https://github.com/thand-io/agent/wiki/CLI)
-- [API Reference](https://github.com/thand-io/agent/wiki/API)
-- [FAQ](https://github.com/thand-io/agent/wiki/FAQ)
+- [Quick Start](http://docs.thand.io/getting-started.html)
+- [Self-Hosting](http://docs.thand.io/environments/)
+- [Roles](http://docs.thand.io/configuration/roles/)
+- [Providers](http://docs.thand.io/configuration/providers/)
+- [Workflows](http://docs.thand.io/configuration/workflows/)
+- [CLI Reference](http://docs.thand.io/configuration/cli.html)
+- [API Reference](http://docs.thand.io/api/)
+- [FAQ](http://docs.thand.io/faq.html)
 
 
 ## Status

@@ -144,7 +144,7 @@ func (s *Server) handleDynamicRequest(c *gin.Context, dynamicRequest models.Elev
 		Resources: models.Resources{
 			// TODO: Add resource constraints based on Groups/Users if needed
 		},
-		Applies: &models.RoleApplies{
+		Scopes: &models.RoleScopes{
 			Groups: dynamicRequest.Groups,
 			Users:  dynamicRequest.Users,
 		},
