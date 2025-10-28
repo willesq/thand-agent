@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Thand Cloud API Reference
-nav_order: 10
+nav_order: 2
 parent: API Reference
 description: "Thand Cloud REST API documentation"
 has_children: true

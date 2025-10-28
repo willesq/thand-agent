@@ -44,7 +44,7 @@ Before deploying your Cloud Run service, you need to set up an Artifact Reposito
 
 You will then be created to the newly created repository page. Click "Copy path" you will need this later. You should see something like this:
 
-![Artifact Registry]({{ "step01.png" }})
+![Artifact Registry]({{ step01.png }})
 
 ### Setup Cloud Run Service
 
@@ -52,20 +52,20 @@ You will then be created to the newly created repository page. Click "Copy path"
 - Click on "Deploy container".
 - In the container image URL field, copy the path to your Artifact Repository followed by `/thand-io/agent` and the desired tag (e.g., `latest`), resulting in a full path like `LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY_NAME/thand-io/agent:latest`.
 
-![Cloud Run]({{ "step02.png" }})
+![Cloud Run]({{ step02.png }})
 
 - Enter a service name (e.g., `thand-agent`).
 - Choose the desired region for your service.
 - Under "Authentication", select "Allow unauthenticated invocations" if you want your service to be publicly accessible.
 - Click "Create" to deploy your Cloud Run service.
 
-![Cloud Run Finished]({{ "step03.png" }})
+![Cloud Run Finished]({{ step03.png }})
 
 {: .note}
 This will deploy your service and provide you with a URL to access it. Nothing has been configured yet. However, at this point it should be running. You will get unauthorized 
 errors until you configure the agent with proper authentication.
 
-![Thand website]({{ "step04.png" }})
+![Thand website]({{ step04.png }})
 
 ## Configuring Thand Agent on Cloud Run
 
@@ -90,7 +90,7 @@ Once created you'll be taken to the key ring page.
 - Choose the desired protection level (e.g., "Software" or "HSM"). HSM will incur additional costs.
 - Click "Create".
 
-![KMS]({{ "kms01.png" }})
+![KMS]({{ kms01.png }})
 
 ### Enabling Vault (Secret Manager API)
 
@@ -127,7 +127,7 @@ Documentation for configuring providers, roles and workflows can be found in the
 - **Roles** - [Roles Configuration](../../configuration/roles/)
 - **Workflows** - [Workflows Configuration](../../configuration/workflows/)
 
-![Secrets Manager]({{ "secrets01.png" }})
+![Secrets Manager]({{ secrets01.png }})
 
 You can also simply mount a volume with the contents of your configuration files if you prefer not to use Secret Manager.
 
@@ -143,22 +143,22 @@ Depending on how you set up your Cloud Run service, a default service account ma
 
 Under the service details section of your Cloud Run service, click on the **Edit and Deploy New Revision** button.
 
-In the **Sercurity** section, scroll down to the **Service account** dropdown. Select create a new service account **Create new service account**.
+In the **Security** section, scroll down to the **Service account** dropdown. Select create a new service account **Create new service account**.
 
 Provide a name for your service account (e.g., `thand-agent`).
 
-![KMS]({{ "serviceAccount01.png" }})
+![KMS]({{ serviceAccount01.png }})
 
 You'll then need to configure the necessary roles for this service account. Click on the **+ Add Another Role** button and add the following roles:
 - Secret Manager Secret Accessor
 - Cloud KMS CryptoKey Encrypter/Decrypter
 - Project IAM Admin (if you plan to manage IAM roles via Thand)
 
-![KMS]({{ "serviceAccount02.png" }})
+![KMS]({{ serviceAccount02.png }})
 
 ### Cloud Run as Github Repository
 
-When your Cloud Run service for a **GitHub repository**, a default service account is created for it. You can use this service account or create a new one with the necessary permissions.
+When your Cloud Run service is created from a **GitHub repository**, a default service account is created for it. You can use this service account or create a new one with the necessary permissions.
 
 - Navigate to the [IAM & Admin page](https://console.cloud.google.com/iam-admin/iam) in the GCP Console.
 - Locate the service account associated with your Cloud Run service (it will typically be named `CLOUD_RUN_NAME@PROJECT_ID.iam.gserviceaccount.com`).
@@ -183,8 +183,8 @@ This will let the agent know where to find the KMS and Secret Manager resources.
 | Variable Name                     | Description                                                                                   | Example Value                                      |
 |----------------------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------------|
 | `THAND_ENVIRONMENT_PLATFORM`             | The environment platform for the Thand agent. This will override detection at startup.                                                 | `gcp`                                             |
-| `THAND_PROVIDERS_VAULT`       | The name of the Secret Manager secret containing your providers configuration.                | `thand-roles`                                  |
-| `THAND_ROLES_VAULT`   | The name of the Secret Manager secret containing your roles configuration.                | `thand-providers`                              |
+| `THAND_PROVIDERS_VAULT`       | The name of the Secret Manager secret containing your providers configuration.                | `thand-providers`                                  |
+| `THAND_ROLES_VAULT`   | The name of the Secret Manager secret containing your roles configuration.                | `thand-roles`                              |
 | `THAND_WORKFLOWS_VAULT`   | The name of the Secret Manager secret containing your workflows configuration.                | `thand-workflows`                              |
 | `THAND_ENVIRONMENT_CONFIG_PROJECT_ID` | Your Google Cloud project ID.                                        | `thand-1234` |
 | `THAND_ENVIRONMENT_CONFIG_KEY_RING` | Your Google Cloud key ring name.                                          | `thand-prod`                             |
@@ -199,7 +199,7 @@ Once the new revision is deployed, you can verify that the Thand Agent is correc
 
 You should see something like this:
 
-![Thand website]({{ "step05.png" }})
+![Thand website]({{ step05.png }})
 
 You'll then be able to login in via the thand cli tool using the `--login-server` flag pointing to your Cloud Run service URL.
 

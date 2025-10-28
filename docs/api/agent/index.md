@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Agent API Reference
-nav_order: 10
+nav_order: 1
 parent: API Reference
 description: "Thand Agent REST API documentation"
 has_children: true
