@@ -147,6 +147,11 @@ func (s *Server) handleAgentMode(c *gin.Context) {
 	for providerName, remoteSession := range agentSessions {
 
 		cookie := sessions.DefaultMany(c, CreateCookieName(providerName))
+
+		if cookie == nil {
+			continue
+		}
+
 		cookie.Set(ThandCookieAttributeSessionName, remoteSession.GetEncodedLocalSession())
 
 		err = cookie.Save()

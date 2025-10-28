@@ -119,7 +119,9 @@ providers:
 - In the "Secret value" field, provide your entire [provider](../../configuration/providers/) configuration. Use either YAML or JSON format and upload it via the "Upload file" option.
 - Click "Create Secret".
 
-Repeat the above steps to create two more secrets named `thand-roles` and `thand-workflows`, providing the respective configurations for roles and workflows.
+Repeat the above steps to create two more secrets:
+- `thand-roles` - containing your [roles configuration](../../configuration/roles/)
+- `thand-workflows` - containing your [workflows configuration](../../configuration/workflows/)
 
 Documentation for configuring providers, roles and workflows can be found in the [Configuration](../../configuration/) section.
 
@@ -210,7 +212,7 @@ thand login --login-server https://agent-dev-01-1234.europe-west1.run.app
 You can then query what roles you have access to:
 
 ```bash
-thand roles
+thand roles --login-server https://agent-dev-01-1234.europe-west1.run.app
 ```
 
 ## Troubleshooting
