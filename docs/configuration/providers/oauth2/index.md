@@ -1,4 +1,5 @@
 ---
+layout: default
 title: OAuth2 Provider
 description: Generic OAuth2 provider for authentication with various services
 parent: Providers

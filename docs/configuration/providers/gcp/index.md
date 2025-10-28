@@ -1,4 +1,5 @@
 ---
+layout: default
 title: GCP Provider
 description: Google Cloud Platform provider with IAM and resource management
 parent: Providers

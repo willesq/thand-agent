@@ -1,4 +1,5 @@
 ---
+layout: default
 title: GitHub Provider
 description: GitHub provider for repository management and authentication
 parent: Providers

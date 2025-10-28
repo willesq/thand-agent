@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Terraform Provider
 description: Terraform Cloud/Enterprise provider for workspace and organization management
 parent: Providers

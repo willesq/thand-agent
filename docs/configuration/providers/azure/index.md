@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Azure Provider
 description: Microsoft Azure provider with RBAC and subscription management
 parent: Providers

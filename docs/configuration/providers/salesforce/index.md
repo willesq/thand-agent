@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Salesforce Provider
 description: Salesforce CRM provider for user and permission management
 parent: Providers

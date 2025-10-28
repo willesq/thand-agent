@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Email Provider
 description: Email provider for notifications and communication
 parent: Providers

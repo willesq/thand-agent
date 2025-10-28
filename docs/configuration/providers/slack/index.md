@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Slack Provider
 description: Slack provider for team communication and notifications
 parent: Providers

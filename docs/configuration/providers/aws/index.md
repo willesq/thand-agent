@@ -1,4 +1,5 @@
 ---
+layout: default
 title: AWS Provider
 description: Amazon Web Services provider with IAM and SSO integration
 parent: Providers

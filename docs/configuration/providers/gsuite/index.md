@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Google Workspace (GSuite) Provider
 description: Google Workspace provider for user and group management
 parent: Providers

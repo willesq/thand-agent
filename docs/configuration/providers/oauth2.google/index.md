@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Google OAuth2 Provider
 description: Google OAuth2 provider for Google account authentication
 parent: Providers

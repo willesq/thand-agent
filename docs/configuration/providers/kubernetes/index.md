@@ -1,4 +1,5 @@
 ---
+layout: default
 title: Kubernetes Provider
 description: Kubernetes provider for cluster authentication and RBAC
 parent: Providers
