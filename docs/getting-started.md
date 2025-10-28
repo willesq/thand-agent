@@ -172,7 +172,7 @@ thand-agent request sudo --duration 30m --reason "System maintenance"
 
 ## Next Steps
 
-- **[Setup Guides](../setup/)** - Configure Thand for specific platforms
+- **[Environment Setup](../environments/)** - Configure Thand for specific environments
 - **[Configuration](../configuration/)** - Detailed configuration options
 - **[API Reference](../api/)** - REST API documentation
 - **[Workflows](../workflows/)** - Custom workflow configuration
