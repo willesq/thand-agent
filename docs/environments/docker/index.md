@@ -240,16 +240,33 @@ server {
 }
 ```
 
-Run Nginx as a separate container:
+Run Nginx as a separate container using Docker networks:
 
 ```bash
+# Create a user-defined bridge network
+docker network create thand-net
+
+# Run Thand Agent container attached to the network
+docker run -d \
+  --name thand-agent-prod \
+  --network thand-net \
+  -p 8080:8080 \
+  --restart unless-stopped \
+  --memory=2g \
+  --cpus=1.0 \
+  -v $(pwd)/config:/app/config:ro \
+  -v $(pwd)/logs:/app/logs \
+  -e THAND_CONFIG_PATH=/app/config/config.yaml \
+  ghcr.io/thand-io/agent:latest
+
+# Run Nginx container attached to the same network
 docker run -d \
   --name nginx-proxy \
+  --network thand-net \
   -p 80:80 \
   -p 443:443 \
   -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro \
   -v $(pwd)/ssl:/etc/nginx/ssl:ro \
-  --link thand-agent-prod:thand-agent \
   nginx:alpine
 ```
 
@@ -267,19 +284,22 @@ USER agent
 
 ### Secret Management
 
-Use Docker secrets for sensitive data:
+Use Docker secrets for sensitive data in Docker Swarm mode:
 
 ```bash
-# Create secrets
+# Create secrets (requires Docker Swarm mode)
 echo "your-aws-access-key" | docker secret create aws_access_key -
 echo "your-aws-secret-key" | docker secret create aws_secret_key -
 
-# Use in compose
-services:
-  thand-agent:
-    secrets:
-      - aws_access_key
-      - aws_secret_key
+# For standalone Docker, use environment variables or mounted files
+docker run -d \
+  --name thand-agent \
+  -p 8080:8080 \
+  -e AWS_ACCESS_KEY_ID_FILE=/run/secrets/aws_access_key \
+  -e AWS_SECRET_ACCESS_KEY_FILE=/run/secrets/aws_secret_key \
+  -v $(pwd)/secrets:/run/secrets:ro \
+  -v $(pwd)/thand-config:/app/config:ro \
+  ghcr.io/thand-io/agent:latest
 ```
 
 ### Network Security
