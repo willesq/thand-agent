@@ -38,7 +38,6 @@ These flags are available for all commands:
 | `--config` | - | string | Config file (default is `$HOME/.config/thand/config.yaml`) |
 | `--verbose` | `-v` | boolean | Enable verbose output for debugging |
 | `--login-server` | - | string | Override the default login server URL |
-| `--api-key` | - | string | Provide API key for login server authentication |
 | `--help` | `-h` | boolean | Show help for any command |
 
 ### Examples
@@ -53,8 +52,6 @@ agent --login-server https://auth.example.com login
 # Enable verbose logging
 agent --verbose server
 
-# Use API key authentication
-agent --api-key "your-api-key" roles
 ```
 
 ---
@@ -164,6 +161,7 @@ agent request access --resource <resource> --role <role> --duration <duration> -
 | Flag | Short | Description | Example |
 |------|-------|-------------|---------|
 | `--resource` | `-r` | Resource/provider to access | `aws-prod`, `snowflake-dev` |
+| `--provider` | `-p` | Provider to access (alias for resource) | `aws-prod`, `snowflake-dev` |
 | `--role` | `-o` | Role to assume | `admin`, `analyst`, `readonly` |
 | `--duration` | `-d` | Access duration | `1h`, `4h`, `8h` |
 | `--reason` | `-e` | Justification for access | `Emergency maintenance` |
@@ -542,7 +540,7 @@ The `agent sessions` command provides interactive session management:
 ### CI/CD Pipeline
 ```bash
 # Automated access request in pipeline
-agent --api-key "$THAND_API_KEY" request access \
+agent request access \
   --resource aws-prod \
   --role deployer \
   --duration 1h \

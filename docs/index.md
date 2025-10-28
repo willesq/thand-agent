@@ -52,18 +52,34 @@ Get up and running with Thand in just a few steps. If you are ready to request a
 
 The Thand architecture breaks down into three components:
 
-```
-Your Machine             Your Infrastructure             Thand Cloud (Optional)
-─────────────            ───────────────────             ──────────────────────
+<pre class="mermaid">
+---
+config:
+  layout: dagre
+---
+flowchart TD
+ subgraph YM["Your Machine"]
+        Agent["Thand Agent"]
+  end
+ subgraph YI["Your Infrastructure"]
+        ThandServer["Thand Server"]
+        AWS["AWS Agent"]
+        GCP["GCP Agent"]
+        Azure["Azure Agent"]
+  end
+ subgraph ThandCloud["Thand Cloud (Optional)"]
+        Thand["Thand Cloud"]
+  end
+    Agent -. HTTPS .-> ThandCloud & ThandServer
+    ThandServer -. GRPC .-> Temporal["Temporal"]
+    Thand -. HTTPS .-> Temporal
+    Temporal -. GRPC .-> AWS & GCP & Azure
+</pre>
 
-Thand Agent  ──HTTPS──▶  Thand Server        ──HTTPS──▶  Thand Cloud
-├─ CLI                   ├─ REST API                     ├─ Agent Management
-├─ Sessions              ├─ Session Management           ├─ Role Management
-├─ Local elevations      ├─ Workflow Worker              ├─ Workflow Management
-├─ REST API              ├─ Audit Forwarder              ├─ Audit Dashboard
-└─ Attestations          ├─ Basic Approvals              └─ etc
-                         ├─ Event collection
-```
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true });
+</script>
 
 - **Agent**: Runs on the user's local machine, provides session management and local callback endpoints
 - **Server**: Forms a "login server" to allow CLIs and other clients to request and be granted elevations
