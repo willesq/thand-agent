@@ -80,8 +80,8 @@ plugins:
 # Analytics configuration
 jekyll_analytics:
   PostHog:
-    api_key: YOUR_POSTHOG_API_KEY  # Replace with your actual PostHog API key
-    api_host: https://posthog.example.com  # Or your self-hosted PostHog instance URL
+    # api_key: YOUR_POSTHOG_API_KEY  # Set your actual PostHog API key here. Do not commit secrets; use environment variables or set locally.
+    # api_host: https://posthog.example.com  # Set your PostHog instance URL here. Do not commit placeholder URLs; configure as needed.
     # Optional configuration
     # debug: false  # Set to true for development debugging
     # capture_pageviews: true  # Automatically capture page views
