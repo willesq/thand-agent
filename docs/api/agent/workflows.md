@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Workflow Management
-parent: API Reference
+parent: Agent
 nav_order: 7
 ---
 

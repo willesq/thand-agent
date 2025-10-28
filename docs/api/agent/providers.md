@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Provider Management
-parent: API Reference
+parent: Agent
 nav_order: 5
 ---
 

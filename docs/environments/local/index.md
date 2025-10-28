@@ -2,7 +2,7 @@
 layout: default
 title: Local
 parent: Environments
-nav_order: 4
+nav_order: 7
 description: "Set up Thand Server for local development and testing"
 ---
 
@@ -20,15 +20,6 @@ Set up Thand Agent for local development and testing.
 
 ---
 
-## Prerequisites
-
-- Go 1.21 or later
-- Git
-- Docker (optional, for containerized setup)
-- Make (optional, for build automation)
-
----
-
 ## Install Thand
 
 Firstly, follow the [Installation Guide](../../getting-started/#install-via-script) to install the Thand Agent.
@@ -38,8 +29,7 @@ Once Thand has been installed you can simply run the server locally.
 ### Start the Server
 
 ```bash
-# Terminal 1: Start server
-./bin/thand server
+thand server
 ```
 
 The server should start without issue. However, you will need to configure; roles, providers and workflow before you can really use it.

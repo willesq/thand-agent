@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Role Management
-parent: API Reference
+parent: Agent
 nav_order: 6
 ---
 

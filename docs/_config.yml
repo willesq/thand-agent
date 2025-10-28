@@ -32,6 +32,9 @@ search:
 # Color scheme supports "light" (default) and "dark"
 color_scheme: light
 
+# Navigation settings
+nav_fold: true  # Enable collapsible navigation sections
+
 # Callouts
 callouts_level: quiet # or loud
 callouts:

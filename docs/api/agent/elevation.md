@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Elevation (Access Requests)
-parent: API Reference
+parent: Agent
 nav_order: 4
 ---
 

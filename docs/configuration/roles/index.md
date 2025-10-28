@@ -35,7 +35,7 @@ Thand roles can **inherit** from other roles and provider roles to leverage exis
 
 ## Role Structure
 
-{.note}
+{: .note}
 When mixing multiple providers into a single role you can use the providers name as a prefix to avoid ambiguity. For example, to inherit from an AWS role in the `aws-prod` provider instance, use `aws-prod:arn:aws:iam::aws:policy/ReadOnlyAccess`.
 
 ### Basic Configuration
