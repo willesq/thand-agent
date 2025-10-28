@@ -2,6 +2,7 @@
 layout: default
 title: Session Management
 parent: Agent
+grand_parent: API Reference
 nav_order: 3
 ---
 
