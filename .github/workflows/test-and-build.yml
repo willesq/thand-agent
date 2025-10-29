@@ -215,6 +215,19 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [auto-tag, build]
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
     
     steps:
     - name: Checkout code
@@ -235,50 +248,41 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
-    - name: Build for multiple platforms
+    - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
       run: |
         VERSION=${{ steps.version.outputs.version }}
         COMMIT=${{ steps.version.outputs.commit }}
+        GOOS=${{ matrix.goos }}
+        GOARCH=${{ matrix.goarch }}
         
         # Create dist directory
         mkdir -p dist
         
-        # Build for different platforms and create archives
-        platforms=(
-          "linux/amd64"
-          "linux/arm64" 
-          "darwin/amd64"
-          "darwin/arm64"
-          "windows/amd64"
-        )
+        # Set output name
+        output_name="agent"
+        if [ "$GOOS" = "windows" ]; then
+          output_name="agent.exe"
+        fi
         
-        for platform in "${platforms[@]}"; do
-          IFS='/' read -r os arch <<< "$platform"
-          output_name="agent"
-          if [ "$os" = "windows" ]; then
-            output_name="agent.exe"
-          fi
-          
-          echo "Building for $os/$arch..."
-          GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -a -installsuffix cgo \
-            -ldflags "-X github.com/thand-io/agent/internal/common.Version=$VERSION -X github.com/thand-io/agent/internal/common.GitCommit=$COMMIT" \
-            -o "dist/$output_name" .
-          
-          # Create archive
-          if [ "$os" = "windows" ]; then
-            cd dist && zip "agent-${os}-${arch}.zip" "$output_name" && cd ..
-          else
-            cd dist && tar -czf "agent-${os}-${arch}.tar.gz" "$output_name" && cd ..
-          fi
-          
-          # Also keep the binary for direct download
-          mv "dist/$output_name" "dist/agent-${os}-${arch}$([ "$os" = "windows" ] && echo ".exe" || echo "")"
-        done
+        echo "Building for $GOOS/$GOARCH..."
+        GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -a -installsuffix cgo \
+          -ldflags "-X github.com/thand-io/agent/internal/common.Version=$VERSION -X github.com/thand-io/agent/internal/common.GitCommit=$COMMIT" \
+          -o "dist/$output_name" .
+        
+        # Create archive
+        if [ "$GOOS" = "windows" ]; then
+          cd dist && zip "agent-${GOOS}-${GOARCH}.zip" "$output_name" && cd ..
+        else
+          cd dist && tar -czf "agent-${GOOS}-${GOARCH}.tar.gz" "$output_name" && cd ..
+        fi
+        
+        # Also keep the binary for direct download
+        mv "dist/$output_name" "dist/agent-${GOOS}-${GOARCH}$([ "$GOOS" = "windows" ] && echo ".exe" || echo "")"
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: binaries-${{ steps.version.outputs.version }}
+        name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}-${{ steps.version.outputs.version }}
         path: dist/
 
   docker-release:
@@ -302,8 +306,9 @@ jobs:
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
-        name: binaries-${{ steps.version.outputs.version }}
+        pattern: binaries-*-${{ steps.version.outputs.version }}
         path: dist/
+        merge-multiple: true
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
