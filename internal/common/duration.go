@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	iso8601arse "github.com/senseyeio/duration"
+	iso8601 "github.com/senseyeio/duration"
 )
 
 func ValidateDuration(duration string) (time.Duration, error) {
@@ -25,7 +25,7 @@ func validateDuration(duration string) (time.Duration, error) {
 
 	if parsedDuration, err := time.ParseDuration(duration); err == nil {
 		return parsedDuration, nil
-	} else if isoDuration, err := iso8601arse.ParseISO8601(duration); err == nil {
+	} else if isoDuration, err := iso8601.ParseISO8601(duration); err == nil {
 		referenceTime := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 		shiftedTime := isoDuration.Shift(referenceTime)
 		return shiftedTime.Sub(referenceTime), nil

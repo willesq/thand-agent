@@ -136,14 +136,14 @@ func MakeElevationRequest(request *models.ElevateRequest) error {
 	if len(request.Authenticator) == 0 {
 
 		// First try to see if we have an authenticator matching the provider
-		foundProvider, localSesison, err := sessionManager.GetFirstActiveSession(
+		foundProvider, localSession, err := sessionManager.GetFirstActiveSession(
 			cfg.GetLoginServerHostname(),
 			request.Role.Authenticators...)
 
 		// If we have a valid session for one of the role's authenticators then use it
-		if err == nil && localSesison != nil {
+		if err == nil && localSession != nil {
 			request.Authenticator = foundProvider
-			request.Session = localSesison
+			request.Session = localSession
 		}
 	}
 
