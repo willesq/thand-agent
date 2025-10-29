@@ -87,8 +87,9 @@ jobs:
     - name: Download build artifacts
       uses: actions/download-artifact@v4
       with:
-        name: binaries-${{ github.event.inputs.tag_version }}
+        pattern: binaries-*-${{ github.event.inputs.tag_version }}
         path: dist/
+        merge-multiple: true
         github-token: ${{ secrets.GITHUB_TOKEN }}
         repository: ${{ github.repository }}
         run-id: ${{ steps.find-run.outputs.run-id }}
