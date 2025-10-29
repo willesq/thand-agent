@@ -108,6 +108,14 @@ func (t *thandTask) executeAuthorization(
 	// Collect all authorization tasks
 	var authTasks []authTask
 
+	if len(elevateRequest.Providers) == 0 {
+		return nil, fmt.Errorf("no providers specified for authorization")
+	}
+
+	if len(elevateRequest.Identities) == 0 {
+		return nil, fmt.Errorf("no identities specified for authorization")
+	}
+
 	for _, providerName := range elevateRequest.Providers {
 
 		providerCall, err := t.config.GetProviderByName(providerName)
@@ -174,6 +182,10 @@ func (t *thandTask) executeAuthorization(
 	// Process results
 	authorizations := make(map[string]any)
 	hasErrors := false
+
+	if len(authResults) == 0 {
+		return nil, fmt.Errorf("no authorization results returned")
+	}
 
 	for _, result := range authResults {
 		if result.Error != nil {

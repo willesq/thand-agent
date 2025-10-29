@@ -173,31 +173,38 @@ func (s *Server) elevate(c *gin.Context, request models.ElevateRequest) {
 
 	// If we have a web session and one hasn't been set then
 	// lets attach a user session to the request.
-	if s.Config.IsServer() {
+	if !s.Config.IsServer() {
+		s.getErrorPage(c, http.StatusBadRequest, "Cannot process elevation request")
+		return
+	}
 
-		if len(request.Workflow) == 0 {
-			s.getErrorPage(c, http.StatusBadRequest, "No workflow specified for elevation request")
-			return
+	if len(request.Workflow) == 0 {
+		s.getErrorPage(c, http.StatusBadRequest, "No workflow specified for elevation request")
+		return
+	}
+
+	authProvider, foundUser, err := s.getUserFromElevationRequest(c, request)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized: unable to get user for list of available roles", err)
+		return
+	}
+
+	if foundUser != nil {
+
+		exportableSession := &models.ExportableSession{
+			Session:  foundUser,
+			Provider: authProvider,
 		}
 
-		authProvider, foundUser, err := s.getUserFromElevationRequest(c, request)
+		request.Session = exportableSession.ToLocalSession(
+			s.Config.GetServices().GetEncryption())
 
-		if err != nil {
-			s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized: unable to get user for list of available roles", err)
-			return
+		// If no identities were set then use the users email
+		// Self elevate
+		if len(request.Identities) == 0 && foundUser.User != nil && len(foundUser.User.Email) > 0 {
+			request.Identities = []string{foundUser.User.Email}
 		}
-
-		if foundUser != nil {
-
-			exportableSession := &models.ExportableSession{
-				Session:  foundUser,
-				Provider: authProvider,
-			}
-
-			request.Session = exportableSession.ToLocalSession(
-				s.Config.GetServices().GetEncryption())
-		}
-
 	}
 
 	workflowTask, err := s.Workflows.CreateWorkflow(ctx, request)
