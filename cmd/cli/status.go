@@ -282,7 +282,7 @@ func (m tuiModel) fetchStatus() tea.Msg {
 
 	if resp.StatusCode() == http.StatusBadRequest {
 		// Check if this is a configuration error
-		return statusMsg{err: fmt.Errorf("polling is not supported by the remote server: %s", body)}
+		return statusMsg{err: fmt.Errorf("polling is not supported by the remote server: %s for: %s", string(resp.Body()), url)}
 	}
 
 	if resp.StatusCode() != http.StatusOK {
