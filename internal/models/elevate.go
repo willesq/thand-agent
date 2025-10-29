@@ -47,8 +47,9 @@ func (r *ElevateStaticRequest) GetSession() *LocalSession {
 
 // ElevateResponse represents the response for /elevate endpoint
 type ElevateResponse struct {
-	Status ctx.StatusPhase `json:"status"`
-	Output map[string]any  `json:"output,omitempty"`
+	WorkflowId string          `json:"id"`
+	Status     ctx.StatusPhase `json:"status"`
+	Output     map[string]any  `json:"output,omitempty"`
 }
 
 type ElevateRequest struct {

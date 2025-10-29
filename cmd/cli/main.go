@@ -58,6 +58,12 @@ func preRunConfigE(cmd *cobra.Command, mode config.Mode) error {
 
 	cfg.SetMode(mode)
 
+	// check if verbose flag is set
+	verbose, err := cmd.Flags().GetBool("verbose")
+	if err == nil && verbose {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
 	switch mode {
 	case config.ModeClient:
 
@@ -184,14 +190,20 @@ func preAuthenticateE(cmd *cobra.Command, _ []string) error {
 
 func preAgentE(cmd *cobra.Command, args []string) error {
 
-	err := preAuthenticateE(cmd, args)
+	logrus.Debug("Starting server")
+
+	// Server has to run first so we can get our callback
+	// from the auth response
+	err := preRunServerE(cmd, args) // load config and authenticate using
 	if err != nil {
 		return err
 	}
-	err = preRunServerE(cmd, args) // load config and authenticate using
+
+	err = preAuthenticateE(cmd, args)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 

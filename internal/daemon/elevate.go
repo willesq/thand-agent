@@ -390,8 +390,9 @@ func (s *Server) resumeWorkflow(c *gin.Context, workflow *models.WorkflowTask) {
 	} else {
 
 		c.JSON(http.StatusOK, models.ElevateResponse{
-			Status: workflowTask.GetStatus(),
-			Output: workflowTask.GetOutputAsMap(),
+			WorkflowId: workflowTask.WorkflowID,
+			Status:     workflowTask.GetStatus(),
+			Output:     workflowTask.GetOutputAsMap(),
 		})
 
 	}
