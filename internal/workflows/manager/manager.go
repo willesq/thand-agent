@@ -106,6 +106,18 @@ func (m *WorkflowManager) executeWorkflow(
 		return nil, fmt.Errorf("failed to create workflow: %w", err)
 	}
 
+	if len(request.Duration) == 0 {
+		return nil, fmt.Errorf("no duration specified in request")
+	}
+
+	if len(request.Providers) == 0 {
+		return nil, fmt.Errorf("no providers specified in request")
+	}
+
+	if len(request.Identities) == 0 {
+		return nil, fmt.Errorf("no identities specified in request")
+	}
+
 	if len(request.Authenticator) == 0 {
 
 		// Get the user information from the context

@@ -152,6 +152,7 @@ func MakeElevationRequest(request *models.ElevateRequest) error {
 	}
 
 	response, err := sendElevationRequest(request)
+
 	if err != nil {
 		return err
 	}

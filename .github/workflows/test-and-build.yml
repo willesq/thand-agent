@@ -181,7 +181,7 @@ jobs:
   build-multi-platform:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [auto-tag]
+    needs: [auto-tag, unit-tests, functional-tests, integration-tests]
     strategy:
       matrix:
         include:
