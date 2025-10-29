@@ -368,14 +368,23 @@ func logRedirectWorkflow() resty.RedirectPolicy {
 			return fmt.Errorf("please complete the authentication request in your browser")
 
 		}
+
+		urlQuery := req.URL.Query()
+
 		// Parse the URL to get the next task name
-		nextTaskName := req.URL.Query().Get("task")
+		nextTaskName := urlQuery.Get("taskName")
 
 		if len(nextTaskName) == 0 {
-			nextTaskName = "unknown"
+			nextTaskName = "initializing"
 		}
 
-		fmt.Printf("redirecting .. %s\n", nextTaskName)
+		taskStatus := urlQuery.Get("taskStatus")
+
+		if len(taskStatus) == 0 {
+			taskStatus = "running"
+		}
+
+		fmt.Printf("redirecting .. %s (%s)\n", nextTaskName, taskStatus)
 
 		return nil
 	})

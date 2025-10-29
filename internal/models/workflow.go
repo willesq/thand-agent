@@ -91,3 +91,37 @@ type TaskHandler func(
 	task *model.TaskItem,
 	input any,
 ) (any, error)
+
+func (w *WorkflowExecutionInfo) GetAuthorizationTime() *time.Time {
+
+	if w.Approved == nil {
+		return nil
+	}
+
+	if !*w.Approved {
+		return nil
+	}
+
+	approvalTime := time.Now()
+
+	// Find the authorization time in the context
+	if w.Context == nil {
+		return &approvalTime
+	}
+
+	contextMap, ok := w.Context.(map[string]any)
+	if !ok {
+		return &approvalTime
+	}
+
+	if authTimeRaw, exists := contextMap["authorized_at"]; exists {
+		if authTimeStr, ok := authTimeRaw.(string); ok {
+			parsedTime, err := time.Parse(time.RFC3339, authTimeStr)
+			if err == nil {
+				return &parsedTime
+			}
+		}
+	}
+
+	return &approvalTime
+}

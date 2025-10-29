@@ -15,9 +15,8 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-type statusMsg struct {
+type execInfo struct {
 	execution *models.WorkflowExecutionInfo
-	err       error
 }
 
 type errorMsg struct {
@@ -31,6 +30,7 @@ type tuiModel struct {
 	loading     bool
 	err         error
 	lastUpdate  time.Time
+	approvedAt  *time.Time
 	quitting    bool
 	liveUpdates bool
 	serverUrl   string
@@ -70,22 +70,32 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
-	case statusMsg:
-		m.loading = false
-		if msg.err != nil {
-			m.err = msg.err
-			m.liveUpdates = false
-			return m, tea.Quit
-		} else {
-			m.execution = msg.execution
-			m.lastUpdate = time.Now()
+	case execInfo:
 
-			// Continue polling if workflow is still running
-			if m.isWorkflowRunning() {
-				return m, tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
-					return m.fetchStatus()
-				})
-			}
+		execution := msg.execution
+
+		if execution == nil {
+			m.err = fmt.Errorf("no execution data received")
+			return m, tea.Quit
+		}
+
+		m.loading = false
+
+		m.execution = execution
+		m.lastUpdate = time.Now()
+
+		if execution.Approved != nil && *execution.Approved && m.approvedAt == nil {
+			m.approvedAt = execution.GetAuthorizationTime()
+		}
+
+		// Continue polling if workflow is still running
+		if m.isWorkflowRunning() {
+			return m, tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
+				return m.fetchStatus()
+			})
+		} else {
+			// Workflow has completed
+			return m, tea.Quit
 		}
 
 	case errorMsg:
@@ -191,10 +201,9 @@ func (m tuiModel) renderStatusSection() string {
 		durationStr := common.FormatDuration(totalDuration)
 		section.WriteString(fmt.Sprintf("Duration:      %s", durationStr))
 
-		if m.execution.Approved != nil && *m.execution.Approved {
+		if m.approvedAt != nil {
 
-			startedAt := m.execution.StartTime
-			expirationTime := startedAt.Add(totalDuration)
+			expirationTime := m.approvedAt.Add(totalDuration)
 
 			// Calculate remaining time until expiration
 			remaining := max(time.Until(expirationTime), 0)
@@ -252,16 +261,16 @@ func (m tuiModel) fetchStatus() tea.Msg {
 		Get(url)
 
 	if err != nil {
-		return statusMsg{err: fmt.Errorf("failed to fetch status: %w", err)}
+		return errorMsg{err: fmt.Errorf("failed to fetch status: %w", err)}
 	}
 
-	if resp.StatusCode() == http.StatusBadRequest {
+	if resp.StatusCode() == http.StatusNotImplemented {
 		// Check if this is a configuration error
-		return statusMsg{err: fmt.Errorf("polling is not supported by the remote server: %s for: %s", string(resp.Body()), url)}
+		return errorMsg{err: fmt.Errorf("live updates are not supported by the server")}
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return statusMsg{err: fmt.Errorf("API error: %d - %s for: %s", resp.StatusCode(), string(resp.Body()), url)}
+		return errorMsg{err: fmt.Errorf("API error: %d - %s for: %s", resp.StatusCode(), string(resp.Body()), url)}
 	}
 
 	var apiResponse struct {
@@ -269,10 +278,10 @@ func (m tuiModel) fetchStatus() tea.Msg {
 	}
 
 	if err := json.Unmarshal(resp.Body(), &apiResponse); err != nil {
-		return statusMsg{err: fmt.Errorf("failed to parse response: %w", err)}
+		return errorMsg{err: fmt.Errorf("failed to parse response: %w", err)}
 	}
 
-	return statusMsg{execution: apiResponse.Execution}
+	return execInfo{execution: apiResponse.Execution}
 }
 
 // runWorkflowStatusTUI starts the TUI for live workflow status updates
@@ -280,13 +289,24 @@ func runWorkflowStatusTUI(workflowID, serverUrl, authToken string) error {
 	model := newTuiModel(workflowID, serverUrl, authToken)
 	program := tea.NewProgram(model)
 
-	if _, err := program.Run(); err != nil {
+	finalModel, err := program.Run()
+	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
+	// Cast the final model back to tuiModel to access its fields
+	finalTuiModel, ok := finalModel.(tuiModel)
+	if !ok {
+		return fmt.Errorf("unexpected model type returned from TUI")
+	}
+
 	// Check if live updates are not supported
-	if !model.liveUpdates {
+	if !finalTuiModel.liveUpdates {
 		return fmt.Errorf("live status updates not supported in this configuration")
+	}
+
+	if finalTuiModel.err != nil {
+		return finalTuiModel.err
 	}
 
 	return nil

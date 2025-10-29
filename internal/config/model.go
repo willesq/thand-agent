@@ -469,7 +469,8 @@ func (c *Config) GetResumeCallbackUrl(workflowTask *models.WorkflowTask) string 
 		"state": {workflowTask.GetEncodedTask(
 			c.servicesClient.GetEncryption(),
 		)},
-		"taskName": {workflowTask.GetTaskName()},
+		"taskName":   {workflowTask.GetTaskName()},
+		"taskStatus": {workflowTask.GetStatus().String()},
 	}
 
 	return fmt.Sprintf(
