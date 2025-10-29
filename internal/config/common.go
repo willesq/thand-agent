@@ -13,7 +13,7 @@ import (
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
-	yamlSig "sigs.k8s.io/yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // loadDataFromSource loads data from either a file path or URL
@@ -189,12 +189,19 @@ func readData[T WorkflowDefinitions | RoleDefinitions | ProviderDefinitions](
 		// If JSON we can unmarshal directly
 		logrus.Debugln("Data format detected: JSON")
 	} else {
-		// If YAML we need to convert to JSON after
-		if yamlData, err := yamlSig.YAMLToJSON(data); err != nil {
+		// If YAML we need to convert to JSON after. Have to use json
+		// as the DSL serverless workflow SDK expects JSON
+		var yamlData any
+		if err := yaml.Unmarshal(data, &yamlData); err != nil {
+			logrus.WithError(err).Errorln("Failed to unmarshal YAML")
+			return nil, err
+		}
+
+		if jsonData, err := json.Marshal(yamlData); err != nil {
 			logrus.WithError(err).Errorln("Failed to convert YAML to JSON")
 			return nil, err
 		} else {
-			data = yamlData
+			data = jsonData
 		}
 	}
 
