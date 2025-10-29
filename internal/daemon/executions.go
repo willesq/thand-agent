@@ -108,14 +108,14 @@ func (s *Server) getRunningWorkflow(c *gin.Context) {
 	temporal := s.Config.GetServices().GetTemporal()
 
 	if temporal == nil || !temporal.HasClient() {
-		s.getErrorPage(c, http.StatusBadRequest, "Temporal service is not configured")
+		s.getErrorPage(c, http.StatusNotImplemented, "Temporal service is not configured")
 		return
 	}
 
 	if !s.Config.IsServer() {
 		// In non-server mode we can assume a default user
 		// TODO: Proxy request to server
-		s.getErrorPage(c, http.StatusBadRequest, "Workflow listing is only available in server mode")
+		s.getErrorPage(c, http.StatusNotImplemented, "Workflow listing is only available in server mode")
 		return
 	}
 

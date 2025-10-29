@@ -176,15 +176,14 @@ func (wr *WorkflowTask) SetTaskReferenceFromName(taskName string) error {
 
 func (r *WorkflowTask) GetTaskName() string {
 
-	if r.state == nil {
-		if len(r.GetEntrypoint()) > 0 {
-			return r.GetEntrypoint()
-		} else {
-			return "unknown"
-		}
+	if r.state != nil && len(r.state.Name) > 0 {
+		return r.state.Name
+	} else if len(r.GetEntrypoint()) > 0 {
+		return r.GetEntrypoint()
+	} else {
+		return "unknown"
 	}
 
-	return r.state.Name
 }
 
 func (r *WorkflowTask) SetUser(user *User) {

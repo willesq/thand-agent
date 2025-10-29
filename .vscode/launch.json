@@ -55,8 +55,8 @@
             "mode": "auto",
             "program": "${workspaceFolder}",
             "cwd": "${workspaceFolder}",
-            "args": ["--login-server", "https://agent-717249053981.europe-west1.run.app"],
             "env": {},
+            "envFile": "${workspaceFolder}/.env.remote.local",
             "showLog": true
         },
         {
@@ -77,7 +77,7 @@
             "mode": "auto",
             "program": "${workspaceFolder}",
             "cwd": "${workspaceFolder}",
-            "args": ["request", "access", "--provider", "aws-prod", "--role", "aws_admin", "--duration", "PT1M", "--reason", "Need access for demo", "--login-server", "http://localhost:9090"],
+            "args": ["request", "access", "--provider", "aws-thand-dev", "--role", "aws_admin", "--duration", "PT1M", "--reason", "Need access for demo", "--login-server", "http://localhost:9090"],
             "env": {},
             "showLog": true
         },
@@ -88,8 +88,9 @@
             "mode": "auto",
             "program": "${workspaceFolder}",
             "cwd": "${workspaceFolder}",
-            "args": ["request", "access", "--provider", "aws-prod", "--role", "aws_admin", "--duration", "PT1M", "--reason", "Need access for demo", "--login-server", "https://agent-717249053981.europe-west1.run.app"],
+            "args": ["request", "access", "--provider", "aws-thand-dev", "--role", "aws_admin", "--duration", "PT1M", "--reason", "Need access for demo"],
             "env": {},
+            "envFile": "${workspaceFolder}/.env.remote.local",
             "showLog": true
         }
     ]

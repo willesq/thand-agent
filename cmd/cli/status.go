@@ -11,12 +11,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/go-resty/resty/v2"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
-type statusMsg struct {
+type execInfo struct {
 	execution *models.WorkflowExecutionInfo
-	err       error
 }
 
 type errorMsg struct {
@@ -30,6 +30,7 @@ type tuiModel struct {
 	loading     bool
 	err         error
 	lastUpdate  time.Time
+	approvedAt  *time.Time
 	quitting    bool
 	liveUpdates bool
 	serverUrl   string
@@ -69,26 +70,32 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
-	case statusMsg:
-		m.loading = false
-		if msg.err != nil {
-			m.err = msg.err
-			// Check if this is a server configuration error
-			if strings.Contains(msg.err.Error(), "Temporal service is not configured") ||
-				strings.Contains(msg.err.Error(), "Workflow listing is only available in server mode") {
-				m.liveUpdates = false
-				return m, tea.Quit
-			}
-		} else {
-			m.execution = msg.execution
-			m.lastUpdate = time.Now()
+	case execInfo:
 
-			// Continue polling if workflow is still running
-			if m.isWorkflowRunning() {
-				return m, tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
-					return m.fetchStatus()
-				})
-			}
+		execution := msg.execution
+
+		if execution == nil {
+			m.err = fmt.Errorf("no execution data received")
+			return m, tea.Quit
+		}
+
+		m.loading = false
+
+		m.execution = execution
+		m.lastUpdate = time.Now()
+
+		if execution.Approved != nil && *execution.Approved && m.approvedAt == nil {
+			m.approvedAt = execution.GetAuthorizationTime()
+		}
+
+		// Continue polling if workflow is still running
+		if m.isWorkflowRunning() {
+			return m, tea.Tick(time.Second*3, func(t time.Time) tea.Msg {
+				return m.fetchStatus()
+			})
+		} else {
+			// Workflow has completed
+			return m, tea.Quit
 		}
 
 	case errorMsg:
@@ -123,16 +130,34 @@ func (m tuiModel) View() string {
 
 	var content strings.Builder
 
+	var statusColor lipgloss.Color
+	var statusText string
+	switch strings.ToLower(m.execution.Status) {
+	case "completed":
+		statusColor = lipgloss.Color("#10b981")
+		statusText = "COMPLETED"
+	case "failed", "faulted":
+		statusColor = lipgloss.Color("#ef4444")
+		statusText = "FAILED"
+	case "cancelled":
+		statusColor = lipgloss.Color("#f59e0b")
+		statusText = "CANCELLED"
+	case "running":
+		statusColor = lipgloss.Color("#3b82f6")
+		statusText = "RUNNING"
+	default:
+		statusColor = lipgloss.Color("#6b7280")
+		statusText = strings.ToUpper(m.execution.Status)
+	}
+
 	// Title
-	content.WriteString(workflowTitleStyle.Render("Workflow Execution Status"))
+	content.WriteString(workflowTitleStyle.Render("Workflow Execution Status: "))
+	statusBadge := statusBadgeStyle.Copy().Background(statusColor).Render(statusText)
+	content.WriteString(statusBadge)
 	content.WriteString("\n\n")
 
 	// Current status section
 	content.WriteString(m.renderStatusSection())
-	content.WriteString("\n\n")
-
-	// Task list
-	content.WriteString(m.renderTaskList())
 	content.WriteString("\n\n")
 
 	// Last updated
@@ -157,28 +182,43 @@ func (m tuiModel) renderStatusSection() string {
 		currentTask = "Initializing"
 	}
 
-	var statusColor lipgloss.Color
-	var statusText string
-	switch strings.ToLower(m.execution.Status) {
-	case "completed":
-		statusColor = lipgloss.Color("#10b981")
-		statusText = "COMPLETED"
-	case "failed", "faulted":
-		statusColor = lipgloss.Color("#ef4444")
-		statusText = "FAILED"
-	case "cancelled":
-		statusColor = lipgloss.Color("#f59e0b")
-		statusText = "CANCELLED"
-	case "running":
-		statusColor = lipgloss.Color("#3b82f6")
-		statusText = "RUNNING"
-	default:
-		statusColor = lipgloss.Color("#6b7280")
-		statusText = strings.ToUpper(m.execution.Status)
+	// Approval status
+	approvalBadge := pendingApprovalStyle.Render("PENDING APPROVAL")
+	if m.execution.Approved != nil {
+		if *m.execution.Approved {
+			approvalBadge = approvedStyle.Render("APPROVED")
+		} else {
+			approvalBadge = rejectedStyle.Render("REJECTED")
+		}
+	}
+	section.WriteString(fmt.Sprintf("Approval:     %s", approvalBadge))
+	section.WriteString("\n")
+
+	if m.execution.Duration > 0 {
+
+		totalDuration := time.Duration(m.execution.Duration) * time.Second
+		// Format duration in PT1H format
+		durationStr := common.FormatDuration(totalDuration)
+		section.WriteString(fmt.Sprintf("Duration:      %s", durationStr))
+
+		if m.approvedAt != nil {
+
+			expirationTime := m.approvedAt.Add(totalDuration)
+
+			// Calculate remaining time until expiration
+			remaining := max(time.Until(expirationTime), 0)
+
+			// Format remaining time in human readable format
+			remainingStr := common.FormatDurationRemaining(remaining)
+
+			section.WriteString(fmt.Sprintf(" (%s remaining)", remainingStr))
+		}
+
+		section.WriteString("\n")
 	}
 
 	// Current task
-	section.WriteString("Current Task: ")
+	section.WriteString("Current Task:  ")
 	if m.isWorkflowRunning() {
 		section.WriteString(fmt.Sprintf("%s %s", m.spinner.View(), currentTask))
 	} else {
@@ -186,73 +226,17 @@ func (m tuiModel) renderStatusSection() string {
 	}
 	section.WriteString("\n")
 
-	// Overall status
-	statusBadge := statusBadgeStyle.Copy().Background(statusColor).Render(statusText)
-	section.WriteString(fmt.Sprintf("Status: %s", statusBadge))
-	section.WriteString("\n")
-
-	// Approval status
-	if m.execution.Approved != nil {
-		if *m.execution.Approved {
-			approvalBadge := approvedStyle.Render("APPROVED")
-			section.WriteString(fmt.Sprintf("Approval: %s", approvalBadge))
-		} else {
-			approvalBadge := rejectedStyle.Render("REJECTED")
-			section.WriteString(fmt.Sprintf("Approval: %s", approvalBadge))
-		}
-	} else {
-		approvalBadge := pendingApprovalStyle.Render("PENDING APPROVAL")
-		section.WriteString(fmt.Sprintf("Approval: %s", approvalBadge))
-	}
-	section.WriteString("\n")
-
 	// User info
-	if m.execution.User != "" {
-		section.WriteString(fmt.Sprintf("User: %s", m.execution.User))
+	if len(m.execution.Identities) > 0 {
+		section.WriteString(fmt.Sprintf("Identity:      %s", strings.Join(m.execution.Identities, ", ")))
+		section.WriteString("\n")
+	} else {
+		section.WriteString(fmt.Sprintf("Identity:      self (%s)", m.execution.User))
 		section.WriteString("\n")
 	}
 
 	if m.execution.Role != "" {
-		section.WriteString(fmt.Sprintf("Role: %s", m.execution.Role))
-		section.WriteString("\n")
-	}
-
-	return section.String()
-}
-
-func (m tuiModel) renderTaskList() string {
-	var section strings.Builder
-
-	section.WriteString("Workflow Tasks:\n")
-
-	if len(m.execution.History) == 0 {
-		section.WriteString(taskPendingStyle.Render("• No task history available"))
-		section.WriteString("\n")
-		return section.String()
-	}
-
-	currentTask := m.execution.Task
-
-	for i, task := range m.execution.History {
-		var style lipgloss.Style
-		var icon string
-
-		if task == currentTask && m.isWorkflowRunning() {
-			// Current running task
-			style = taskCurrentStyle
-			icon = m.spinner.View()
-		} else if i < len(m.execution.History)-1 || !m.isWorkflowRunning() {
-			// Completed task
-			style = taskCompletedStyle
-			icon = "✓"
-		} else {
-			// Pending task
-			style = taskPendingStyle
-			icon = "○"
-		}
-
-		line := fmt.Sprintf("%s %s", icon, task)
-		section.WriteString(style.Render(line))
+		section.WriteString(fmt.Sprintf("Role:          %s", m.execution.Role))
 		section.WriteString("\n")
 	}
 
@@ -277,16 +261,16 @@ func (m tuiModel) fetchStatus() tea.Msg {
 		Get(url)
 
 	if err != nil {
-		return statusMsg{err: fmt.Errorf("failed to fetch status: %w", err)}
+		return errorMsg{err: fmt.Errorf("failed to fetch status: %w", err)}
 	}
 
-	if resp.StatusCode() == http.StatusBadRequest {
+	if resp.StatusCode() == http.StatusNotImplemented {
 		// Check if this is a configuration error
-		return statusMsg{err: fmt.Errorf("polling is not supported by the remote server: %s for: %s", string(resp.Body()), url)}
+		return errorMsg{err: fmt.Errorf("live updates are not supported by the server")}
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return statusMsg{err: fmt.Errorf("API error: %d - %s for: %s", resp.StatusCode(), string(resp.Body()), url)}
+		return errorMsg{err: fmt.Errorf("API error: %d - %s for: %s", resp.StatusCode(), string(resp.Body()), url)}
 	}
 
 	var apiResponse struct {
@@ -294,10 +278,10 @@ func (m tuiModel) fetchStatus() tea.Msg {
 	}
 
 	if err := json.Unmarshal(resp.Body(), &apiResponse); err != nil {
-		return statusMsg{err: fmt.Errorf("failed to parse response: %w", err)}
+		return errorMsg{err: fmt.Errorf("failed to parse response: %w", err)}
 	}
 
-	return statusMsg{execution: apiResponse.Execution}
+	return execInfo{execution: apiResponse.Execution}
 }
 
 // runWorkflowStatusTUI starts the TUI for live workflow status updates
@@ -305,13 +289,24 @@ func runWorkflowStatusTUI(workflowID, serverUrl, authToken string) error {
 	model := newTuiModel(workflowID, serverUrl, authToken)
 	program := tea.NewProgram(model)
 
-	if _, err := program.Run(); err != nil {
+	finalModel, err := program.Run()
+	if err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
 
+	// Cast the final model back to tuiModel to access its fields
+	finalTuiModel, ok := finalModel.(tuiModel)
+	if !ok {
+		return fmt.Errorf("unexpected model type returned from TUI")
+	}
+
 	// Check if live updates are not supported
-	if !model.liveUpdates {
+	if !finalTuiModel.liveUpdates {
 		return fmt.Errorf("live status updates not supported in this configuration")
+	}
+
+	if finalTuiModel.err != nil {
+		return finalTuiModel.err
 	}
 
 	return nil
