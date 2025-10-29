@@ -282,12 +282,7 @@ func (m tuiModel) fetchStatus() tea.Msg {
 
 	if resp.StatusCode() == http.StatusBadRequest {
 		// Check if this is a configuration error
-		body := string(resp.Body())
-		if strings.Contains(body, "Temporal service is not configured") ||
-			strings.Contains(body, "Workflow listing is only available in server mode") {
-			return statusMsg{err: fmt.Errorf("live status updates not available: %s", body)}
-		}
-		return statusMsg{err: fmt.Errorf("server error: %s", body)}
+		return statusMsg{err: fmt.Errorf("polling is not supported by the remote server: %s", body)}
 	}
 
 	if resp.StatusCode() != http.StatusOK {
