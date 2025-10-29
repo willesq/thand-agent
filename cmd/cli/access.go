@@ -23,20 +23,17 @@ var accessCmd = &cobra.Command{
 	Long:    `Request access to a specific resource with role and duration`,
 	PreRunE: preAgentE, // load agent
 	Run: func(cmd *cobra.Command, args []string) {
-		resource, _ := cmd.Flags().GetString("resource")
+		// TODO: use resource, permissions later to let users request specific permissions
+		// and access to specific resources
+		// resource, _ := cmd.Flags().GetString("resource")
 		provider, _ := cmd.Flags().GetString("provider")
 		role, _ := cmd.Flags().GetString("role")
 		duration, _ := cmd.Flags().GetString("duration")
 		reason, _ := cmd.Flags().GetString("reason")
 
-		// Use provider as an alias for resource if resource is not provided
-		if len(resource) == 0 && len(provider) > 0 {
-			resource = provider
-		}
-
-		if len(resource) == 0 || len(role) == 0 || len(duration) == 0 || len(reason) == 0 {
-			fmt.Println("Error: --resource (or --provider), --role, --duration, and --reason are required")
-			fmt.Println("Example: agent request access --resource snowflake-prod --role analyst --duration 4h --reason 'Need access for analysis'")
+		if len(provider) == 0 || len(role) == 0 || len(duration) == 0 || len(reason) == 0 {
+			fmt.Println("Error: --provider, --role, --duration, and --reason are required")
+			fmt.Println("Example: agent request access --provider snowflake-prod --role analyst --duration 4h --reason 'Need access for analysis'")
 			return
 		}
 
@@ -49,7 +46,7 @@ var accessCmd = &cobra.Command{
 
 		err = MakeElevationRequest(&models.ElevateRequest{
 			Role:      foundRole,
-			Providers: []string{resource},
+			Providers: []string{provider},
 			// Let the system pick the workflow based on role and provider
 			Reason:   reason,
 			Duration: duration,
@@ -68,7 +65,7 @@ func init() {
 	requestCmd.AddCommand(accessCmd) // Builds the request based on roles and providers
 
 	// Add flags for access command
-	accessCmd.Flags().StringP("resource", "r", "", "Resource to access (e.g., snowflake-prod, aws-prod)")
+	// accessCmd.Flags().StringP("resource", "r", "", "Resource to access (e.g., snowflake-prod, aws-prod)")
 	accessCmd.Flags().StringP("provider", "p", "", "Provider to access (alias for resource)")
 	accessCmd.Flags().StringP("role", "o", "", "Role to assume (e.g., analyst, admin, readonly)")
 	accessCmd.Flags().StringP("duration", "d", "", "Duration of access (e.g., 1h, 4h, 8h)")

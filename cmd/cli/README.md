@@ -14,7 +14,7 @@ agent login --login-server <server-url>
 agent request "I need admin access to AWS production for database maintenance"
 
 # Or use specific access request
-agent request access --resource aws-prod --role admin --duration 4h --reason "Database maintenance"
+agent request access --provider aws-prod --role admin --duration 4h --reason "Database maintenance"
 ```
 
 ## Global Options
@@ -61,15 +61,14 @@ agent request "Grant me read access to S3 bucket for data analysis"
 The AI analyzes your natural language request and automatically determines the appropriate provider, role, and permissions needed.
 
 #### `agent request access`
-Request access to a specific resource with explicit parameters.
+Request access to a specific provider with explicit parameters.
 
 **Usage:**
 ```bash
-agent request access --resource <resource> --role <role> --duration <duration> --reason <reason>
+agent request access --provider <provider> --role <role> --duration <duration> --reason <reason>
 ```
 
 **Options:**
-- `--resource`, `-r` - Resource to access (e.g., `snowflake-prod`, `aws-prod`)
 - `--provider`, `-p` - Provider to access (alias for resource)
 - `--role`, `-o` - Role to assume (e.g., `analyst`, `admin`, `readonly`)
 - `--duration`, `-d` - Duration of access (e.g., `1h`, `4h`, `8h`)
@@ -77,7 +76,7 @@ agent request access --resource <resource> --role <role> --duration <duration> -
 
 **Example:**
 ```bash
-agent request access --resource aws-prod --role admin --duration 4h --reason "Database maintenance required"
+agent request access --provider aws-prod --role admin --duration 4h --reason "Database maintenance required"
 ```
 
 ### Session Management
@@ -244,7 +243,7 @@ agent request "I need read access to the customer database"
 
 # Explicit access request
 agent request access \
-  --resource database-prod \
+  --provider database-prod \
   --role readonly \
   --duration 2h \
   --reason "Customer support ticket investigation"

@@ -32,7 +32,7 @@ var requestCmd = &cobra.Command{
 	Use:     "request",
 	Short:   "Request access to resources",
 	Long:    `Request just-in-time access to cloud infrastructure or SaaS applications`,
-	PreRunE: preRunServerE,
+	PreRunE: preAgentE,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		reason := strings.TrimSpace(strings.Join(args, " "))
@@ -141,7 +141,7 @@ func MakeElevationRequest(request *models.ElevateRequest) error {
 		return err
 	}
 
-	return handleElevationResponse(response, request)
+	return handleElevationResponse(request, response)
 }
 
 func validateElevationRequest(request *models.ElevateRequest) error {
@@ -260,14 +260,14 @@ func sendElevationRequest(request *models.ElevateRequest) (*resty.Response, erro
 	return res, nil
 }
 
-func handleElevationResponse(res *resty.Response, request *models.ElevateRequest) error {
+func handleElevationResponse(request *models.ElevateRequest, res *resty.Response) error {
 	if res.StatusCode() == http.StatusOK {
-		return handleSuccessResponse(res)
+		return handleSuccessResponse(request, res)
 	}
-	return handleErrorResponse(res, request)
+	return handleErrorResponse(request, res)
 }
 
-func handleSuccessResponse(res *resty.Response) error {
+func handleSuccessResponse(request *models.ElevateRequest, res *resty.Response) error {
 	var elevateResponse models.ElevateResponse
 	if err := json.Unmarshal(res.Body(), &elevateResponse); err != nil {
 		logrus.Errorf("failed to unmarshal elevation response: %v", err)
@@ -275,33 +275,39 @@ func handleSuccessResponse(res *resty.Response) error {
 	}
 
 	fmt.Println()
-	displayStatusMessage(elevateResponse.Status)
+	displayStatusMessage(request, &elevateResponse)
 	fmt.Println()
 	return nil
 }
 
-func displayStatusMessage(status ctx.StatusPhase) {
-	switch status {
+func displayStatusMessage(request *models.ElevateRequest, response *models.ElevateResponse) {
+	switch response.Status {
 	case ctx.CompletedStatus:
 		fmt.Println(successStyle.Render("Elevation Complete!"))
-	case ctx.WaitingStatus:
-		fmt.Println(warningStyle.Render("⏳ Elevation Pending... Waiting for user action"))
 	case ctx.FaultedStatus:
 		fmt.Println(warningStyle.Render("Elevation Failed"))
 	case ctx.CancelledStatus:
 		fmt.Println(warningStyle.Render("Elevation Cancelled"))
-	case ctx.RunningStatus:
-		fmt.Println(warningStyle.Render("⏳ Elevation In Progress..."))
 	case ctx.SuspendedStatus:
 		fmt.Println(warningStyle.Render("⏸️ Elevation Suspended"))
 	case ctx.PendingStatus:
-		fmt.Println(warningStyle.Render("⏳ Elevation Pending..."))
+		fallthrough
+	case ctx.WaitingStatus:
+		fallthrough
+	case ctx.RunningStatus:
+
+		// Extract workflow ID from output and try to get live updates
+		if err := getElevationStatus(request, response); err != nil {
+			// If live updates fail, just show the current status
+			fmt.Println(warningStyle.Render(fmt.Sprintf("Status: %s (live updates unavailable)", response.Status)))
+		}
+
 	default:
-		fmt.Println(warningStyle.Render(fmt.Sprintf("Unknown Status: %s", status)))
+		fmt.Println(warningStyle.Render(fmt.Sprintf("Unknown Status: %s", response.Status)))
 	}
 }
 
-func handleErrorResponse(res *resty.Response, request *models.ElevateRequest) error {
+func handleErrorResponse(request *models.ElevateRequest, res *resty.Response) error {
 	var errorResponse models.ErrorResponse
 	if err := json.Unmarshal(res.Body(), &errorResponse); err != nil {
 		logrus.Errorf("failed to unmarshal error response: %v", err)
@@ -359,6 +365,23 @@ func logRedirectWorkflow() resty.RedirectPolicy {
 
 		return nil
 	})
+}
+
+func getElevationStatus(request *models.ElevateRequest, response *models.ElevateResponse) error {
+	// Get server URL and auth token for the API call
+	baseUrl := fmt.Sprintf("%s/%s",
+		strings.TrimPrefix(cfg.GetLoginServerUrl(), "/"),
+		strings.TrimPrefix(cfg.GetApiBasePath(), "/"))
+
+	authToken := request.Session.GetEncodedLocalSession()
+
+	// Try to run the TUI for live status updates
+	err := runWorkflowStatusTUI(response.WorkflowId, baseUrl, authToken)
+	if err != nil {
+		return fmt.Errorf("failed to show live status: %w", err)
+	}
+
+	return nil
 }
 
 func init() {

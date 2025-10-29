@@ -153,14 +153,13 @@ agent request "Emergency database maintenance required"
 Make structured access requests with specific parameters.
 
 ```bash
-agent request access --resource <resource> --role <role> --duration <duration> --reason <reason>
+agent request access --provider <provider> --role <role> --duration <duration> --reason <reason>
 ```
 
 **Required Flags:**
 
 | Flag | Short | Description | Example |
 |------|-------|-------------|---------|
-| `--resource` | `-r` | Resource/provider to access | `aws-prod`, `snowflake-dev` |
 | `--provider` | `-p` | Provider to access (alias for resource) | `aws-prod`, `snowflake-dev` |
 | `--role` | `-o` | Role to assume | `admin`, `analyst`, `readonly` |
 | `--duration` | `-d` | Access duration | `1h`, `4h`, `8h` |
@@ -170,7 +169,7 @@ agent request access --resource <resource> --role <role> --duration <duration> -
 ```bash
 # Request AWS admin access
 agent request access \
-  --resource aws-prod \
+  --provider aws-prod \
   --role admin \
   --duration 2h \
   --reason "Emergency security patch deployment"
@@ -541,7 +540,7 @@ The `agent sessions` command provides interactive session management:
 ```bash
 # Automated access request in pipeline
 agent request access \
-  --resource aws-prod \
+  --provider aws-prod \
   --role deployer \
   --duration 1h \
   --reason "Automated deployment pipeline"
@@ -557,7 +556,7 @@ agent request "Production outage - need immediate admin access"
 ```bash
 # Planned maintenance window
 agent request access \
-  --resource all-systems \
+  --provider all-systems \
   --role maintenance \
   --duration 4h \
   --reason "Scheduled maintenance window MW-2024-10-27"
