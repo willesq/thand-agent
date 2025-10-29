@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -37,20 +38,27 @@ func (l LoginServer) GetSessions() map[string]models.LocalSession {
 	return l.Sessions
 }
 
-func (l LoginServer) GetFirstActiveSession() (*models.LocalSession, error) {
+func (l LoginServer) GetFirstActiveSession(providers ...string) (string, *models.LocalSession, error) {
 
 	if len(l.Sessions) == 0 {
-		return nil, fmt.Errorf("error")
+		return "", nil, fmt.Errorf("error")
 	}
 
-	for _, sesh := range l.Sessions {
+	for providerName, sesh := range l.Sessions {
+
+		if len(providers) > 0 {
+			if !slices.Contains(providers, providerName) {
+				continue
+			}
+		}
+
 		// Return first non-expired session
 		if sesh.Expiry.After(time.Now()) {
-			return &sesh, nil
+			return providerName, &sesh, nil
 		}
 	}
 
-	return nil, fmt.Errorf("error")
+	return "", nil, fmt.Errorf("error")
 }
 
 func (m *SessionManager) AddSession(loginServer string, provider string, session models.LocalSession) error {
@@ -80,6 +88,22 @@ func (m *SessionManager) RemoveSession(loginServer string, provider string) erro
 	delete(m.Servers[loginServer].Sessions, provider)
 
 	return m.Commit(loginServer)
+}
+
+func (m *SessionManager) GetFirstActiveSession(loginServer string, providers ...string) (string, *models.LocalSession, error) {
+
+	logrus.WithFields(logrus.Fields{
+		"loginServer": loginServer,
+		"providers":   providers,
+	}).Debugln("Getting first active provider session")
+
+	m.createLoginServer(loginServer)
+	server, ok := m.Servers[loginServer]
+	if !ok {
+		return "", nil, fmt.Errorf("no sessions found for login server: %s", loginServer)
+	}
+
+	return server.GetFirstActiveSession(providers...)
 }
 
 func (m *SessionManager) GetSession(loginServer string, provider string) (*models.LocalSession, error) {

@@ -26,12 +26,15 @@ var accessCmd = &cobra.Command{
 		// TODO: use resource, permissions later to let users request specific permissions
 		// and access to specific resources
 		// resource, _ := cmd.Flags().GetString("resource")
-		provider, _ := cmd.Flags().GetString("provider")
+		identities, _ := cmd.Flags().GetStringArray("identity")
+		authenticator, _ := cmd.Flags().GetString("authenticator")
+		workflow, _ := cmd.Flags().GetString("workflow")
+		providers, _ := cmd.Flags().GetStringArray("provider")
 		role, _ := cmd.Flags().GetString("role")
 		duration, _ := cmd.Flags().GetString("duration")
 		reason, _ := cmd.Flags().GetString("reason")
 
-		if len(provider) == 0 || len(role) == 0 || len(duration) == 0 || len(reason) == 0 {
+		if len(providers) == 0 || len(role) == 0 || len(duration) == 0 || len(reason) == 0 {
 			fmt.Println("Error: --provider, --role, --duration, and --reason are required")
 			fmt.Println("Example: agent request access --provider snowflake-prod --role analyst --duration 4h --reason 'Need access for analysis'")
 			return
@@ -45,11 +48,13 @@ var accessCmd = &cobra.Command{
 		}
 
 		err = MakeElevationRequest(&models.ElevateRequest{
-			Role:      foundRole,
-			Providers: []string{provider},
-			// Let the system pick the workflow based on role and provider
-			Reason:   reason,
-			Duration: duration,
+			Role:          foundRole,
+			Providers:     providers,
+			Identities:    identities,
+			Authenticator: authenticator,
+			Workflow:      workflow,
+			Reason:        reason,
+			Duration:      duration,
 		})
 
 		if err != nil {
@@ -66,7 +71,10 @@ func init() {
 
 	// Add flags for access command
 	// accessCmd.Flags().StringP("resource", "r", "", "Resource to access (e.g., snowflake-prod, aws-prod)")
-	accessCmd.Flags().StringP("provider", "p", "", "Provider to access (alias for resource)")
+	accessCmd.Flags().StringArrayP("identities", "i", []string{}, "Identities to use for access (e.g., user@example.com)")
+	accessCmd.Flags().StringP("authenticator", "a", "", "Authenticator to use for login (overrides provider selection)")
+	accessCmd.Flags().StringP("workflow", "w", "", "Workflow to execute (e.g., snowflake-access)")
+	accessCmd.Flags().StringArrayP("provider", "p", []string{}, "Provider to access (alias for resource)")
 	accessCmd.Flags().StringP("role", "o", "", "Role to assume (e.g., analyst, admin, readonly)")
 	accessCmd.Flags().StringP("duration", "d", "", "Duration of access (e.g., 1h, 4h, 8h)")
 	accessCmd.Flags().StringP("reason", "e", "", "Reason for access request (e.g., 'Need access for analysis')")

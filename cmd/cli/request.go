@@ -60,7 +60,7 @@ var requestCmd = &cobra.Command{
 			return
 		}
 
-		sesh, err := loginSessions.GetFirstActiveSession()
+		_, sesh, err := loginSessions.GetFirstActiveSession()
 
 		if err != nil {
 			return
@@ -125,11 +125,26 @@ func MakeElevationRequest(request *models.ElevateRequest) error {
 	}
 
 	if len(request.Workflow) == 0 {
+		// Default to first workflow in role
 		if len(request.Role.Workflows) == 0 {
 			return fmt.Errorf("no workflow specified and role has no associated workflows")
 		}
 
 		request.Workflow = request.Role.Workflows[0]
+	}
+
+	if len(request.Authenticator) == 0 {
+
+		// First try to see if we have an authenticator matching the provider
+		foundProvider, localSesison, err := sessionManager.GetFirstActiveSession(
+			cfg.GetLoginServerHostname(),
+			request.Role.Authenticators...)
+
+		// If we have a valid session for one of the role's authenticators then use it
+		if err == nil && localSesison != nil {
+			request.Authenticator = foundProvider
+			request.Session = localSesison
+		}
 	}
 
 	if err := ensureValidSession(request); err != nil {
@@ -164,13 +179,11 @@ func validateElevationRequest(request *models.ElevateRequest) error {
 }
 
 func ensureValidSession(request *models.ElevateRequest) error {
-	session, err := sessionManager.GetSession(
-		cfg.GetLoginServerHostname(), request.Authenticator)
-	request.Session = session
 
-	if err != nil || isSessionExpired(session) {
+	if request.Session == nil || isSessionExpired(request.Session) {
 		return authenticateUser(request)
 	}
+
 	return nil
 }
 
@@ -226,12 +239,13 @@ func authenticateUser(request *models.ElevateRequest) error {
 		sessionHandler := sessionManager.AwaitRefresh(
 			cfg.GetLoginServerHostname())
 
-		session, err := sessionHandler.GetFirstActiveSession()
+		foundProvider, session, err := sessionHandler.GetFirstActiveSession()
 
 		if err != nil {
 			return fmt.Errorf("failed to get session: %w", err)
 		}
 
+		request.Authenticator = foundProvider
 		request.Session = session
 
 	}

@@ -389,15 +389,13 @@ func (c *Config) SyncWithLoginServer() error {
 	// Lets make our registration request. This will pull down our
 	// remote configuration and also register this instance with the login server
 
-	regResponse, err := c.RegisterWithLoginServer(localToken)
+	_, err = c.RegisterWithLoginServer(localToken)
 
 	if err != nil {
 		return fmt.Errorf("failed to register with login server: %w", err)
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"response": regResponse,
-	}).Debugf("Syncing configuration with login server at: %s", apiUrl)
+	logrus.Debugf("Syncing configuration with login server at: %s", apiUrl)
 
 	// Overwrite everything.
 	c.Providers = ProviderConfig{
