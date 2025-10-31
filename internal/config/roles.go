@@ -153,7 +153,8 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 	// Create a copy of the base role for the composite
 	compositeRole := *baseRole
 
-	// Process inherited roles
+	// Process inherited roles and track which ones to keep vs remove
+	var remainingInherits []string
 	for _, inheritedRoleName := range baseRole.Inherits {
 
 		// First check to see if the rolename exists as-is for
@@ -161,6 +162,8 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 		providerRole := c.GetProviderRole(inheritedRoleName, baseRole.Providers...)
 
 		if providerRole != nil {
+			// Keep provider roles in the inherits list
+			remainingInherits = append(remainingInherits, inheritedRoleName)
 			continue
 		}
 
@@ -177,7 +180,12 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 		// Merge only the inherited permissions and resources
 		c.mergeRolePermissions(&compositeRole, inheritedRole)
 		c.mergeRoleResources(&compositeRole, inheritedRole)
+
+		// Only provider roles are kept in the inherits list; resolved inherited roles are excluded
 	}
+
+	// Update the inherits list to only contain provider roles that weren't resolved
+	compositeRole.Inherits = remainingInherits
 
 	// Even for roles without inheritance, we need to resolve Allow/Deny conflicts
 	// within the same role and handle condensed actions properly
