@@ -30,6 +30,11 @@ func (s *Server) getErrorPage(c *gin.Context, code int, message string, err ...e
 
 		// Log all errors
 		for _, e := range err {
+
+			if e == nil {
+				continue
+			}
+
 			logrus.WithError(e).Errorln(message)
 			messages = append(messages, e.Error())
 		}

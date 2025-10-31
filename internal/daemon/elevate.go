@@ -38,7 +38,7 @@ func (s *Server) getElevate(c *gin.Context) {
 
 	if len(primaryWorkflow) == 0 {
 		if len(role.Workflows) == 0 {
-			s.getErrorPage(c, http.StatusBadRequest, "No workflow specified and role has no associated workflows", err)
+			s.getErrorPage(c, http.StatusBadRequest, "No workflow specified and role has no associated workflows")
 			return
 		}
 		primaryWorkflow = role.Workflows[0]
@@ -451,13 +451,6 @@ func (s *Server) handleLargeLanguageModelRequest(c *gin.Context, elevateRequest 
 		return
 	}
 
-	providers := s.Config.GetProvidersByCapability(models.ProviderCapabilityRBAC)
-
-	if len(providers) == 0 {
-		s.getErrorPage(c, http.StatusBadRequest, "No providers with RBAC capability are configured")
-		return
-	}
-
 	// Get user context
 	if !s.Config.IsServer() {
 		s.getErrorPage(c, http.StatusBadRequest, "LLM Elevation is only available in server mode")
@@ -474,6 +467,13 @@ func (s *Server) handleLargeLanguageModelRequest(c *gin.Context, elevateRequest 
 
 	if foundUser == nil {
 		s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized: user not found for elevation")
+		return
+	}
+
+	providers := s.Config.GetProvidersByCapabilityWithUser(foundUser.User, models.ProviderCapabilityRBAC)
+
+	if len(providers) == 0 {
+		s.getErrorPage(c, http.StatusBadRequest, "No providers with RBAC capability are configured")
 		return
 	}
 

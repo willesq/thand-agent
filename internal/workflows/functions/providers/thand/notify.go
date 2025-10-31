@@ -63,8 +63,20 @@ func (t *notifyFunction) ValidateRequest(
 	var notificationReq NotifierRequest
 	common.ConvertMapToInterface(call.With, &notificationReq)
 
-	notifierProviders := t.config.GetProvidersByCapability(
-		models.ProviderCapabilityNotifier)
+	// Get requesting user info
+	requestingUser := workflowTask.GetUser()
+
+	if requestingUser == nil {
+		return errors.New("requesting user cannot be nil")
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"provider": notificationReq.Provider,
+		"user":     requestingUser.Name,
+	}).Info("Validating notifier")
+
+	notifierProviders := t.config.GetProvidersByCapabilityWithUser(
+		requestingUser, models.ProviderCapabilityNotifier)
 
 	// filter out providers to see if the name matches
 	for _, provider := range notifierProviders {

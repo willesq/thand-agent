@@ -178,7 +178,7 @@ jobs:
         git tag -a $NEW_VERSION -m "Auto-release $NEW_VERSION"
         git push origin $NEW_VERSION
 
-  build-multi-platform:
+  build:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [auto-tag, unit-tests, functional-tests, integration-tests]
@@ -255,7 +255,7 @@ jobs:
   docker-release:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [auto-tag, build-multi-platform]
+    needs: [auto-tag, build]
     
     steps:
     - name: Checkout code
