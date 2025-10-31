@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,8 @@ import (
 	"google.golang.org/api/option"
 )
 
+const ProviderName = "gcp"
+
 var DefaultStage = "GA"
 
 // gcpProvider implements the ProviderImpl interface for GCP
@@ -31,8 +34,12 @@ type gcpProvider struct {
 	crmClient        *cloudresourcemanager.Service
 	permissions      []models.ProviderPermission
 	permissionsIndex bleve.Index
+	permissionsMap   map[string]*models.ProviderPermission
 	roles            []models.ProviderRole
 	rolesIndex       bleve.Index
+	rolesMap         map[string]*models.ProviderRole
+
+	indexMu sync.RWMutex
 }
 
 func (p *gcpProvider) Initialize(provider models.Provider) error {
@@ -68,6 +75,9 @@ func (p *gcpProvider) Initialize(provider models.Provider) error {
 		return fmt.Errorf("failed to load roles: %w", err)
 	}
 
+	// Start background indexing
+	go p.buildSearchIndex()
+
 	iamService, err := iam.NewService(ctx, clientOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to create IAM client: %w", err)
@@ -96,7 +106,7 @@ func (p *gcpProvider) GetStage() string {
 }
 
 func init() {
-	providers.Register("gcp", &gcpProvider{})
+	providers.Register(ProviderName, &gcpProvider{})
 }
 
 func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, error) {

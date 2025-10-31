@@ -19,7 +19,7 @@ func TestAzureRoles(t *testing.T) {
 				"slack_approval",
 			},
 			Inherits: []string{
-				"Azure Container Storage Owner",
+				"custom_storage_admin",
 			},
 			Permissions: models.Permissions{
 				Allow: []string{
@@ -40,9 +40,9 @@ func TestAzureRoles(t *testing.T) {
 			},
 			Enabled: true,
 		},
-		"Azure Container Storage Owner": {
-			Name:        "Azure Container Storage Owner",
-			Description: "Azure built-in role for container storage",
+		"custom_storage_admin": {
+			Name:        "Custom Storage Admin",
+			Description: "Custom role for storage administration",
 			Permissions: models.Permissions{
 				Allow: []string{
 					"Microsoft.Storage/storageAccounts/blobServices/containers/*",
@@ -63,14 +63,7 @@ func TestAzureRoles(t *testing.T) {
 	}
 
 	t.Run("azure_admin role composition", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: azureRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: azureProviders,
-			},
-		}
+		config := newTestConfig(t, azureRoles, azureProviders)
 
 		identity := &models.Identity{
 			ID: "azure-admin-user",
@@ -89,7 +82,9 @@ func TestAzureRoles(t *testing.T) {
 		assert.Equal(t, "Full access to all resources and capabilities.", result.Description)
 		assert.True(t, result.Enabled)
 
-		// Should have merged permissions from both azure_admin and inherited role
+		// Should have merged permissions from both azure_admin and inherited "Azure Container Storage Owner"
+		// Since "Azure Container Storage Owner" is defined in the test roles (not a real Azure built-in role),
+		// it should be resolved and merged
 		expectedPermissions := []string{
 			"Microsoft.Compute/*/read",
 			"Microsoft.Compute/availabilitySets/*",
@@ -100,6 +95,9 @@ func TestAzureRoles(t *testing.T) {
 			"Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
 		}
 		assert.ElementsMatch(t, expectedPermissions, result.Permissions.Allow)
+
+		// The inherited role should be removed from Inherits list after being merged
+		assert.Empty(t, result.Inherits)
 
 		// Verify resources
 		assert.ElementsMatch(t, []string{"azure:*"}, result.Resources.Allow)
@@ -159,14 +157,7 @@ func TestAzureRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "dev1",
@@ -205,9 +196,9 @@ func TestAzureRoleScenarios(t *testing.T) {
 
 	t.Run("azure rbac inheritance pattern", func(t *testing.T) {
 		roles := map[string]models.Role{
-			"Reader": {
-				Name:        "Reader",
-				Description: "Azure built-in Reader role",
+			"custom_reader": {
+				Name:        "Custom Reader",
+				Description: "Custom read-only role",
 				Permissions: models.Permissions{
 					Allow: []string{
 						"*/read",
@@ -215,9 +206,9 @@ func TestAzureRoleScenarios(t *testing.T) {
 				},
 				Enabled: true,
 			},
-			"Storage Blob Data Reader": {
-				Name:        "Storage Blob Data Reader",
-				Description: "Azure built-in storage role",
+			"custom_blob_reader": {
+				Name:        "Custom Blob Reader",
+				Description: "Custom storage blob reading role",
 				Permissions: models.Permissions{
 					Allow: []string{
 						"Microsoft.Storage/storageAccounts/blobServices/containers/read",
@@ -231,8 +222,8 @@ func TestAzureRoleScenarios(t *testing.T) {
 				Name:        "Data Analyst",
 				Description: "Custom role for data analysts",
 				Inherits: []string{
-					"Reader",
-					"Storage Blob Data Reader",
+					"custom_reader",
+					"custom_blob_reader",
 				},
 				Permissions: models.Permissions{
 					Allow: []string{
@@ -256,14 +247,7 @@ func TestAzureRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "analyst1",
@@ -279,6 +263,8 @@ func TestAzureRoleScenarios(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Should have merged permissions from all inherited roles
+		// Since "Reader" and "Storage Blob Data Reader" are defined in the test roles,
+		// they should be resolved and merged
 		expectedAllowPerms := []string{
 			// from custom_analyst
 			"Microsoft.DataFactory/datafactories/read",
@@ -292,6 +278,9 @@ func TestAzureRoleScenarios(t *testing.T) {
 		}
 		assert.ElementsMatch(t, expectedAllowPerms, result.Permissions.Allow)
 		assert.ElementsMatch(t, []string{"azure-analytics"}, result.Providers)
+
+		// The inherited roles should be removed from Inherits list after being merged
+		assert.Empty(t, result.Inherits)
 	})
 
 	t.Run("azure subscription scoped role", func(t *testing.T) {
@@ -333,14 +322,7 @@ func TestAzureRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "sub-admin",

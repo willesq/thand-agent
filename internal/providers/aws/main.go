@@ -22,6 +22,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
+const ProviderName = "aws"
+
 // awsProvider implements the ProviderImpl interface for AWS
 type awsProvider struct {
 	*models.BaseProvider
@@ -62,7 +64,7 @@ func (p *awsProvider) Initialize(provider models.Provider) error {
 	}
 
 	// Start background indexing
-	go p.buildSearchIndexAsync()
+	go p.buildSearchIndex()
 
 	// Right lets figure out how to initialize the AWS SDK
 	awsConfig := p.GetConfig()
@@ -201,5 +203,5 @@ type AwsConfigurationProvider struct {
 }
 
 func init() {
-	providers.Register("aws", &awsProvider{})
+	providers.Register(ProviderName, &awsProvider{})
 }

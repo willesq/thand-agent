@@ -37,8 +37,10 @@ func (p *awsProviderMock) Initialize(provider models.Provider) error {
 		return fmt.Errorf("failed to load roles: %w", err)
 	}
 
-	// Start background indexing
-	go p.awsProvider.buildSearchIndexAsync()
+	// Start indexing synchronously for testing to avoid race conditions
+	p.awsProvider.buildSearchIndex()
+
+	// TODO: Implement AWS client initialization if mock interactions with AWS services are needed.
 
 	return nil
 }

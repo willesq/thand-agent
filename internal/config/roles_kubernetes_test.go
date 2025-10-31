@@ -135,14 +135,7 @@ func TestKubernetesRoles(t *testing.T) {
 	}
 
 	t.Run("dev-pod-reader role composition", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: k8sRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: k8sProviders,
-			},
-		}
+		config := newTestConfig(t, k8sRoles, k8sProviders)
 
 		identity := &models.Identity{
 			ID: "dev-user",
@@ -181,14 +174,7 @@ func TestKubernetesRoles(t *testing.T) {
 	})
 
 	t.Run("dev-deployer role composition", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: k8sRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: k8sProviders,
-			},
-		}
+		config := newTestConfig(t, k8sRoles, k8sProviders)
 
 		identity := &models.Identity{
 			ID: "deployer-user",
@@ -217,14 +203,7 @@ func TestKubernetesRoles(t *testing.T) {
 	})
 
 	t.Run("staging-admin role composition", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: k8sRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: k8sProviders,
-			},
-		}
+		config := newTestConfig(t, k8sRoles, k8sProviders)
 
 		identity := &models.Identity{
 			ID: "staging-admin-user",
@@ -519,14 +498,7 @@ func TestKubernetesRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "cluster-admin",

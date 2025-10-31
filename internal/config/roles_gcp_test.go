@@ -47,14 +47,7 @@ func TestGCPRoles(t *testing.T) {
 	}
 
 	t.Run("gcp_admin role composition", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: gcpRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: gcpProviders,
-			},
-		}
+		config := newTestConfig(t, gcpRoles, gcpProviders)
 
 		identity := &models.Identity{
 			ID: "gcp-admin-user",
@@ -138,14 +131,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "dev1",
@@ -250,14 +236,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "sre1",
@@ -322,11 +301,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-		}
+		config := newTestConfig(t, roles, nil)
 
 		// User who is NOT in the admin_only scope
 		identity := &models.Identity{
@@ -393,11 +368,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-		}
+		config := newTestConfig(t, roles, nil)
 
 		identity := &models.Identity{
 			ID: "multi-admin",

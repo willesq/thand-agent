@@ -16,6 +16,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const ProviderName = "kubernetes"
+
 // kubernetesProvider implements the ProviderImpl interface for Kubernetes
 type kubernetesProvider struct {
 	*models.BaseProvider
@@ -84,5 +86,5 @@ func (p *kubernetesProvider) getKubernetesConfig() (*rest.Config, error) {
 }
 
 func init() {
-	providers.Register("kubernetes", &kubernetesProvider{})
+	providers.Register(ProviderName, &kubernetesProvider{})
 }

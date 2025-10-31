@@ -44,14 +44,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "user1",
@@ -104,14 +97,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "user1",
@@ -165,14 +151,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "user1",
@@ -350,14 +329,7 @@ func TestProviderParsingLogicConsolidated(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "user1",

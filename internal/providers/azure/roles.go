@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
-	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/google/uuid"
+	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/data"
@@ -143,25 +143,43 @@ func (p *azureProvider) getUserPrincipalID(ctx context.Context, user *models.Use
 		return "", fmt.Errorf("user email is required for Azure role assignments")
 	}
 
-	// For this implementation, we'll use the user's email to lookup the Azure AD object ID
-	// In a production implementation, you would query Microsoft Graph API to get the object ID
-	// based on the user's email or UPN
-
-	// For now, we'll use the user's ID field if it contains an Azure object ID (GUID format)
-	// or derive it from email in a simplified way
+	// If the user's ID field already contains an Azure object ID (GUID format), use it
 	if len(user.ID) > 0 && len(user.ID) >= 32 {
-		// Assume ID is already an Azure object ID if it looks like a GUID
-		return user.ID, nil
+		// Validate it looks like a GUID
+		if _, err := uuid.Parse(user.ID); err == nil {
+			logrus.WithField("user_id", user.ID).Debug("Using existing Azure object ID from user.ID field")
+			return user.ID, nil
+		}
 	}
 
-	// TODO: In production, implement Microsoft Graph API lookup:
-	// 1. Use Microsoft Graph SDK to query users by email
-	// 2. Get the user's object ID from the response
-	// Example: GET https://graph.microsoft.com/v1.0/users/{email}
+	// Use Microsoft Graph API to lookup the user by email and get their object ID
+	logrus.WithField("email", user.Email).Debug("Looking up Azure AD object ID via Microsoft Graph API")
 
-	// For development/testing, return error with instruction
-	return "", fmt.Errorf("azure object ID not found. User ID should contain the Azure AD object ID. "+
-		"In production, implement Microsoft Graph API lookup to resolve email '%s' to object ID", user.Email)
+	// Create a Microsoft Graph client using the existing Azure credentials
+	client, err := msgraphsdk.NewGraphServiceClientWithCredentials(p.cred.Token, []string{"https://graph.microsoft.com/.default"})
+	if err != nil {
+		return "", fmt.Errorf("failed to create Microsoft Graph client: %w", err)
+	}
+
+	// Query the user by their email address (UPN)
+	// GET https://graph.microsoft.com/v1.0/users/{email}
+	graphUser, err := client.Users().ByUserId(user.Email).Get(ctx, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup user '%s' in Azure AD via Microsoft Graph API: %w", user.Email, err)
+	}
+
+	// Extract the object ID from the response
+	if graphUser == nil || graphUser.GetId() == nil {
+		return "", fmt.Errorf("user '%s' found in Azure AD but object ID is missing", user.Email)
+	}
+
+	objectID := *graphUser.GetId()
+	logrus.WithFields(logrus.Fields{
+		"email":     user.Email,
+		"object_id": objectID,
+	}).Debug("Successfully retrieved Azure AD object ID")
+
+	return objectID, nil
 }
 
 // getScope returns the scope for role operations
@@ -174,34 +192,63 @@ func (p *azureProvider) getScope() string {
 
 // GetRole retrieves a specific role by name
 func (p *azureProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
-	// First check in loaded built-in roles
-	for _, r := range p.roles {
-		if strings.EqualFold(r.Name, role) {
-			return &r, nil
+	role = strings.ToLower(role)
+	// Fast map lookup for built-in roles
+	if r, exists := p.rolesMap[role]; exists {
+		return r, nil
+	}
+
+	// If not found in built-in roles and we have an Azure client, try to get custom role definition
+	if p.roleDefClient != nil {
+		roleDefinition, err := p.getRoleDefinition(ctx, role)
+		if err != nil {
+			return nil, fmt.Errorf("role '%s' not found", role)
 		}
+
+		roleInfo := &models.ProviderRole{
+			Name:        *roleDefinition.Properties.RoleName,
+			Description: *roleDefinition.Properties.Description,
+		}
+
+		return roleInfo, nil
 	}
 
-	// If not found in built-in roles, try to get custom role definition
-	roleDefinition, err := p.getRoleDefinition(ctx, role)
-	if err != nil {
-		return nil, fmt.Errorf("role '%s' not found", role)
-	}
-
-	roleInfo := &models.ProviderRole{
-		Name:        *roleDefinition.Properties.RoleName,
-		Description: *roleDefinition.Properties.Description,
-	}
-
-	return roleInfo, nil
+	// Role not found in built-in roles and no client available
+	return nil, fmt.Errorf("role '%s' not found", role)
 }
 
 // ListRoles returns all available roles
 func (p *azureProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
+	// If no filters, return all roles
+	if len(filters) == 0 {
+		return p.roles, nil
+	}
 
-	return common.BleveListSearch(ctx, p.rolesIndex, func(a *search.DocumentMatch, b models.ProviderRole) bool {
-		return strings.Compare(a.ID, b.Name) == 0
-	}, p.roles, filters...)
+	// Check if search index is ready
+	p.indexMu.RLock()
+	rolesIndex := p.rolesIndex
+	p.indexMu.RUnlock()
 
+	if rolesIndex != nil {
+		// Use Bleve search for better search capabilities
+		return common.BleveListSearch(ctx, rolesIndex, func(a *search.DocumentMatch, b models.ProviderRole) bool {
+			return strings.Compare(a.ID, b.Name) == 0
+		}, p.roles, filters...)
+	}
+
+	// Fallback to simple substring filtering while index is being built
+	var filtered []models.ProviderRole
+	filterText := strings.ToLower(strings.Join(filters, " "))
+
+	for _, role := range p.roles {
+		// Check if any filter matches the role name or description
+		if strings.Contains(strings.ToLower(role.Name), filterText) ||
+			strings.Contains(strings.ToLower(role.Description), filterText) {
+			filtered = append(filtered, role)
+		}
+	}
+
+	return filtered, nil
 }
 
 // LoadRoles loads Azure built-in roles from the embedded roles data
@@ -220,27 +267,23 @@ func (p *azureProvider) LoadRoles() error {
 	}
 
 	var roles []models.ProviderRole
-
-	// Create in-memory Bleve index for roles
-	mapping := bleve.NewIndexMapping()
-	rolesIndex, err := bleve.NewMemOnly(mapping)
-	if err != nil {
-		return fmt.Errorf("failed to create roles search index: %w", err)
-	}
+	rolesMap := make(map[string]*models.ProviderRole, len(azureRoles))
 
 	for _, role := range azureRoles {
-		roles = append(roles, models.ProviderRole{
+		r := models.ProviderRole{
 			Name:        role.Name,
 			Description: role.Description,
-		})
+		}
+		roles = append(roles, r)
+		rolesMap[strings.ToLower(role.Name)] = &roles[len(roles)-1] // Reference to the slice element
 	}
 
 	p.roles = roles
-	p.rolesIndex = rolesIndex
+	p.rolesMap = rolesMap
 
 	logrus.WithFields(logrus.Fields{
 		"roles": len(roles),
-	}).Debug("Loaded Azure built-in roles")
+	}).Debug("Loaded Azure built-in roles, building search index in background")
 
 	return nil
 }
