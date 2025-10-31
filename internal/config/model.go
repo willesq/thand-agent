@@ -156,12 +156,6 @@ func (c *Config) GetProvidersByCapabilityWithUser(user *models.User, capability 
 	return providers
 }
 
-func (c *Config) GetRoleByName(name string) (*models.Role, error) {
-	if role, exists := c.Roles.Definitions[name]; exists {
-		return &role, nil
-	}
-	return nil, fmt.Errorf("role not found: %s", name)
-}
 
 func (c *Config) GetWorkflowByName(name string) (*models.Workflow, error) {
 	if workflow, exists := c.Workflows.Definitions[name]; exists {
