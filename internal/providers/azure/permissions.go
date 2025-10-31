@@ -15,6 +15,7 @@ import (
 
 // GetPermission retrieves a specific permission by name
 func (p *azureProvider) GetPermission(ctx context.Context, permission string) (*models.ProviderPermission, error) {
+	// AWS permissions are case-insensitive; normalize to lowercase for consistent matching.
 	permission = strings.ToLower(permission)
 	// Fast map lookup
 	if perm, exists := p.permissionsMap[permission]; exists {

@@ -142,28 +142,3 @@ type AzureConfigurationProvider struct {
 	ProjectID string
 	Token     azcore.TokenCredential
 }
-
-// azureProviderOperation represents an Azure provider operation
-type azureProviderOperation struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
-}
-
-// azureProvider represents an Azure resource provider
-type azureResourceProvider struct {
-	Name        string                   `json:"name"`
-	DisplayName string                   `json:"displayName"`
-	Operations  []azureProviderOperation `json:"operations"`
-}
-
-// azureBuiltInRole represents an Azure built-in role
-type azureBuiltInRole struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-// azureBuiltInRoles represents the structure of the built-in roles JSON
-type azureBuiltInRoles struct {
-	Roles []azureBuiltInRole `json:"roles"`
-}

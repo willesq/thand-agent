@@ -469,10 +469,12 @@ func expandCondensedActions(permission string) []string {
 	actionParts := strings.Split(actions, ",")
 	result := make([]string, 0, len(actionParts))
 
-	for _, action := range actionParts {
+	for i, action := range actionParts {
 		action = strings.TrimSpace(action)
 		if action != "" {
 			result = append(result, resource+":"+action)
+		} else {
+			logrus.Warnf("Empty action detected in permission string '%s' at position %d. This may indicate a configuration error.", permission, i)
 		}
 	}
 
