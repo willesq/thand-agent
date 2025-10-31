@@ -6,7 +6,37 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/thand-io/agent/internal/models"
+	_ "github.com/thand-io/agent/test/mocks" // Register mock providers
 )
+
+// setupConfigWithMockProviders creates a Config with mock providers initialized
+// The mock providers are registered via the test/mocks package import
+// This prevents actual cloud provider client initialization during tests
+// but still loads roles and permissions from embedded data
+func newTestConfig(t *testing.T, roles map[string]models.Role, providers map[string]models.Provider) *Config {
+	t.Helper()
+
+	config := &Config{
+		mode: "server", // Set mode to server so getProviderImplementation works
+		Roles: RoleConfig{
+			Definitions: roles,
+		},
+		Providers: ProviderConfig{
+			Definitions: providers,
+		},
+	}
+
+	// Initialize providers - will use mock implementations registered in test/mocks
+	if len(providers) > 0 {
+		loadedProviders, err := config.InitializeProviders(providers)
+		if err != nil {
+			t.Fatalf("Failed to initialize mock providers: %v", err)
+		}
+		config.Providers.Definitions = loadedProviders
+	}
+
+	return config
+}
 
 // TestAWSRoles tests AWS-specific role configurations based on config/roles/aws.yaml
 func TestAWSRoles(t *testing.T) {
@@ -95,14 +125,7 @@ func TestAWSRoles(t *testing.T) {
 	}
 
 	t.Run("aws_admin role composition", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: awsRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: awsProviders,
-			},
-		}
+		config := newTestConfig(t, awsRoles, awsProviders)
 
 		// Test with a user in the allowed group
 		identity := &models.Identity{
@@ -137,14 +160,7 @@ func TestAWSRoles(t *testing.T) {
 	})
 
 	t.Run("aws_admin role - user not in scope", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: awsRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: awsProviders,
-			},
-		}
+		config := newTestConfig(t, awsRoles, awsProviders)
 
 		// Test with a user NOT in the allowed groups/users
 		identity := &models.Identity{
@@ -165,14 +181,7 @@ func TestAWSRoles(t *testing.T) {
 	})
 
 	t.Run("aws_user role composition", func(t *testing.T) {
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: awsRoles,
-			},
-			Providers: ProviderConfig{
-				Definitions: awsProviders,
-			},
-		}
+		config := newTestConfig(t, awsRoles, awsProviders)
 
 		identity := &models.Identity{
 			ID: "basic-user",
@@ -229,11 +238,7 @@ func TestAWSRoles(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-		}
+		config := newTestConfig(t, roles, nil)
 
 		identity := &models.Identity{
 			ID: "admin-user",
@@ -289,14 +294,7 @@ func TestAWSRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "dev1",
@@ -390,14 +388,7 @@ func TestAWSRoleScenarios(t *testing.T) {
 			},
 		}
 
-		config := &Config{
-			Roles: RoleConfig{
-				Definitions: roles,
-			},
-			Providers: ProviderConfig{
-				Definitions: providers,
-			},
-		}
+		config := newTestConfig(t, roles, providers)
 
 		identity := &models.Identity{
 			ID: "admin1",
@@ -430,5 +421,127 @@ func TestAWSRoleScenarios(t *testing.T) {
 		}, result.Resources.Allow)
 
 		assert.ElementsMatch(t, []string{"aws-prod"}, result.Providers)
+	})
+
+	t.Run("aws_admin inherits from aws_user", func(t *testing.T) {
+		// AWS providers for this test
+		testProviders := map[string]models.Provider{
+			"aws-prod": {
+				Name:        "aws-prod",
+				Description: "AWS Production Environment",
+				Provider:    "aws",
+			},
+			"aws-dev": {
+				Name:        "aws-dev",
+				Description: "AWS Development Environment",
+				Provider:    "aws",
+			},
+			"aws-thand-dev": {
+				Name:        "aws-thand-dev",
+				Description: "AWS Thand Development Environment",
+				Provider:    "aws",
+			},
+		}
+
+		// Create roles that demonstrate inheritance behavior
+		awsRolesWithInheritance := map[string]models.Role{
+			"aws_admin": {
+				Name:        "Admin",
+				Description: "Full access to all resources and capabilities.",
+				Authenticators: []string{
+					"google_oauth2",
+					"thand_oauth2",
+				},
+				Workflows: []string{
+					"slack_approval",
+				},
+				Inherits: []string{
+					"aws_user", // This should be resolved and removed from final Inherits
+					"arn:aws:iam::aws:policy/AdministratorAccess", // Provider role - should remain
+				},
+				Permissions: models.Permissions{
+					Allow: []string{
+						"ec2:*",
+						"s3:*",
+						"rds:*",
+					},
+				},
+				Resources: models.Resources{
+					Allow: []string{
+						"aws:*",
+					},
+				},
+				Scopes: &models.RoleScopes{
+					Groups: []string{
+						"oidc:user",
+						"oidc:eng",
+					},
+					Users: []string{
+						"hugh@thand.io",
+					},
+				},
+				Providers: []string{
+					"aws-prod",
+					"aws-dev",
+					"aws-thand-dev",
+				},
+				Enabled: true,
+			},
+			"aws_user": {
+				Name:        "User",
+				Description: "Basic access to user resources.",
+				Workflows:   []string{"slack_approval"},
+				Permissions: models.Permissions{
+					Allow: []string{
+						"ec2:describeInstances",
+						"s3:listBuckets",
+					},
+				},
+				Providers: []string{
+					"aws-thand-dev",
+					"aws",
+				},
+				Enabled: true,
+			},
+		}
+
+		// Create config with mock providers
+		config := newTestConfig(t, awsRolesWithInheritance, testProviders)
+
+		// Test with a user in the allowed group
+		identity := &models.Identity{
+			ID: "eng-user",
+			User: &models.User{
+				Username: "engineer",
+				Email:    "engineer@example.com",
+				Groups:   []string{"oidc:eng", "developers"},
+			},
+		}
+
+		result, err := config.GetCompositeRoleByName(identity, "aws_admin")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		// Verify that aws_user inheritance was resolved and removed from Inherits
+		// but provider roles (ARN policies) are preserved
+		expectedInherits := []string{
+			"arn:aws:iam::aws:policy/AdministratorAccess",
+		}
+		assert.ElementsMatch(t, expectedInherits, result.Inherits,
+			"Provider roles should remain in Inherits, but regular inherited roles (aws_user) should be removed")
+
+		// Verify that permissions from aws_user were merged into aws_admin
+		expectedPermissions := []string{
+			"ec2:*", // from aws_admin (overrides aws_user's ec2:describeInstances)
+			"s3:*",  // from aws_admin (overrides aws_user's s3:listBuckets)
+			"rds:*", // from aws_admin
+		}
+		assert.ElementsMatch(t, expectedPermissions, result.Permissions.Allow,
+			"Permissions should be merged from inherited roles")
+
+		// Verify other properties are preserved
+		assert.Equal(t, "Admin", result.Name)
+		assert.ElementsMatch(t, []string{"aws-prod", "aws-dev", "aws-thand-dev"}, result.Providers)
+		assert.ElementsMatch(t, []string{"slack_approval"}, result.Workflows)
 	})
 }

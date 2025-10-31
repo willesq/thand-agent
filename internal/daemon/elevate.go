@@ -340,7 +340,7 @@ func (s *Server) getElevateAuthOAuth2(c *gin.Context) {
 
 	workflowTask.SetUser(session.User)
 
-	// Now that we have a user we need to evalute our composite role
+	// Now that we have a user we need to evaluate our composite role
 
 	newRole, err := s.Config.GetCompositeRole(&models.Identity{
 		ID:    session.User.GetIdentity(),

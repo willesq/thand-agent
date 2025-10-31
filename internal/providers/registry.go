@@ -5,14 +5,21 @@ import (
 	"reflect"
 	"strings"
 
+	"sync"
+
 	"github.com/thand-io/agent/internal/models"
 )
 
-var registry = make(map[string]models.ProviderImpl)
+var (
+	registry      = make(map[string]models.ProviderImpl)
+	registryMutex sync.RWMutex
+)
 
 // Register adds a provider to the registry.
 func Register(name string, provider models.ProviderImpl) {
 	name = strings.ToLower(name)
+	registryMutex.Lock()
+	defer registryMutex.Unlock()
 	if _, exists := registry[name]; exists {
 		// Handle duplicate registration if necessary
 		return
@@ -20,9 +27,19 @@ func Register(name string, provider models.ProviderImpl) {
 	registry[name] = provider
 }
 
+// Set replaces a provider in the registry (useful for testing)
+func Set(name string, provider models.ProviderImpl) {
+	name = strings.ToLower(name)
+	registryMutex.Lock()
+	defer registryMutex.Unlock()
+	registry[name] = provider
+}
+
 // Get returns a provider from the registry.
 func Get(name string) (models.ProviderImpl, error) {
 	name = strings.ToLower(name)
+	registryMutex.RLock()
+	defer registryMutex.RUnlock()
 	provider, exists := registry[name]
 	if !exists {
 		return nil, fmt.Errorf("provider not found: %s", name)
@@ -33,7 +50,9 @@ func Get(name string) (models.ProviderImpl, error) {
 // Get returns a new instance of the provider from the registry.
 func CreateInstance(name string) (models.ProviderImpl, error) {
 	name = strings.ToLower(name)
+	registryMutex.RLock()
 	template, exists := registry[name]
+	registryMutex.RUnlock()
 	if !exists {
 		return nil, fmt.Errorf("provider not found: %s", name)
 	}

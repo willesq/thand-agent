@@ -23,7 +23,9 @@ import (
 
 // LoadProviders loads providers from a file or URL and maps them to their implementations
 func (c *Config) LoadProviders() (map[string]models.Provider, error) {
+
 	vaultData, err := c.loadVaultData()
+
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +42,7 @@ func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 	}
 
 	defs := c.processProviderDefinitions(foundProviders)
-	return c.initializeProviders(defs)
+	return c.InitializeProviders(defs)
 }
 
 // loadVaultData loads provider data from vault if configured
@@ -110,8 +112,8 @@ type initResult struct {
 	err      error
 }
 
-// initializeProviders initializes all providers in parallel using channels
-func (c *Config) initializeProviders(defs map[string]models.Provider) (map[string]models.Provider, error) {
+// InitializeProviders initializes all providers in parallel using channels
+func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[string]models.Provider, error) {
 	resultChan := make(chan initResult, len(defs))
 
 	// Start goroutines for each provider

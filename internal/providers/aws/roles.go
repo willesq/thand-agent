@@ -52,7 +52,7 @@ func (p *awsProvider) LoadRoles() error {
 func (p *awsProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
 
 	// If the role is a policy arn: arn:aws:iam::aws:policy/AdministratorAccess
-	// Then parse the role and extract the policy name and conver it to a role
+	// Then parse the role and extract the policy name and convert it to a role
 	role = strings.TrimPrefix(role, "arn:aws:iam::aws:policy/")
 	role = strings.ToLower(role)
 

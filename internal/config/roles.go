@@ -112,6 +112,7 @@ The final composite role contains all permissions from the base role
 and its inherited roles, providing a complete set of permissions
 for the given identity.
 */
+
 func (c *Config) GetCompositeRole(identity *models.Identity, baseRole *models.Role) (*models.Role, error) {
 	visited := make(map[string]bool)
 	return c.resolveCompositeRole(identity, baseRole, visited)
@@ -167,7 +168,7 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 			continue
 		}
 
-		// Resolve the inherited role (which handles provider-specific inheritance and scope checking)
+		// Try to resolve the inherited role (which handles provider-specific inheritance and scope checking)
 		inheritedRole, err := c.resolveInheritedRole(identity, inheritedRoleName, visited)
 		if err != nil {
 			// Check if it's a scope mismatch error and skip
@@ -208,7 +209,7 @@ func (c *Config) resolveInheritedRole(identity *models.Identity, inheritSpec str
 		roleName := inheritSpec[colonIndex+1:]
 
 		// First try to find a provider with this name
-		provider, err := c.GetProviderByName(providerName)
+		_, err := c.GetProviderByName(providerName)
 		if err != nil {
 			// If provider not found, treat the whole string as a role name
 			baseRoleName = inheritSpec
@@ -216,7 +217,6 @@ func (c *Config) resolveInheritedRole(identity *models.Identity, inheritSpec str
 			// If provider exists, use the role name part
 			// For now, we'll fall back to treating it as a regular role name
 			// This could be extended to support provider-specific role resolution
-			_ = provider // Use the provider variable to avoid unused variable error
 			baseRoleName = roleName
 		}
 	} else {
