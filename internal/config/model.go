@@ -142,12 +142,11 @@ func (c *Config) GetProvidersByCapabilityWithUser(user *models.User, capability 
 			continue
 		}
 
+		if !provider.HasPermission(user) {
+			continue
+		}
+
 		for _, cap := range capability {
-
-			if !provider.HasPermission(user) {
-				continue
-			}
-
 			if slices.Contains(client.GetCapabilities(), cap) {
 				providers[name] = provider
 			}
