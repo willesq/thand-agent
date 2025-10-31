@@ -263,7 +263,7 @@ func (r *WorkflowTask) GetUser() *User {
 
 	req, err := r.GetContextAsElevationRequest()
 
-	if req == nil || err == nil {
+	if req == nil || err != nil {
 		return nil
 	}
 

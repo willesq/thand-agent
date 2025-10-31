@@ -31,6 +31,10 @@ func (s *Server) getIdentities(c *gin.Context) {
 	identityProvidersCount := s.Config.GetProvidersByCapabilityWithUser(
 		foundUser.User, models.ProviderCapabilityIdentities)
 	identities, err := s.Config.GetIdentitiesWithFilter(foundUser.User, filter)
+	if err != nil {
+		s.getErrorPage(c, http.StatusInternalServerError, "Failed to get identities", err)
+		return
+	}
 
 	// Return the aggregated identities
 	c.JSON(http.StatusOK, gin.H{
