@@ -273,7 +273,7 @@ func (p *samlProvider) ListResources(ctx context.Context, filters ...string) ([]
 
 // ValidateRole is required by ProviderRoleBasedAccessControl interface
 func (p *samlProvider) ValidateRole(
-	ctx context.Context, user *models.User, role *models.Role) (map[string]any, error) {
+	ctx context.Context, user *models.Identity, role *models.Role) (map[string]any, error) {
 	if user == nil || role == nil {
 		return nil, fmt.Errorf("user or role is nil")
 	}

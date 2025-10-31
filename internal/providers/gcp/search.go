@@ -1,4 +1,4 @@
-package aws
+package gcp
 
 import (
 	"time"
@@ -7,12 +7,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// buildSearchIndex builds the Bleve search index for AWS permissions and roles
-func (p *awsProvider) buildSearchIndex() {
+// buildSearchIndex builds the Bleve search index for GCP permissions and roles
+func (p *gcpProvider) buildSearchIndex() {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
-		logrus.Debugf("Built AWS search indices in %s", elapsed)
+		logrus.Debugf("Built GCP search indices in %s", elapsed)
 	}()
 
 	// Create in-memory Bleve indices
@@ -55,5 +55,5 @@ func (p *awsProvider) buildSearchIndex() {
 	logrus.WithFields(logrus.Fields{
 		"permissions": len(p.permissions),
 		"roles":       len(p.roles),
-	}).Debug("AWS search indices ready")
+	}).Debug("GCP search indices ready")
 }

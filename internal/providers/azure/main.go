@@ -3,6 +3,7 @@ package azure
 import (
 	_ "embed"
 	"fmt"
+	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -14,6 +15,8 @@ import (
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
 )
+
+const ProviderName = "azure"
 
 var UseLatestVersion = ""
 
@@ -29,8 +32,12 @@ type azureProvider struct {
 	resourceGroupName   string
 	permissions         []models.ProviderPermission
 	permissionsIndex    bleve.Index
+	permissionsMap      map[string]*models.ProviderPermission
 	roles               []models.ProviderRole
 	rolesIndex          bleve.Index
+	rolesMap            map[string]*models.ProviderRole
+
+	indexMu sync.RWMutex
 }
 
 func (p *azureProvider) Initialize(provider models.Provider) error {
@@ -51,6 +58,9 @@ func (p *azureProvider) Initialize(provider models.Provider) error {
 	if err != nil {
 		return fmt.Errorf("failed to load roles: %w", err)
 	}
+
+	// Start background indexing
+	go p.buildSearchIndex()
 
 	config := p.GetConfig()
 
@@ -92,7 +102,7 @@ func (p *azureProvider) Initialize(provider models.Provider) error {
 }
 
 func init() {
-	providers.Register("azure", &azureProvider{})
+	providers.Register(ProviderName, &azureProvider{})
 }
 
 // CreateAzureConfig creates Azure credentials based on the provided configuration
@@ -131,29 +141,4 @@ func CreateAzureConfig(azureConfig *models.BasicConfig) (*AzureConfigurationProv
 type AzureConfigurationProvider struct {
 	ProjectID string
 	Token     azcore.TokenCredential
-}
-
-// azureProviderOperation represents an Azure provider operation
-type azureProviderOperation struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
-}
-
-// azureProvider represents an Azure resource provider
-type azureResourceProvider struct {
-	Name        string                   `json:"name"`
-	DisplayName string                   `json:"displayName"`
-	Operations  []azureProviderOperation `json:"operations"`
-}
-
-// azureBuiltInRole represents an Azure built-in role
-type azureBuiltInRole struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-// azureBuiltInRoles represents the structure of the built-in roles JSON
-type azureBuiltInRoles struct {
-	Roles []azureBuiltInRole `json:"roles"`
 }

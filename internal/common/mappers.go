@@ -28,6 +28,23 @@ func ConvertInterfaceToInterface(from any, to any) error {
 	return json.Unmarshal(data, to)
 }
 
+func ConvertInterfaceToMap(from any) (map[string]any, error) {
+	if from == nil {
+		return nil, nil
+	}
+
+	data, err := json.Marshal(from)
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	err = json.Unmarshal(data, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 /*
 Convert everything to lowercase and only allow
 these special characters: _+=,.@-

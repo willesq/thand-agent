@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -153,13 +154,6 @@ func (c *Config) GetProvidersByCapabilityWithUser(user *models.User, capability 
 		}
 	}
 	return providers
-}
-
-func (c *Config) GetRoleByName(name string) (*models.Role, error) {
-	if role, exists := c.Roles.Definitions[name]; exists {
-		return &role, nil
-	}
-	return nil, fmt.Errorf("role not found: %s", name)
 }
 
 func (c *Config) GetWorkflowByName(name string) (*models.Workflow, error) {
@@ -555,6 +549,7 @@ func (r *Config) GetWorkflowFromElevationRequest(
 	providerName := strings.ToLower(primaryProvider)
 	workflowName := strings.ToLower(elevationRequest.Workflow)
 
+	// We want the original role request. The composite role will be created later
 	role := elevationRequest.Role
 
 	if len(workflowName) == 0 {
@@ -582,6 +577,70 @@ func (r *Config) GetWorkflowFromElevationRequest(
 
 	return &workflow, nil
 
+}
+
+func (r *Config) GetProviderRole(roleName string, providers ...string) *models.ProviderRole {
+
+	ctx := context.TODO()
+
+	for _, providerName := range providers {
+
+		p, err := r.GetProviderByName(providerName)
+
+		if err != nil || p == nil {
+			continue
+		}
+
+		providerClient := p.GetClient()
+
+		if providerClient == nil {
+			continue
+		}
+
+		providerRole, err := providerClient.GetRole(ctx, roleName)
+
+		if err != nil {
+			continue
+		}
+
+		if providerRole != nil {
+			return providerRole
+		}
+	}
+
+	return nil
+}
+
+func (r *Config) GetProviderPermission(permissionName string, providers ...string) *models.ProviderPermission {
+
+	ctx := context.TODO()
+
+	for _, providerName := range providers {
+
+		p, err := r.GetProviderByName(providerName)
+
+		if err != nil || p == nil {
+			continue
+		}
+
+		providerClient := p.GetClient()
+
+		if providerClient == nil {
+			continue
+		}
+
+		providerPermission, err := providerClient.GetPermission(ctx, permissionName)
+
+		if err != nil {
+			continue
+		}
+
+		if providerPermission != nil {
+			return providerPermission
+		}
+	}
+
+	return nil
 }
 
 // TemplateData represents data passed to HTML templates

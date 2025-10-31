@@ -205,6 +205,19 @@ func (m *WorkflowManager) executeWorkflow(
 
 				workflowTask.SetUser(decodedSession.User)
 
+				// Now that we have a user we need to evaluate our composite role
+				newRole, err := m.config.GetCompositeRole(&models.Identity{
+					ID:    decodedSession.User.GetIdentity(),
+					Label: decodedSession.User.GetName(),
+					User:  decodedSession.User,
+				}, workflowTask.GetRole())
+
+				if err != nil {
+					return nil, fmt.Errorf("failed to evaluate composite role for elevation request: %w", err)
+				}
+
+				workflowTask.SetRole(newRole)
+
 				redirectUrl := m.config.GetResumeCallbackUrl(workflowTask)
 
 				logrus.WithField("redirect_url", redirectUrl).Info("Resuming workflow with existing session")

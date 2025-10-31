@@ -39,8 +39,7 @@ func (u *User) GetIdentity() string {
 
 func (u *User) AsMap() map[string]any {
 	// Convert User struct to a map[string]any
-	var mapUser map[string]any
-	err := common.ConvertInterfaceToInterface(u, &mapUser)
+	mapUser, err := common.ConvertInterfaceToMap(u)
 	if err != nil {
 
 		logrus.WithError(err).Error("Failed to convert User struct to map")

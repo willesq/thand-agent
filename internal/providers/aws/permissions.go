@@ -37,7 +37,7 @@ func (p *awsProvider) LoadPermissions() error {
 			Description: description,
 		}
 		permissions = append(permissions, perm)
-		permissionsMap[name] = &permissions[len(permissions)-1] // Reference to the slice element
+		permissionsMap[strings.ToLower(name)] = &permissions[len(permissions)-1] // Reference to the slice element
 	}
 
 	p.permissions = permissions
@@ -51,6 +51,8 @@ func (p *awsProvider) LoadPermissions() error {
 }
 
 func (p *awsProvider) GetPermission(ctx context.Context, permission string) (*models.ProviderPermission, error) {
+
+	permission = strings.ToLower(permission)
 	// Fast map lookup
 	if perm, exists := p.permissionsMap[permission]; exists {
 		return perm, nil
