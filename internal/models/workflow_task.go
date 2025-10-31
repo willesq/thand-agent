@@ -259,6 +259,18 @@ func (r *WorkflowTask) GetContextAsElevationRequest() (*ElevateRequestInternal, 
 	return &req, nil
 }
 
+func (r *WorkflowTask) GetUser() *User {
+
+	req, err := r.GetContextAsElevationRequest()
+
+	if req == nil || err == nil {
+		return nil
+	}
+
+	return req.User
+
+}
+
 func (ctx *WorkflowTask) GetState() *WorkflowTaskState {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()

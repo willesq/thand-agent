@@ -123,15 +123,31 @@ func (c *Config) GetProviderByName(name string) (*models.Provider, error) {
 }
 
 func (c *Config) GetProvidersByCapability(capability ...models.ProviderCapability) map[string]models.Provider {
+	return c.GetProvidersByCapabilityWithUser(nil, capability...)
+}
+
+func (c *Config) GetProvidersByCapabilityWithUser(user *models.User, capability ...models.ProviderCapability) map[string]models.Provider {
+
 	providers := make(map[string]models.Provider)
+
 	for name, provider := range c.Providers.Definitions {
 		// Skip providers that don't have a client initialized
 		client := provider.GetClient()
+
 		if client == nil {
 			continue
 		}
 
+		if !provider.Enabled {
+			continue
+		}
+
 		for _, cap := range capability {
+
+			if !provider.HasPermission(user) {
+				continue
+			}
+
 			if slices.Contains(client.GetCapabilities(), cap) {
 				providers[name] = provider
 			}
