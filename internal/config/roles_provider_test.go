@@ -61,7 +61,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "app-role")
+		result, err := config.GetCompositeRoleByName(identity, "app-role")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -122,7 +122,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "developer-role")
+		result, err := config.GetCompositeRoleByName(identity, "developer-role")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -183,7 +183,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "ops-role")
+		result, err := config.GetCompositeRoleByName(identity, "ops-role")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -230,7 +230,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "parent-role")
+		result, err := config.GetCompositeRoleByName(identity, "parent-role")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -369,7 +369,7 @@ func TestProviderParsingLogicConsolidated(t *testing.T) {
 		}
 
 		// This would have failed with the old strings.Split() logic
-		result, err := config.GetCompositeRole(identity, "test-role")
+		result, err := config.GetCompositeRoleByName(identity, "test-role")
 		require.NoError(t, err, "Should successfully parse and inherit AWS ARN role")
 		require.NotNil(t, result)
 

@@ -80,7 +80,7 @@ func TestAzureRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "azure_admin")
+		result, err := config.GetCompositeRoleByName(identity, "azure_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -177,7 +177,7 @@ func TestAzureRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "azure_developer")
+		result, err := config.GetCompositeRoleByName(identity, "azure_developer")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -274,7 +274,7 @@ func TestAzureRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "custom_analyst")
+		result, err := config.GetCompositeRoleByName(identity, "custom_analyst")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -350,7 +350,7 @@ func TestAzureRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "subscription_admin")
+		result, err := config.GetCompositeRoleByName(identity, "subscription_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 

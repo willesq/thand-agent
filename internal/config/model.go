@@ -155,7 +155,6 @@ func (c *Config) GetProvidersByCapabilityWithUser(user *models.User, capability 
 	return providers
 }
 
-
 func (c *Config) GetWorkflowByName(name string) (*models.Workflow, error) {
 	if workflow, exists := c.Workflows.Definitions[name]; exists {
 		return &workflow, nil
@@ -549,6 +548,7 @@ func (r *Config) GetWorkflowFromElevationRequest(
 	providerName := strings.ToLower(primaryProvider)
 	workflowName := strings.ToLower(elevationRequest.Workflow)
 
+	// We want the original role request. The composite role will be created later
 	role := elevationRequest.Role
 
 	if len(workflowName) == 0 {

@@ -361,7 +361,7 @@ func TestGetCompositeRole(t *testing.T) {
 			}
 
 			// Call GetCompositeRole
-			result, err := config.GetCompositeRole(tt.identity, tt.roleName)
+			result, err := config.GetCompositeRoleByName(tt.identity, tt.roleName)
 
 			// Check error expectations
 			if tt.expectError {
@@ -443,7 +443,7 @@ func TestGetCompositeRole_ProviderSpecificInheritance(t *testing.T) {
 		},
 	}
 
-	result, err := config.GetCompositeRole(identity, "base")
+	result, err := config.GetCompositeRoleByName(identity, "base")
 	require.NoError(t, err)
 	require.NotNil(t, result)
 

@@ -190,6 +190,10 @@ func (r *WorkflowTask) SetUser(user *User) {
 	r.SetContextKeyValue(VarsContextUser, user.AsMap())
 }
 
+func (r *WorkflowTask) SetRole(role *Role) {
+	r.SetContextKeyValue(VarsContextRole, role.AsMap())
+}
+
 // Helper methods for TaskSupport
 func (r *WorkflowTask) SetWorkflowDsl(workflow *model.Workflow) {
 	r.Workflow = workflow
@@ -269,6 +273,16 @@ func (r *WorkflowTask) GetUser() *User {
 
 	return req.User
 
+}
+
+func (r *WorkflowTask) GetRole() *Role {
+	req, err := r.GetContextAsElevationRequest()
+
+	if req == nil || err != nil {
+		return nil
+	}
+
+	return req.Role
 }
 
 func (ctx *WorkflowTask) GetState() *WorkflowTaskState {

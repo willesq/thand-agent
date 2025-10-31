@@ -28,6 +28,17 @@ func (r *Role) HasPermission(user *User) bool {
 	return true
 }
 
+func (r *Role) AsMap() map[string]any {
+
+	role, err := common.ConvertInterfaceToMap(r)
+	if err != nil {
+		logrus.WithError(err).Errorln("Failed to convert role to map")
+		return nil
+	}
+	return role
+
+}
+
 func (r *Role) IsValid() bool {
 	return len(r.Name) > 0 && len(r.Description) > 0
 }

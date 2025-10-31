@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -74,6 +75,10 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 	return defs, nil
 }
 
+func (c *Config) GetRoleByName(name string) (*models.Role, error) {
+	return c.Roles.GetRoleByName(name)
+}
+
 /*
 This function is used to evaluate a role and resolve all its
 inherited roles into a single composite role.
@@ -106,26 +111,43 @@ The final composite role contains all permissions from the base role
 and its inherited roles, providing a complete set of permissions
 for the given identity.
 */
-func (c *Config) GetCompositeRole(identity *models.Identity, name string) (*models.Role, error) {
+func (c *Config) GetCompositeRole(identity *models.Identity, baseRole *models.Role) (*models.Role, error) {
 	visited := make(map[string]bool)
-	return c.resolveCompositeRole(identity, name, visited)
+	return c.resolveCompositeRole(identity, baseRole, visited)
 }
 
-// resolveCompositeRole recursively resolves a role and its inheritance chain
-func (c *Config) resolveCompositeRole(identity *models.Identity, name string, visited map[string]bool) (*models.Role, error) {
-	// Check for cyclic inheritance
-	if visited[name] {
-		return nil, fmt.Errorf("cyclic inheritance detected in role: %s", name)
-	}
-
-	visited[name] = true
-	defer delete(visited, name)
+func (c *Config) GetCompositeRoleByName(identity *models.Identity, roleName string) (*models.Role, error) {
 
 	// Get the base role
-	baseRole, err := c.Roles.GetRoleByName(name)
+	baseRole, err := c.GetRoleByName(roleName)
 	if err != nil {
 		return nil, err
 	}
+
+	return c.GetCompositeRole(identity, baseRole)
+}
+
+func (c *Config) resolveCompositeRoleByName(identity *models.Identity, roleName string, visited map[string]bool) (*models.Role, error) {
+
+	// Get the base role
+	baseRole, err := c.GetRoleByName(roleName)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.resolveCompositeRole(identity, baseRole, visited)
+
+}
+
+// resolveCompositeRole recursively resolves a role and its inheritance chain
+func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *models.Role, visited map[string]bool) (*models.Role, error) {
+	// Check for cyclic inheritance
+	if visited[baseRole.Name] {
+		return nil, fmt.Errorf("cyclic inheritance detected in role: %s", baseRole.Name)
+	}
+
+	visited[baseRole.Name] = true
+	defer delete(visited, baseRole.Name)
 
 	// Create a copy of the base role for the composite
 	compositeRole := *baseRole
@@ -146,6 +168,10 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, name string, vi
 		c.mergeRolePermissions(&compositeRole, inheritedRole)
 		c.mergeRoleResources(&compositeRole, inheritedRole)
 	}
+
+	// Even for roles without inheritance, we need to resolve Allow/Deny conflicts
+	// within the same role and handle condensed actions properly
+	c.resolveInternalPermissionConflicts(&compositeRole)
 
 	return &compositeRole, nil
 }
@@ -181,7 +207,7 @@ func (c *Config) resolveInheritedRole(identity *models.Identity, inheritSpec str
 	}
 
 	// Get the base role for scope checking
-	baseRole, err = c.Roles.GetRoleByName(baseRoleName)
+	baseRole, err = c.GetRoleByName(baseRoleName)
 	if err != nil {
 		return nil, fmt.Errorf("inherited role '%s' not found: %w", baseRoleName, err)
 	}
@@ -192,7 +218,7 @@ func (c *Config) resolveInheritedRole(identity *models.Identity, inheritSpec str
 	}
 
 	// If scope check passes, resolve the full inheritance chain
-	return c.resolveCompositeRole(identity, baseRoleName, visited)
+	return c.resolveCompositeRoleByName(identity, baseRoleName, visited)
 }
 
 // isRoleApplicableToIdentity checks if a role's scopes allow it to be applied to the given identity
@@ -244,42 +270,104 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 }
 
 // mergeRolePermissions merges permissions from inherited role into composite role
-// with proper Allow/Deny conflict resolution
+// with proper Allow/Deny conflict resolution and intelligent condensed action handling
 func (c *Config) mergeRolePermissions(composite *models.Role, inherited *models.Role) {
-	// Start with inherited permissions (child)
-	allowSet := make(map[string]bool)
-	denySet := make(map[string]bool)
+	// Expand all condensed actions to individual permissions for merging
+	expandedAllowSet := make(map[string]bool)
+	expandedDenySet := make(map[string]bool)
 
-	// Add inherited permissions first (child permissions)
+	// Add inherited permissions first (child permissions) - expand condensed actions
 	for _, perm := range inherited.Permissions.Allow {
-		allowSet[perm] = true
+		expandedPerms := expandCondensedActions(perm)
+		for _, expandedPerm := range expandedPerms {
+			expandedAllowSet[expandedPerm] = true
+		}
 	}
 	for _, perm := range inherited.Permissions.Deny {
-		denySet[perm] = true
+		expandedPerms := expandCondensedActions(perm)
+		for _, expandedPerm := range expandedPerms {
+			expandedDenySet[expandedPerm] = true
+		}
 	}
 
 	// Add composite permissions (parent) - these take precedence in conflicts
 	for _, perm := range composite.Permissions.Allow {
-		allowSet[perm] = true
-		// Parent Allow overrides child Deny
-		delete(denySet, perm)
+		expandedPerms := expandCondensedActions(perm)
+		for _, expandedPerm := range expandedPerms {
+			expandedAllowSet[expandedPerm] = true
+		}
 	}
 	for _, perm := range composite.Permissions.Deny {
-		denySet[perm] = true
-		// Parent Deny overrides child Allow
-		delete(allowSet, perm)
+		expandedPerms := expandCondensedActions(perm)
+		for _, expandedPerm := range expandedPerms {
+			expandedDenySet[expandedPerm] = true
+		}
 	}
 
-	// Convert sets back to slices
-	composite.Permissions.Allow = make([]string, 0, len(allowSet))
-	for perm := range allowSet {
-		composite.Permissions.Allow = append(composite.Permissions.Allow, perm)
+	// Convert expanded sets back to slices (don't resolve conflicts yet)
+	expandedAllowList := make([]string, 0, len(expandedAllowSet))
+	for perm := range expandedAllowSet {
+		expandedAllowList = append(expandedAllowList, perm)
 	}
 
-	composite.Permissions.Deny = make([]string, 0, len(denySet))
-	for perm := range denySet {
-		composite.Permissions.Deny = append(composite.Permissions.Deny, perm)
+	expandedDenyList := make([]string, 0, len(expandedDenySet))
+	for perm := range expandedDenySet {
+		expandedDenyList = append(expandedDenyList, perm)
 	}
+
+	// Condense actions back for cleaner output
+	composite.Permissions.Allow = condenseActions(expandedAllowList)
+	composite.Permissions.Deny = condenseActions(expandedDenyList)
+}
+
+// resolveInternalPermissionConflicts resolves Allow/Deny conflicts within a single role
+// and handles condensed actions properly
+func (c *Config) resolveInternalPermissionConflicts(role *models.Role) {
+	// Expand all condensed actions to individual permissions
+	expandedAllowSet := make(map[string]bool)
+	expandedDenySet := make(map[string]bool)
+
+	// Add allow permissions - expand condensed actions
+	for _, perm := range role.Permissions.Allow {
+		expandedPerms := expandCondensedActions(perm)
+		for _, expandedPerm := range expandedPerms {
+			expandedAllowSet[expandedPerm] = true
+		}
+	}
+
+	// Add deny permissions - expand condensed actions
+	for _, perm := range role.Permissions.Deny {
+		expandedPerms := expandCondensedActions(perm)
+		for _, expandedPerm := range expandedPerms {
+			expandedDenySet[expandedPerm] = true
+		}
+	}
+
+	// Resolve conflicts: remove permissions that are both allowed and denied
+	// Within a single role, deny takes precedence by removing from allow
+	for denyPerm := range expandedDenySet {
+		if expandedAllowSet[denyPerm] {
+			// Remove from allow set (deny wins the conflict)
+			delete(expandedAllowSet, denyPerm)
+			// Remove from deny set too since there's no point denying something not allowed
+			delete(expandedDenySet, denyPerm)
+		}
+	}
+
+	// Convert expanded sets back to slices
+	expandedAllowList := make([]string, 0, len(expandedAllowSet))
+	for perm := range expandedAllowSet {
+		expandedAllowList = append(expandedAllowList, perm)
+	}
+
+	expandedDenyList := make([]string, 0, len(expandedDenySet))
+	for perm := range expandedDenySet {
+		expandedDenyList = append(expandedDenyList, perm)
+	}
+
+	// Condense actions back for cleaner output
+	role.Permissions.Allow = condenseActions(expandedAllowList)
+	role.Permissions.Deny = condenseActions(expandedDenyList)
 }
 
 // mergeRoleResources merges resources from inherited role into composite role
@@ -344,5 +432,72 @@ func (c *Config) mergeStringSlices(slice1, slice2 []string) []string {
 		}
 	}
 
+	return result
+}
+
+// expandCondensedActions expands a condensed permission like "k8s:pods:get,list,watch"
+// into individual permissions ["k8s:pods:get", "k8s:pods:list", "k8s:pods:watch"]
+func expandCondensedActions(permission string) []string {
+	// Find the last colon
+	idx := strings.LastIndex(permission, ":")
+	if idx == -1 {
+		return []string{permission}
+	}
+
+	resource := permission[:idx]
+	actions := permission[idx+1:]
+
+	// Check if actions contains comma
+	if !strings.Contains(actions, ",") {
+		return []string{permission}
+	}
+
+	actionParts := strings.Split(actions, ",")
+	result := make([]string, 0, len(actionParts))
+
+	for _, action := range actionParts {
+		action = strings.TrimSpace(action)
+		if action != "" {
+			result = append(result, resource+":"+action)
+		}
+	}
+
+	return result
+}
+
+// condenseActions takes individual permissions and groups them by resource,
+// condensing actions where possible
+func condenseActions(permissions []string) []string {
+	resourceActions := make(map[string][]string)
+
+	for _, perm := range permissions {
+		idx := strings.LastIndex(perm, ":")
+		if idx == -1 {
+			resourceActions[perm] = []string{""}
+			continue
+		}
+
+		resource := perm[:idx]
+		action := perm[idx+1:]
+
+		resourceActions[resource] = append(resourceActions[resource], action)
+	}
+
+	result := make([]string, 0, len(resourceActions))
+	for resource, actions := range resourceActions {
+		if len(actions) == 1 && actions[0] == "" {
+			// This was a permission without actions
+			result = append(result, resource)
+		} else if len(actions) == 1 {
+			// Single action
+			result = append(result, resource+":"+actions[0])
+		} else {
+			// Multiple actions - condense them
+			sort.Strings(actions)
+			result = append(result, resource+":"+strings.Join(actions, ","))
+		}
+	}
+
+	sort.Strings(result)
 	return result
 }

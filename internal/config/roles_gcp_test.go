@@ -64,7 +64,7 @@ func TestGCPRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "gcp_admin")
+		result, err := config.GetCompositeRoleByName(identity, "gcp_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -156,7 +156,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "gcp_developer")
+		result, err := config.GetCompositeRoleByName(identity, "gcp_developer")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -268,7 +268,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "gcp_sre")
+		result, err := config.GetCompositeRoleByName(identity, "gcp_sre")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -337,7 +337,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "general_role")
+		result, err := config.GetCompositeRoleByName(identity, "general_role")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -407,7 +407,7 @@ func TestGCPRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "multi_project_admin")
+		result, err := config.GetCompositeRoleByName(identity, "multi_project_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 

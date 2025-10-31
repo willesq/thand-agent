@@ -297,6 +297,7 @@ func (s *Server) getElevateAuthOAuth2(c *gin.Context) {
 
 	workflowTask, err := manager.CreateWorkflowFromEncodedTask(
 		s.GetConfig().GetServices().GetEncryption(), state)
+
 	if err != nil {
 		s.getErrorPage(c, http.StatusBadRequest, "Failed to create workflow from state", err)
 		return
@@ -328,10 +329,32 @@ func (s *Server) getElevateAuthOAuth2(c *gin.Context) {
 		return
 	}
 
+	if session.User == nil {
+		s.getErrorPage(c, http.StatusInternalServerError,
+			"Failed to get user information from auth provider during elevation")
+		return
+	}
+
 	// Get the users identity information and role info.
 	fmt.Println("Resuming workflow with state:", state)
 
 	workflowTask.SetUser(session.User)
+
+	// Now that we have a user we need to evalute our composite role
+
+	newRole, err := s.Config.GetCompositeRole(&models.Identity{
+		ID:    session.User.GetIdentity(),
+		Label: session.User.GetName(),
+		User:  session.User,
+	}, workflowTask.GetRole())
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusInternalServerError,
+			"Failed to evaluate composite role for elevation request", err)
+		return
+	}
+
+	workflowTask.SetRole(newRole)
 
 	exportableSession := &models.ExportableSession{
 		Session:  session,

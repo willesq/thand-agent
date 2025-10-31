@@ -51,7 +51,7 @@ func TestAllowDenyConflictResolution(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "parent")
+		result, err := config.GetCompositeRoleByName(identity, "parent")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -120,7 +120,7 @@ func TestAllowDenyConflictResolution(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "parent")
+		result, err := config.GetCompositeRoleByName(identity, "parent")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -170,7 +170,7 @@ func TestAllowDenyConflictResolution(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "parent")
+		result, err := config.GetCompositeRoleByName(identity, "parent")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -214,7 +214,7 @@ func TestAllowDenyConflictResolution(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "restrictive-parent")
+		result, err := config.GetCompositeRoleByName(identity, "restrictive-parent")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 

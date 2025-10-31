@@ -152,7 +152,7 @@ func TestKubernetesRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "dev-pod-reader")
+		result, err := config.GetCompositeRoleByName(identity, "dev-pod-reader")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -198,7 +198,7 @@ func TestKubernetesRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "dev-deployer")
+		result, err := config.GetCompositeRoleByName(identity, "dev-deployer")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -234,7 +234,7 @@ func TestKubernetesRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "staging-admin")
+		result, err := config.GetCompositeRoleByName(identity, "staging-admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -323,7 +323,7 @@ func TestKubernetesRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "k8s-sre")
+		result, err := config.GetCompositeRoleByName(identity, "k8s-sre")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -337,7 +337,7 @@ func TestKubernetesRoleScenarios(t *testing.T) {
 		expectedAllowPerms := []string{
 			// Only from k8s-sre (inheritance chain broken at k8s-developer)
 			"k8s:pods:delete",
-			"k8s:services:create,update,patch,delete",
+			"k8s:services:create,delete,patch,update", // sorted alphabetically
 			"k8s:apps/deployments:delete,watch",
 			"k8s:nodes:get,list,watch",
 			"k8s:persistentvolumes:get,list,watch",
@@ -437,7 +437,7 @@ func TestKubernetesRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(teamAIdentity, "team-a-dev")
+		result, err := config.GetCompositeRoleByName(teamAIdentity, "team-a-dev")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -460,7 +460,7 @@ func TestKubernetesRoleScenarios(t *testing.T) {
 			},
 		}
 
-		managerResult, err := config.GetCompositeRole(managerIdentity, "cross-team-viewer")
+		managerResult, err := config.GetCompositeRoleByName(managerIdentity, "cross-team-viewer")
 		require.NoError(t, err)
 		require.NotNil(t, managerResult)
 
@@ -478,7 +478,7 @@ func TestKubernetesRoleScenarios(t *testing.T) {
 
 		// Should have deny permissions from cross-team-viewer
 		assert.ElementsMatch(t, []string{
-			"k8s:*:create,update,patch,delete",
+			"k8s:*:create,delete,patch,update", // sorted alphabetically
 		}, managerResult.Permissions.Deny)
 
 		// Should NOT have resources from inherited roles since they don't apply to manager
@@ -536,7 +536,7 @@ func TestKubernetesRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "cluster-admin")
+		result, err := config.GetCompositeRoleByName(identity, "cluster-admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 

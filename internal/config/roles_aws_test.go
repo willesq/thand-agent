@@ -42,9 +42,9 @@ func TestAWSRoles(t *testing.T) {
 					"oidc:eng",
 				},
 				Users: []string{
-						"admin@example.com",
-						"devops@example.com",
-					},
+					"admin@example.com",
+					"devops@example.com",
+				},
 			},
 			Providers: []string{
 				"aws-prod",
@@ -114,7 +114,7 @@ func TestAWSRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "aws_admin")
+		result, err := config.GetCompositeRoleByName(identity, "aws_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -156,7 +156,7 @@ func TestAWSRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "aws_admin")
+		result, err := config.GetCompositeRoleByName(identity, "aws_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -182,7 +182,7 @@ func TestAWSRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "aws_user")
+		result, err := config.GetCompositeRoleByName(identity, "aws_user")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -245,7 +245,7 @@ func TestAWSRoles(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "base_admin")
+		result, err := config.GetCompositeRoleByName(identity, "base_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -310,7 +310,7 @@ func TestAWSRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "developer")
+		result, err := config.GetCompositeRoleByName(identity, "developer")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -412,7 +412,7 @@ func TestAWSRoleScenarios(t *testing.T) {
 			},
 		}
 
-		result, err := config.GetCompositeRole(identity, "prod_admin")
+		result, err := config.GetCompositeRoleByName(identity, "prod_admin")
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
