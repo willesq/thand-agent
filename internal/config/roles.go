@@ -282,43 +282,38 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 	return true
 }
 
+// expandPermissionsToSet is a generic helper that expands a slice of permissions
+// into a set (map[string]bool) by expanding any condensed actions
+func expandPermissionsToSet(permissions []string) map[string]bool {
+	permSet := make(map[string]bool)
+	for _, perm := range permissions {
+		expandedPerms := expandCondensedActions(perm)
+		for _, expandedPerm := range expandedPerms {
+			permSet[expandedPerm] = true
+		}
+	}
+	return permSet
+}
+
+// setToSlice converts a permission set back to a sorted slice
+func setToSlice(permSet map[string]bool) []string {
+	result := make([]string, 0, len(permSet))
+	for perm := range permSet {
+		result = append(result, perm)
+	}
+	sort.Strings(result)
+	return result
+}
+
 // mergeRolePermissions merges permissions from inherited role into composite role
 // with proper Allow/Deny conflict resolution and intelligent condensed action handling
 // Parent (composite) permissions override child (inherited) permissions in conflicts
 func (c *Config) mergeRolePermissions(composite *models.Role, inherited *models.Role) {
 	// Expand all condensed actions to individual permissions for merging
-	childAllowSet := make(map[string]bool)
-	childDenySet := make(map[string]bool)
-	parentAllowSet := make(map[string]bool)
-	parentDenySet := make(map[string]bool)
-
-	// Add inherited permissions (child permissions) - expand condensed actions
-	for _, perm := range inherited.Permissions.Allow {
-		expandedPerms := expandCondensedActions(perm)
-		for _, expandedPerm := range expandedPerms {
-			childAllowSet[expandedPerm] = true
-		}
-	}
-	for _, perm := range inherited.Permissions.Deny {
-		expandedPerms := expandCondensedActions(perm)
-		for _, expandedPerm := range expandedPerms {
-			childDenySet[expandedPerm] = true
-		}
-	}
-
-	// Add composite permissions (parent permissions) - expand condensed actions
-	for _, perm := range composite.Permissions.Allow {
-		expandedPerms := expandCondensedActions(perm)
-		for _, expandedPerm := range expandedPerms {
-			parentAllowSet[expandedPerm] = true
-		}
-	}
-	for _, perm := range composite.Permissions.Deny {
-		expandedPerms := expandCondensedActions(perm)
-		for _, expandedPerm := range expandedPerms {
-			parentDenySet[expandedPerm] = true
-		}
-	}
+	childAllowSet := expandPermissionsToSet(inherited.Permissions.Allow)
+	childDenySet := expandPermissionsToSet(inherited.Permissions.Deny)
+	parentAllowSet := expandPermissionsToSet(composite.Permissions.Allow)
+	parentDenySet := expandPermissionsToSet(composite.Permissions.Deny)
 
 	// Merge with inheritance override logic:
 	// 1. Start with child permissions
@@ -353,44 +348,17 @@ func (c *Config) mergeRolePermissions(composite *models.Role, inherited *models.
 		finalDenySet[perm] = true
 	}
 
-	// Convert expanded sets back to slices
-	expandedAllowList := make([]string, 0, len(finalAllowSet))
-	for perm := range finalAllowSet {
-		expandedAllowList = append(expandedAllowList, perm)
-	}
-
-	expandedDenyList := make([]string, 0, len(finalDenySet))
-	for perm := range finalDenySet {
-		expandedDenyList = append(expandedDenyList, perm)
-	}
-
-	// Condense actions back for cleaner output
-	composite.Permissions.Allow = condenseActions(expandedAllowList)
-	composite.Permissions.Deny = condenseActions(expandedDenyList)
+	// Convert expanded sets back to slices and condense actions back for cleaner output
+	composite.Permissions.Allow = condenseActions(setToSlice(finalAllowSet))
+	composite.Permissions.Deny = condenseActions(setToSlice(finalDenySet))
 }
 
 // resolveInternalPermissionConflicts resolves Allow/Deny conflicts within a single role
 // and handles condensed actions properly
 func (c *Config) resolveInternalPermissionConflicts(role *models.Role) {
 	// Expand all condensed actions to individual permissions
-	expandedAllowSet := make(map[string]bool)
-	expandedDenySet := make(map[string]bool)
-
-	// Add allow permissions - expand condensed actions
-	for _, perm := range role.Permissions.Allow {
-		expandedPerms := expandCondensedActions(perm)
-		for _, expandedPerm := range expandedPerms {
-			expandedAllowSet[expandedPerm] = true
-		}
-	}
-
-	// Add deny permissions - expand condensed actions
-	for _, perm := range role.Permissions.Deny {
-		expandedPerms := expandCondensedActions(perm)
-		for _, expandedPerm := range expandedPerms {
-			expandedDenySet[expandedPerm] = true
-		}
-	}
+	expandedAllowSet := expandPermissionsToSet(role.Permissions.Allow)
+	expandedDenySet := expandPermissionsToSet(role.Permissions.Deny)
 
 	// Resolve conflicts: remove permissions that are both allowed and denied
 	// Within a single role, deny takes precedence by removing from allow
@@ -403,20 +371,9 @@ func (c *Config) resolveInternalPermissionConflicts(role *models.Role) {
 		}
 	}
 
-	// Convert expanded sets back to slices
-	expandedAllowList := make([]string, 0, len(expandedAllowSet))
-	for perm := range expandedAllowSet {
-		expandedAllowList = append(expandedAllowList, perm)
-	}
-
-	expandedDenyList := make([]string, 0, len(expandedDenySet))
-	for perm := range expandedDenySet {
-		expandedDenyList = append(expandedDenyList, perm)
-	}
-
-	// Condense actions back for cleaner output
-	role.Permissions.Allow = condenseActions(expandedAllowList)
-	role.Permissions.Deny = condenseActions(expandedDenyList)
+	// Convert expanded sets back to slices and condense actions back for cleaner output
+	role.Permissions.Allow = condenseActions(setToSlice(expandedAllowSet))
+	role.Permissions.Deny = condenseActions(setToSlice(expandedDenySet))
 }
 
 // mergeRoleResources merges resources from inherited role into composite role
@@ -541,9 +498,17 @@ func condenseActions(permissions []string) []string {
 			// Single action
 			result = append(result, resource+":"+actions[0])
 		} else {
-			// Multiple actions - condense them
-			sort.Strings(actions)
-			result = append(result, resource+":"+strings.Join(actions, ","))
+			// Multiple actions - check for wildcard
+			hasWildcard := slices.Contains(actions, "*")
+
+			if hasWildcard {
+				// Wildcard overrides all other actions
+				result = append(result, resource+":*")
+			} else {
+				// Multiple specific actions - condense them
+				sort.Strings(actions)
+				result = append(result, resource+":"+strings.Join(actions, ","))
+			}
 		}
 	}
 

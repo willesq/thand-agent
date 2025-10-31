@@ -336,6 +336,23 @@ func TestCondensedActionParsing(t *testing.T) {
 					"k8s:configmaps:create",
 				},
 			},
+			{
+				name: "wildcard overrides specific actions",
+				input: []string{
+					"ec2:describeInstances",
+					"ec2:*",
+					"ec2:startInstances",
+					"rds:*",
+					"rds:describeDBInstances",
+					"s3:listBuckets",
+					"s3:getBucketLocation",
+				},
+				expected: []string{
+					"ec2:*",
+					"rds:*",
+					"s3:getBucketLocation,listBuckets",
+				},
+			},
 		}
 
 		for _, tc := range testCases {
