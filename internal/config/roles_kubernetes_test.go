@@ -205,12 +205,12 @@ func TestKubernetesRoles(t *testing.T) {
 		assert.Equal(t, "Deploy applications in development namespace", result.Description)
 		assert.ElementsMatch(t, []string{
 			"k8s:pods:get,list,watch",
-			"k8s:services:get,list,create,update,patch,delete",
-			"k8s:configmaps:get,list,create,update,delete",
-			"k8s:secrets:get,list,create,update,delete",
-			"k8s:apps/deployments:get,list,create,update,patch,delete,watch",
+			"k8s:services:create,delete,get,list,patch,update",
+			"k8s:configmaps:create,delete,get,list,update",
+			"k8s:secrets:create,delete,get,list,update",
+			"k8s:apps/deployments:create,delete,get,list,patch,update,watch",
 			"k8s:apps/replicasets:get,list",
-			"k8s:events:get,list,create",
+			"k8s:events:create,get,list",
 		}, result.Permissions.Allow)
 
 		assert.ElementsMatch(t, []string{"namespace:development"}, result.Resources.Allow)

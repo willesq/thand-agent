@@ -1080,7 +1080,10 @@ roles:
 
 ### Multiple Workflows
 
-Workflows are executed in sequence:
+Multiple workflows can be applied to a single role for different purposes:
+
+#### Sequential Execution
+Workflows are typically executed in sequence, with each workflow having specific responsibilities:
 
 ```yaml
 roles:
@@ -1095,77 +1098,348 @@ roles:
       allow: ["*:*"]
 ```
 
-### Conditional Workflows
-
-Workflows can implement conditional logic:
+#### Scoped Workflows
+Different workflows can be scoped to specific resources, users, teams, or permissions:
 
 ```yaml
 roles:
-  escalated-access:
-    name: Escalated Access
+  multi-scoped-admin:
+    name: Multi-Scoped Administrator
     workflows:
-      - risk-assessment          # Determines approval path based on risk
-      # Workflow logic can route to different approval chains
+      # Base approval for all requests
+      - manager-approval
+      
+      # Additional security review for sensitive resources
+      - security-review          # Scoped to sensitive resources
+      
+      # Emergency bypass for on-call team
+      - emergency-bypass         # Scoped to on-call users
+      
+      # Extended approval for high-privilege actions
+      - ciso-approval           # Scoped to admin permissions
+      
+      # Audit logging for all actions
+      - audit-trail             # Applied to all requests
+    permissions:
+      allow: ["*:*"]
+    resources:
+      allow: ["*"]
+```
+
+#### Resource-Scoped Workflow Example
+```yaml
+roles:
+  database-admin:
+    name: Database Administrator
+    workflows:
+      # Standard approval for read operations
+      - team-lead-approval      # Scoped to read-only permissions
+      
+      # DBA approval for schema changes
+      - dba-approval           # Scoped to DDL operations
+      
+      # CISO approval for production databases
+      - ciso-approval          # Scoped to production resources
+      
+      # Immediate notification for all access
+      - security-notification  # Applied to all requests
+    permissions:
+      allow:
+        - "rds:Describe*,List*"           # Read operations
+        - "rds:CreateDBSnapshot"          # Backup operations
+        - "rds:ModifyDBInstance"          # Configuration changes
+        - "rds:CreateDBInstance"          # New instance creation
+    resources:
+      allow:
+        - "arn:aws:rds:*:*:db:dev-*"     # Development databases
+        - "arn:aws:rds:*:*:db:staging-*" # Staging databases  
+        - "arn:aws:rds:*:*:db:prod-*"    # Production databases
+```
+
+#### Team-Scoped Workflow Example
+```yaml
+roles:
+  escalated-support:
+    name: Escalated Support Access
+    workflows:
+      # Different approval chains for different teams
+      - l2-approval            # Scoped to L2 support team
+      - security-approval      # Scoped to security team members
+      - manager-approval       # Scoped to engineering managers
+      - emergency-access       # Scoped to on-call personnel
+      
+      # Universal workflows
+      - access-logging         # Applied to all users
+      - time-restriction       # Applied to all requests
+    scopes:
+      groups:
+        - l2-support           # L2 support team
+        - security-team        # Security personnel
+        - engineering-managers # Engineering managers
+        - on-call             # On-call rotation
+    permissions:
+      allow: ["*:*"]
+```
+
+#### Permission-Scoped Workflow Example
+```yaml
+roles:
+  cloud-engineer:
+    name: Cloud Engineer
+    workflows:
+      # Light approval for read operations
+      - self-approval          # Scoped to read-only permissions
+      
+      # Team approval for standard operations
+      - peer-review           # Scoped to create/update operations
+      
+      # Management approval for destructive operations
+      - manager-approval      # Scoped to delete operations
+      
+      # Security review for IAM operations
+      - security-review       # Scoped to IAM/security permissions
+      
+      # Audit trail for all actions
+      - comprehensive-audit   # Applied to all permissions
+    permissions:
+      allow:
+        - "ec2:Describe*,List*,Get*"     # Read operations
+        - "ec2:Start*,Stop*,Reboot*"     # Management operations
+        - "ec2:Create*,Update*,Modify*"  # Creation operations
+        - "ec2:Terminate*,Delete*"       # Destructive operations
+        - "iam:List*,Get*,Describe*"     # IAM read operations
+        - "iam:Create*,Update*,Delete*"  # IAM write operations
+```
+
+### Conditional Workflows
+
+Workflows can implement conditional logic based on context:
+
+```yaml
+roles:
+  adaptive-access:
+    name: Adaptive Access Control
+    workflows:
+      # Risk-based routing workflow
+      - risk-assessment        # Analyzes request context and routes accordingly
+      
+      # Conditional workflows based on risk assessment:
+      # - Low risk: automatic approval
+      # - Medium risk: manager approval + time limits
+      # - High risk: security team + CISO approval + enhanced monitoring
+      
+      # Time-based workflows
+      - business-hours-check   # Different approval paths for after-hours access
+      
+      # Location-based workflows  
+      - geo-validation        # Additional verification for non-standard locations
+      
+      # Frequency-based workflows
+      - usage-pattern-check   # Escalated approval for unusual access patterns
+    permissions:
+      allow: ["*:*"]
+```
+
+### Dynamic Workflow Selection
+
+Workflows can be dynamically selected based on request attributes:
+
+```yaml
+roles:
+  smart-admin:
+    name: Smart Administrative Access
+    workflows:
+      # Base workflow engine that routes to appropriate sub-workflows
+      - dynamic-router
+      
+      # Available sub-workflows (selected by dynamic-router):
+      # For emergency situations:
+      - emergency-fast-track    # Immediate approval with post-review
+      
+      # For business hours, standard requests:
+      - standard-approval      # Manager approval within business hours
+      
+      # For after-hours requests:
+      - extended-approval      # Manager + security team approval
+      
+      # For high-risk operations:
+      - enhanced-security      # Multi-level approval + monitoring
+      
+      # For audit/compliance requests:
+      - compliance-track       # Compliance team approval + audit trail
     permissions:
       allow: ["*:*"]
 ```
 
 ### Workflow Context
 
-Workflows receive context about the role request:
+Workflows receive rich context about the role request, enabling intelligent routing and scoped processing:
 
+#### Request Context
 - **Role name**: Which role is being requested
-- **User identity**: Who is requesting access
+- **User identity**: Who is requesting access (user ID, email, groups)
 - **Duration**: How long access is requested for
 - **Justification**: User-provided reason for access
-- **Resources**: Specific resources if applicable
-- **Provider**: Which provider instance will be used
+- **Requested resources**: Specific resources if applicable
+- **Provider instance**: Which provider instance will be used
+- **Time context**: Request time, business hours, timezone
+- **Location context**: User's IP address, geolocation
+- **Risk factors**: Unusual access patterns, privilege escalation
+
+#### Permission Context
+- **Requested permissions**: Specific actions being requested
+- **Permission risk level**: Classification of permission sensitivity
+- **Resource sensitivity**: Classification of target resources
+- **Blast radius**: Potential impact of the requested access
+
+#### Historical Context
+- **Access history**: User's previous access patterns
+- **Approval history**: Past approval decisions for similar requests
+- **Incident context**: Recent security incidents or alerts
+- **Compliance status**: Current compliance posture
+
+#### Example: Context-Aware Workflow
+```yaml
+roles:
+  context-aware-admin:
+    name: Context-Aware Administrator
+    workflows:
+      # Main routing workflow that uses all available context
+      - intelligent-router
+      
+      # Context-specific workflows:
+      - first-time-access      # For users with no access history
+      - repeat-access          # For users with established patterns
+      - anomaly-detected       # For unusual access patterns
+      - high-risk-resource     # For sensitive resource access
+      - compliance-required    # For regulated environments
+      - incident-response      # For emergency/incident scenarios
+    permissions:
+      allow: ["*:*"]
+```
 
 ### Integration Examples
 
-#### Emergency Access
+#### Emergency Access with Multiple Safeguards
 ```yaml
 roles:
   break-glass:
     name: Emergency Break Glass Access
     workflows:
+      # Immediate notification workflows
       - emergency-notification   # Immediately notify security team
-      - post-incident-review     # Schedule follow-up review
+      - incident-tracking        # Create incident ticket automatically
+      
+      # Approval workflows (can run in parallel)
+      - on-call-approval         # On-call engineer approval (fastest)
+      - security-notification    # Security team real-time notification
+      
+      # Monitoring and control workflows
+      - enhanced-monitoring      # Real-time activity monitoring
+      - time-enforcement         # Strict time limits (1-2 hours max)
+      
+      # Post-access workflows
+      - post-incident-review     # Schedule mandatory follow-up review
+      - access-report           # Generate detailed access report
     scopes:
-      groups: [on-call, security-team]
+      groups: [on-call, security-team, incident-commanders]
     permissions:
       allow: ["*:*"]
 ```
 
-#### Development Access
+#### Development Access with Tiered Approval
 ```yaml
 roles:
   dev-access:
     name: Development Access
     workflows:
-      - self-approval           # Automatic approval for dev
-      - usage-tracking          # Track usage patterns
+      # Automated workflows for low-risk operations
+      - self-approval           # Automatic approval for dev environments
+      - usage-tracking          # Track usage patterns and anomalies
+      
+      # Peer review for moderate-risk operations
+      - peer-review            # Another developer reviews the request
+      
+      # Management approval for high-risk operations
+      - tech-lead-approval     # Technical lead approval for prod access
+      
+      # Governance workflows
+      - compliance-check       # Automated compliance validation
+      - audit-logging          # Comprehensive audit trail
     scopes:
-      groups: [developers]
+      groups: [developers, qa-engineers]
     permissions:
       allow: ["*:*"]
     resources:
-      allow: ["*dev*", "*staging*"]
+      allow: 
+        - "*dev*"              # Development resources (self-approval)
+        - "*staging*"          # Staging resources (peer-review)
+        - "*prod*"             # Production resources (tech-lead-approval)
 ```
 
-#### Audit Access
+#### Audit Access with Enhanced Oversight
 ```yaml
 roles:
   audit-access:
     name: Audit Access
     workflows:
-      - compliance-approval     # Compliance team approval
-      - audit-logging           # Enhanced audit logging
-      - time-restriction        # Strict time limits
+      # Pre-approval workflows
+      - compliance-team-approval # Compliance team must approve
+      - legal-review            # Legal team review for sensitive audits
+      
+      # Access control workflows
+      - just-in-time           # Activate access only when needed
+      - session-recording      # Record all activities during access
+      
+      # Oversight workflows
+      - dual-control           # Require two auditors for sensitive operations
+      - supervisor-monitoring  # Audit supervisor real-time monitoring
+      
+      # Post-access workflows  
+      - access-summary         # Generate summary of all actions taken
+      - evidence-preservation  # Preserve audit evidence securely
     scopes:
-      groups: [auditors, compliance]
+      groups: [auditors, compliance-team, legal-team]
     permissions:
-      allow: ["*:List*", "*:Describe*", "*:Get*"]
+      allow: ["*:List*", "*:Describe*", "*:Get*", "*:Read*"]
+    resources:
+      allow: ["*"]  # Auditors may need access to any resource
+```
+
+#### Service Account Access with Automation Controls
+```yaml
+roles:
+  ci-cd-deployment:
+    name: CI/CD Deployment Access
+    workflows:
+      # Automated approval workflows
+      - ci-validation          # Validate CI/CD context and credentials
+      - deployment-window      # Check if within allowed deployment window
+      
+      # Safety workflows
+      - canary-deployment      # Gradual rollout for production deployments
+      - rollback-preparation   # Prepare automatic rollback mechanisms
+      
+      # Monitoring workflows
+      - deployment-monitoring  # Monitor deployment health
+      - security-scanning      # Real-time security scanning of deployments
+      
+      # Notification workflows
+      - team-notification      # Notify relevant teams of deployments
+      - stakeholder-update     # Update stakeholders on deployment status
+    scopes:
+      users:
+        - ci-service@example.com
+        - deployment-bot@example.com
+    permissions:
+      allow:
+        - "ec2:*Instance*"
+        - "s3:GetObject,PutObject"
+        - "ecs:*Service*"
+        - "lambda:UpdateFunctionCode"
+      deny:
+        - "*:Delete*"             # No deletion permissions for automation
+        - "*:Create*User*"        # No user creation
 ```
 
 ---

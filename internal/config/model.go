@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -576,6 +577,70 @@ func (r *Config) GetWorkflowFromElevationRequest(
 
 	return &workflow, nil
 
+}
+
+func (r *Config) GetProviderRole(roleName string, providers ...string) *models.ProviderRole {
+
+	ctx := context.TODO()
+
+	for _, providerName := range providers {
+
+		p, err := r.GetProviderByName(providerName)
+
+		if err != nil || p == nil {
+			continue
+		}
+
+		providerClient := p.GetClient()
+
+		if providerClient == nil {
+			continue
+		}
+
+		providerRole, err := providerClient.GetRole(ctx, roleName)
+
+		if err != nil {
+			continue
+		}
+
+		if providerRole != nil {
+			return providerRole
+		}
+	}
+
+	return nil
+}
+
+func (r *Config) GetProviderPermission(permissionName string, providers ...string) *models.ProviderPermission {
+
+	ctx := context.TODO()
+
+	for _, providerName := range providers {
+
+		p, err := r.GetProviderByName(providerName)
+
+		if err != nil || p == nil {
+			continue
+		}
+
+		providerClient := p.GetClient()
+
+		if providerClient == nil {
+			continue
+		}
+
+		providerPermission, err := providerClient.GetPermission(ctx, permissionName)
+
+		if err != nil {
+			continue
+		}
+
+		if providerPermission != nil {
+			return providerPermission
+		}
+	}
+
+	return nil
 }
 
 // TemplateData represents data passed to HTML templates

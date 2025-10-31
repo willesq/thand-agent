@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -154,6 +155,15 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 
 	// Process inherited roles
 	for _, inheritedRoleName := range baseRole.Inherits {
+
+		// First check to see if the rolename exists as-is for
+		// one of the providers
+		providerRole := c.GetProviderRole(inheritedRoleName, baseRole.Providers...)
+
+		if providerRole != nil {
+			continue
+		}
+
 		// Resolve the inherited role (which handles provider-specific inheritance and scope checking)
 		inheritedRole, err := c.resolveInheritedRole(identity, inheritedRoleName, visited)
 		if err != nil {
@@ -228,6 +238,11 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 		return true
 	}
 
+	if identity == nil {
+		// No identity provided, cannot match scoped role
+		return false
+	}
+
 	// Check user scopes
 	if identity.IsUser() && len(role.Scopes.Users) > 0 {
 		userIdentity := identity.GetUser().GetIdentity()
@@ -253,10 +268,8 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 	if identity.IsUser() && len(role.Scopes.Groups) > 0 {
 		userGroups := identity.GetUser().Groups
 		for _, userGroup := range userGroups {
-			for _, allowedGroup := range role.Scopes.Groups {
-				if allowedGroup == userGroup {
-					return true
-				}
+			if slices.Contains(role.Scopes.Groups, userGroup) {
+				return true
 			}
 		}
 	}
@@ -271,47 +284,83 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 
 // mergeRolePermissions merges permissions from inherited role into composite role
 // with proper Allow/Deny conflict resolution and intelligent condensed action handling
+// Parent (composite) permissions override child (inherited) permissions in conflicts
 func (c *Config) mergeRolePermissions(composite *models.Role, inherited *models.Role) {
 	// Expand all condensed actions to individual permissions for merging
-	expandedAllowSet := make(map[string]bool)
-	expandedDenySet := make(map[string]bool)
+	childAllowSet := make(map[string]bool)
+	childDenySet := make(map[string]bool)
+	parentAllowSet := make(map[string]bool)
+	parentDenySet := make(map[string]bool)
 
-	// Add inherited permissions first (child permissions) - expand condensed actions
+	// Add inherited permissions (child permissions) - expand condensed actions
 	for _, perm := range inherited.Permissions.Allow {
 		expandedPerms := expandCondensedActions(perm)
 		for _, expandedPerm := range expandedPerms {
-			expandedAllowSet[expandedPerm] = true
+			childAllowSet[expandedPerm] = true
 		}
 	}
 	for _, perm := range inherited.Permissions.Deny {
 		expandedPerms := expandCondensedActions(perm)
 		for _, expandedPerm := range expandedPerms {
-			expandedDenySet[expandedPerm] = true
+			childDenySet[expandedPerm] = true
 		}
 	}
 
-	// Add composite permissions (parent) - these take precedence in conflicts
+	// Add composite permissions (parent permissions) - expand condensed actions
 	for _, perm := range composite.Permissions.Allow {
 		expandedPerms := expandCondensedActions(perm)
 		for _, expandedPerm := range expandedPerms {
-			expandedAllowSet[expandedPerm] = true
+			parentAllowSet[expandedPerm] = true
 		}
 	}
 	for _, perm := range composite.Permissions.Deny {
 		expandedPerms := expandCondensedActions(perm)
 		for _, expandedPerm := range expandedPerms {
-			expandedDenySet[expandedPerm] = true
+			parentDenySet[expandedPerm] = true
 		}
 	}
 
-	// Convert expanded sets back to slices (don't resolve conflicts yet)
-	expandedAllowList := make([]string, 0, len(expandedAllowSet))
-	for perm := range expandedAllowSet {
+	// Merge with inheritance override logic:
+	// 1. Start with child permissions
+	// 2. Parent Allow overrides child Deny (remove from child deny, add to final allow)
+	// 3. Parent Deny overrides child Allow (remove from child allow, add to final deny)
+	// 4. Add remaining parent permissions that don't conflict
+
+	finalAllowSet := make(map[string]bool)
+	finalDenySet := make(map[string]bool)
+
+	// Start with child permissions
+	for perm := range childAllowSet {
+		finalAllowSet[perm] = true
+	}
+	for perm := range childDenySet {
+		finalDenySet[perm] = true
+	}
+
+	// Handle parent overrides: parent Allow overrides child Deny
+	for perm := range parentAllowSet {
+		// Remove from final deny if child denied it
+		delete(finalDenySet, perm)
+		// Add to final allow
+		finalAllowSet[perm] = true
+	}
+
+	// Handle parent overrides: parent Deny overrides child Allow
+	for perm := range parentDenySet {
+		// Remove from final allow if child allowed it
+		delete(finalAllowSet, perm)
+		// Add to final deny
+		finalDenySet[perm] = true
+	}
+
+	// Convert expanded sets back to slices
+	expandedAllowList := make([]string, 0, len(finalAllowSet))
+	for perm := range finalAllowSet {
 		expandedAllowList = append(expandedAllowList, perm)
 	}
 
-	expandedDenyList := make([]string, 0, len(expandedDenySet))
-	for perm := range expandedDenySet {
+	expandedDenyList := make([]string, 0, len(finalDenySet))
+	for perm := range finalDenySet {
 		expandedDenyList = append(expandedDenyList, perm)
 	}
 

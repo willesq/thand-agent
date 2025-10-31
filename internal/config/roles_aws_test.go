@@ -191,13 +191,10 @@ func TestAWSRoles(t *testing.T) {
 		assert.Equal(t, "Basic access to user resources.", result.Description)
 		assert.True(t, result.Enabled)
 
-		// Verify permissions
+		// Verify permissions (condensed format)
 		assert.ElementsMatch(t, []string{
-			"ec2:describeInstances",
-			"s3:listBuckets",
-			"ec2:Describe*",
-			"s3:Get*",
-			"s3:List*",
+			"ec2:Describe*,describeInstances",
+			"s3:Get*,List*,listBuckets",
 		}, result.Permissions.Allow)
 
 		// Verify providers
@@ -317,10 +314,8 @@ func TestAWSRoleScenarios(t *testing.T) {
 		assert.Equal(t, "Developer", result.Name)
 		assert.ElementsMatch(t, []string{
 			"ec2:DescribeInstances",
-			"s3:GetObject",
-			"s3:PutObject",
-			"logs:DescribeLogGroups",
-			"logs:DescribeLogStreams",
+			"logs:DescribeLogGroups,DescribeLogStreams",
+			"s3:GetObject,PutObject",
 		}, result.Permissions.Allow)
 
 		assert.ElementsMatch(t, []string{
@@ -416,18 +411,17 @@ func TestAWSRoleScenarios(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Should have merged permissions from all inherited roles
+		// Should have merged permissions from all inherited roles (condensed format)
 		expectedAllowPerms := []string{
 			"ec2:*", "rds:*", // from prod_admin
-			"iam:GetUser", "iam:ListMFADevices", // from base_user
-			"s3:*", // from s3_admin
+			"iam:GetUser,ListMFADevices", // from base_user (condensed)
+			"s3:*",                       // from s3_admin
 		}
 		assert.ElementsMatch(t, expectedAllowPerms, result.Permissions.Allow)
 
-		// Should have deny permissions
+		// Should have deny permissions (condensed format)
 		assert.ElementsMatch(t, []string{
-			"iam:DeleteRole",
-			"iam:DeleteUser",
+			"iam:DeleteRole,DeleteUser",
 		}, result.Permissions.Deny)
 
 		// Should have merged resources

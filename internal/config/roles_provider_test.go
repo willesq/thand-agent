@@ -67,8 +67,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 
 		expectedPerms := []string{
 			"app:deploy",
-			"s3:GetObject",
-			"s3:ListBucket",
+			"s3:GetObject,ListBucket",
 			"ec2:DescribeInstances",
 		}
 		assert.ElementsMatch(t, expectedPerms, result.Permissions.Allow)

@@ -207,7 +207,7 @@ type ProviderRoleBasedAccessControl interface {
 	ListResources(ctx context.Context, filters ...string) ([]ProviderResource, error)
 
 	// Bind a user to a role
-	ValidateRole(ctx context.Context, user *User, role *Role) (map[string]any, error)
+	ValidateRole(ctx context.Context, identity *Identity, role *Role) (map[string]any, error)
 	AuthorizeRole(
 		ctx context.Context,
 		req *AuthorizeRoleRequest,
@@ -390,7 +390,7 @@ func (p *BaseProvider) RefreshIdentities(ctx context.Context) error {
 }
 
 /* Default implementation for ValidateRole */
-func (p *BaseProvider) ValidateRole(ctx context.Context, user *User, role *Role) (map[string]any, error) {
+func (p *BaseProvider) ValidateRole(ctx context.Context, user *Identity, role *Role) (map[string]any, error) {
 	// TODO this won't work as its the base provider. needs to call the actual provider
 	// to validate the role
 	return nil, ErrNotImplemented
@@ -403,9 +403,15 @@ func ValidateRole(
 ) (map[string]any, error) {
 	// Check the user has access to the required scopes etc
 
+	identity := Identity{
+		ID:    elevateRequest.User.GetIdentity(),
+		Label: elevateRequest.User.GetName(),
+		User:  elevateRequest.User,
+	}
+
 	res, err := providerCall.ValidateRole(
 		context.Background(),
-		elevateRequest.User,
+		&identity,
 		elevateRequest.Role,
 	)
 
@@ -416,7 +422,7 @@ func ValidateRole(
 		}
 
 		logrus.Warn("Provider does not implement role validation, using default")
-		err = validateRole(providerCall, elevateRequest.User, elevateRequest.Role)
+		err = validateRole(providerCall, &identity, elevateRequest.Role)
 
 		if err != nil {
 			return nil, err
@@ -426,7 +432,7 @@ func ValidateRole(
 	return res, nil
 }
 
-func validateRole(provider ProviderImpl, user *User, role *Role) error {
+func validateRole(provider ProviderImpl, _ *Identity, role *Role) error {
 	if err := validateRoleNotEmpty(role); err != nil {
 		return err
 	}

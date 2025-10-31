@@ -59,29 +59,23 @@ func TestPermissionMerging(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Current behavior: permissions are merged as separate strings
-		// This demonstrates the issue - we get separate permission strings
-		// instead of merged condensed actions
-		expectedCurrentBehavior := []string{
-			"k8s:pods:get,list",                               // from base-reader
-			"k8s:services:get,list",                           // from base-reader
-			"k8s:configmaps:get,list",                         // from base-reader
-			"k8s:apps/deployments:get,list",                   // from base-reader
-			"k8s:pods:create,update,delete",                   // from enhanced-dev
-			"k8s:services:create,update,delete",               // from enhanced-dev
-			"k8s:configmaps:create,update,delete",             // from enhanced-dev
-			"k8s:apps/deployments:create,update,patch,delete", // from enhanced-dev
+		// Updated behavior: permissions are now intelligently condensed
+		expectedCondensedBehavior := []string{
+			"k8s:apps/deployments:create,delete,get,list,patch,update", // merged and condensed
+			"k8s:configmaps:create,delete,get,list,update",             // merged and condensed
+			"k8s:pods:create,delete,get,list,update",                   // merged and condensed
+			"k8s:services:create,delete,get,list,update",               // merged and condensed
 		}
 
 		// Sort both slices for comparison since map iteration order is not guaranteed
 		sort.Strings(result.Permissions.Allow)
-		sort.Strings(expectedCurrentBehavior)
+		sort.Strings(expectedCondensedBehavior)
 
-		assert.ElementsMatch(t, expectedCurrentBehavior, result.Permissions.Allow,
-			"Current behavior: permissions are merged as separate strings")
+		assert.ElementsMatch(t, expectedCondensedBehavior, result.Permissions.Allow,
+			"Current behavior: permissions are merged and intelligently condensed")
 	})
 
-	t.Run("overlapping condensed permissions - demonstrates limitation", func(t *testing.T) {
+	t.Run("overlapping condensed permissions - intelligent merging", func(t *testing.T) {
 		roles := map[string]models.Role{
 			"partial-access": {
 				Name: "Partial Access",
@@ -124,26 +118,17 @@ func TestPermissionMerging(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Current behavior: separate strings, no intelligent merging
-		expectedCurrentBehavior := []string{
-			"k8s:pods:get,list,watch",                // from partial-access
-			"k8s:services:get",                       // from partial-access
-			"k8s:pods:create,update",                 // from extended-access
-			"k8s:services:list,create,update,delete", // from extended-access
+		// Updated behavior: intelligent merging is now implemented
+		expectedImprovedBehavior := []string{
+			"k8s:pods:create,get,list,update,watch",      // merged and condensed
+			"k8s:services:create,delete,get,list,update", // merged and condensed
 		}
 
 		sort.Strings(result.Permissions.Allow)
-		sort.Strings(expectedCurrentBehavior)
+		sort.Strings(expectedImprovedBehavior)
 
-		assert.ElementsMatch(t, expectedCurrentBehavior, result.Permissions.Allow,
-			"Current behavior shows duplicate/overlapping permissions without intelligent merging")
-
-		// What we WANT to see (this test will initially fail):
-		// expectedIdealBehavior := []string{
-		//     "k8s:pods:get,list,watch,create,update",      // merged and condensed
-		//     "k8s:services:get,list,create,update,delete", // merged and condensed
-		// }
-		// This demonstrates why we need smart permission merging
+		assert.ElementsMatch(t, expectedImprovedBehavior, result.Permissions.Allow,
+			"New behavior shows intelligent merging of overlapping permissions")
 	})
 
 	t.Run("deny permissions with condensed actions", func(t *testing.T) {
@@ -180,11 +165,12 @@ func TestPermissionMerging(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Current behavior: deny doesn't affect condensed allow permission
-		assert.Contains(t, result.Permissions.Allow, "k8s:pods:get,list,create,update,delete")
-		assert.Contains(t, result.Permissions.Deny, "k8s:pods:delete")
+		// Updated behavior: deny properly removes actions from condensed allow permissions
+		// The "delete" action should be removed from the allow list due to the deny
+		assert.Contains(t, result.Permissions.Allow, "k8s:pods:create,get,list,update")
+		assert.Empty(t, result.Permissions.Deny, "Deny permissions should be empty after conflict resolution")
 
-		// This shows the limitation: the deny doesn't intelligently remove
+		// This shows the improved behavior: deny intelligently removes
 		// the 'delete' action from the condensed allow permission
 	})
 
@@ -248,38 +234,22 @@ func TestPermissionMerging(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		// Current behavior: all permissions as separate strings
-		expectedCurrentBehavior := []string{
-			// From viewer
-			"k8s:pods:get,list",
-			"k8s:services:get,list",
-			"k8s:events:get,list,watch",
-			// From editor
-			"k8s:pods:create,update,patch",
-			"k8s:services:create,update,patch",
-			"k8s:configmaps:get,list,create,update,delete",
-			// From admin
-			"k8s:pods:delete",
-			"k8s:services:delete",
-			"k8s:secrets:get,list,create,update,delete",
+		// Updated behavior: intelligent merging across inheritance levels
+		expectedImprovedBehavior := []string{
+			"k8s:pods:create,delete,get,list,patch,update",     // fully merged
+			"k8s:services:create,delete,get,list,patch,update", // fully merged
+			"k8s:events:get,list,watch",                        // no overlaps
+			"k8s:configmaps:create,delete,get,list,update",     // no overlaps
+			"k8s:secrets:create,get,list,update",               // delete removed by deny
 		}
 
 		sort.Strings(result.Permissions.Allow)
-		sort.Strings(expectedCurrentBehavior)
+		sort.Strings(expectedImprovedBehavior)
 
-		assert.ElementsMatch(t, expectedCurrentBehavior, result.Permissions.Allow)
+		assert.ElementsMatch(t, expectedImprovedBehavior, result.Permissions.Allow)
 
-		// Verify deny permissions
-		assert.Contains(t, result.Permissions.Deny, "k8s:secrets:delete")
-
-		// What we WANT to see eventually:
-		// expectedIdealBehavior := []string{
-		//     "k8s:pods:get,list,create,update,patch,delete",       // fully merged
-		//     "k8s:services:get,list,create,update,patch,delete",   // fully merged
-		//     "k8s:events:get,list,watch",                         // no overlaps
-		//     "k8s:configmaps:get,list,create,update,delete",      // no overlaps
-		//     "k8s:secrets:get,list,create,update",                // delete removed by deny
-		// }
+		// Verify deny permissions remain to enforce security policy
+		assert.ElementsMatch(t, []string{"k8s:secrets:delete"}, result.Permissions.Deny, "Explicit deny should remain to enforce security policy")
 	})
 }
 
@@ -379,5 +349,5 @@ func TestCondensedActionParsing(t *testing.T) {
 	})
 }
 
-// Note: Helper functions expandCondensedActions and condenseActions 
+// Note: Helper functions expandCondensedActions and condenseActions
 // are now implemented in roles.go

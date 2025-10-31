@@ -193,8 +193,8 @@ func TestIntelligentPermissionMerging(t *testing.T) {
 
 		assert.ElementsMatch(t, expectedAllow, result.Permissions.Allow)
 
-		// Should not have deny permissions since conflicts were resolved
-		assert.Empty(t, result.Permissions.Deny)
+		// Should have deny permissions to enforce security policy
+		assert.ElementsMatch(t, []string{"k8s:secrets:delete"}, result.Permissions.Deny)
 	})
 
 	t.Run("mixed condensed and individual permissions", func(t *testing.T) {
