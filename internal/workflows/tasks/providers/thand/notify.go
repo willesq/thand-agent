@@ -7,6 +7,7 @@ import (
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/google/uuid"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
@@ -23,8 +24,9 @@ const ThandNotifyTask = "notify"
 const ThandApprovalEventType = "com.thand.approval"
 
 type NotifyRequest struct {
-	Approvals int                           `json:"approvals" default:"1"`
-	Notifier  thandFunction.NotifierRequest `json:"notifier"`
+	Approvals   int                           `json:"approvals" default:"1"`
+	SelfApprove bool                          `json:"selfApprove" default:"false"`
+	Notifier    thandFunction.NotifierRequest `json:"notifier"`
 
 	// Internal use only: entrypoint for resuming workflow
 	Entrypoint string `json:"entrypoint"`
@@ -45,9 +47,10 @@ func (n *NotifyRequest) IsValid() bool {
 
 func (n *NotifyRequest) AsMap() map[string]any {
 	return map[string]any{
-		"approvals":  n.Approvals,
-		"notifier":   n.Notifier.AsMap(),
-		"entrypoint": n.Entrypoint,
+		"approvals":   n.Approvals,
+		"selfApprove": n.SelfApprove,
+		"notifier":    n.Notifier.AsMap(),
+		"entrypoint":  n.Entrypoint,
 	}
 }
 
@@ -536,12 +539,16 @@ func (t *thandTask) createCallbackUrl(
 
 	// Create an Event.
 	event := cloudevents.NewEvent()
-	event.SetSource("thand/agent")
+	event.SetSpecVersion("1.0")
+	event.SetID(uuid.New().String())
+	event.SetTime(time.Now())
+	event.SetSource("urn:thand:agent")
 	event.SetType(ThandApprovalEventType)
 	event.SetData(cloudevents.ApplicationJSON, map[string]any{
 		"approved": approve,
-		"user":     "",
 	})
+	// The user who clicked the button is not known at this time
+	// event.SetExtension("user", "")
 
 	// Setup workflow for the next state
 	signaledWorkflow := workflowTask.Clone().(*models.WorkflowTask)

@@ -294,7 +294,8 @@ func (m *WorkflowManager) ResumeWorkflow(
 
 		// Lets signal the workflow to continue
 		err = temporalClient.SignalWorkflow(
-			ctx, result.WorkflowID, models.TemporalEmptyRunId, models.TemporalResumeSignalName, result)
+			ctx, result.WorkflowID, models.TemporalEmptyRunId,
+			models.TemporalResumeSignalName, result)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to signal workflow: %w", err)
