@@ -396,11 +396,10 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			api.GET("/execution/:id", s.getRunningWorkflow)
 			api.GET("/execution/:id/cancel", s.cancelRunningWorkflow)
 			api.GET("/execution/:id/terminate", s.terminateRunningWorkflow)
+			api.GET("/execution/:id/signal", s.signalRunningWorkflow)
 
 		}
-
 	}
-
 }
 
 // healthHandler handles the health check endpoint

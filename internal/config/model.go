@@ -490,6 +490,28 @@ func (c *Config) GetResumeCallbackUrl(workflowTask *models.WorkflowTask) string 
 	)
 }
 
+func (c *Config) GetSignalCallbackUrl(workflowTask *models.WorkflowTask) string {
+
+	encodedInput := models.EncodingWrapper{
+		Type: models.ENCODED_WORKFLOW_SIGNAL,
+		Data: workflowTask.Input,
+	}.EncodeAndEncrypt(c.servicesClient.GetEncryption())
+
+	queryParams := url.Values{
+		"input":      {encodedInput},
+		"taskName":   {workflowTask.GetTaskName()},
+		"taskStatus": {workflowTask.GetStatus().String()},
+	}
+
+	return fmt.Sprintf(
+		"%s/%s/execution/%s/signal?%s",
+		c.GetLoginServerUrl(),
+		strings.TrimPrefix(c.GetApiBasePath(), "/"),
+		workflowTask.WorkflowID,
+		queryParams.Encode(),
+	)
+}
+
 /*
 GetSecret retrieves a secret from the provider configuration
 If the provider is not found, it returns an empty string.

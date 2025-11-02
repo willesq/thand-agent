@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 
@@ -96,14 +98,12 @@ func (s *Server) createWorkflow(c *gin.Context) {
 }
 
 func (s *Server) getRunningWorkflow(c *gin.Context) {
-	workflowID := c.Param("id")
+	workflowId := c.Param("id")
 
-	if len(workflowID) == 0 {
+	if len(workflowId) == 0 {
 		s.getErrorPage(c, http.StatusBadRequest, "Workflow ID is required")
 		return
 	}
-
-	ctx := context.Background()
 
 	temporal := s.Config.GetServices().GetTemporal()
 
@@ -126,32 +126,61 @@ func (s *Server) getRunningWorkflow(c *gin.Context) {
 		return
 	}
 
+	data, err := s.getWorkflowExecutionState(c, workflowId)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusInternalServerError, err.Error(), err)
+		return
+	}
+
+	if s.canAcceptHtml(c) {
+
+		s.renderHtml(c, "execution.html", data)
+
+	} else {
+
+		c.JSON(http.StatusOK, data)
+	}
+}
+
+func (s *Server) getExecutionsPage(c *gin.Context) {
+	s.listRunningWorkflows(c)
+}
+
+// getWorkflowExecutionState retrieves the current state of a workflow execution
+// and returns it as ExecutionStatePageData ready for rendering or JSON response
+func (s *Server) getWorkflowExecutionState(c *gin.Context, workflowID string) (*ExecutionStatePageData, error) {
+	ctx := context.Background()
+
+	temporal := s.Config.GetServices().GetTemporal()
+
+	if temporal == nil || !temporal.HasClient() {
+		return nil, fmt.Errorf("temporal service is not configured")
+	}
+
 	temporalClient := temporal.GetClient()
 
-	// If it timesout then get the workflow information without the task details
+	// Get the workflow execution information
 	wkflw, err := temporalClient.DescribeWorkflowExecution(ctx, workflowID, models.TemporalEmptyRunId)
 
 	if err != nil {
-		s.getErrorPage(c, http.StatusInternalServerError, "Failed to get workflow state", err)
-		return
+		return nil, fmt.Errorf("failed to get workflow state: %w", err)
 	}
 
 	wklwInfo := wkflw.GetWorkflowExecutionInfo()
 
 	if wklwInfo == nil {
-		s.getErrorPage(c, http.StatusNotFound, "Workflow execution not found", nil)
-		return
+		return nil, fmt.Errorf("workflow execution not found")
 	}
 
 	workflowExecInfo := workflowExecutionInfo(wklwInfo)
 
 	var workflowTask models.WorkflowTask
 
-	// If workflow hasn't completed the query for the current state
+	// If workflow hasn't completed, query for the current state
 	if workflowExecInfo.CloseTime == nil {
 
-		// Create a timeout context for the query
-		// to avoid hanging requests
+		// Create a timeout context for the query to avoid hanging requests
 		timeoutCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
@@ -167,8 +196,7 @@ func (s *Server) getRunningWorkflow(c *gin.Context) {
 			err = queryResponse.QueryResult.Get(&workflowTask)
 
 			if err != nil {
-				s.getErrorPage(c, http.StatusInternalServerError, "Failed to get workflow state", err)
-				return
+				return nil, fmt.Errorf("failed to get workflow state: %w", err)
 			}
 
 			workflowName := workflowTask.WorkflowName
@@ -226,24 +254,13 @@ func (s *Server) getRunningWorkflow(c *gin.Context) {
 
 	}
 
-	data := ExecutionStatePageData{
+	data := &ExecutionStatePageData{
 		TemplateData: s.GetTemplateData(c),
 		Execution:    workflowExecInfo,
 		Workflow:     workflowTask.Workflow,
 	}
 
-	if s.canAcceptHtml(c) {
-
-		s.renderHtml(c, "execution.html", data)
-
-	} else {
-
-		c.JSON(http.StatusOK, data)
-	}
-}
-
-func (s *Server) getExecutionsPage(c *gin.Context) {
-	s.listRunningWorkflows(c)
+	return data, nil
 }
 
 func workflowExecutionInfo(
@@ -337,5 +354,105 @@ func workflowExecutionInfo(
 	}
 
 	return &response
+
+}
+
+func (s *Server) signalRunningWorkflow(c *gin.Context) {
+
+	workflowId := c.Param("id")
+	// get input from the query parameters
+	input := c.Query("input")
+
+	if len(input) == 0 {
+		s.getErrorPage(c, http.StatusBadRequest, "Input parameter is required")
+		return
+	}
+
+	if !s.Config.IsServer() {
+		s.getErrorPage(c, http.StatusForbidden, "Forbidden: unable to signal workflow in non-server mode", nil)
+		return
+	}
+
+	if !s.Config.GetServices().HasTemporal() {
+		s.getErrorPage(c, http.StatusInternalServerError, "Temporal service is not configured", nil)
+		return
+	}
+
+	_, foundUser, err := s.getUser(c)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized: unable to get user for signaling workflow", err)
+		return
+	}
+
+	// Convert state to cloudevent Signal
+	// Tasks may contain sensitive information, ensure encryption is used
+	decodedTask, err := models.EncodingWrapper{}.DecodeAndDecrypt(input, s.Config.GetServices().GetEncryption())
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusBadRequest, "Failed to decode workflow state", err)
+		return
+	}
+
+	if decodedTask.Type != models.ENCODED_WORKFLOW_SIGNAL {
+		s.getErrorPage(c, http.StatusBadRequest, fmt.Sprintf("invalid workflow state type: %s", decodedTask.Type), nil)
+		return
+	}
+
+	var signal cloudevents.Event
+	dataMap, ok := decodedTask.Data.(map[string]any)
+	if !ok {
+		s.getErrorPage(c, http.StatusBadRequest, "Failed to parse workflow state: invalid data type", nil)
+		return
+	}
+	err = common.ConvertMapToInterface(dataMap, &signal)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusBadRequest, "Failed to parse workflow state", err)
+		return
+	}
+
+	// Extensions only support basic types so we need to set the user identity as a string
+	signal.SetExtension(models.VarsContextUser, foundUser.User.GetIdentity())
+
+	if len(signal.FieldErrors) > 0 {
+		logrus.WithField("errors", signal.FieldErrors).
+			Error("failed to set user extension on cloudevent")
+		s.getErrorPage(c, http.StatusBadRequest, fmt.Sprintf("Failed to set user extension on cloudevent: %v", signal.FieldErrors))
+		return
+	}
+
+	ctx := context.Background()
+
+	serviceClient := s.Config.GetServices()
+
+	temporalService := serviceClient.GetTemporal()
+	temporalClient := temporalService.GetClient()
+
+	// Lets signal the workflow to continue
+	err = temporalClient.SignalWorkflow(
+		ctx, workflowId, models.TemporalEmptyRunId,
+		models.TemporalEventSignalName, signal)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusInternalServerError, "Failed to signal workflow", err)
+		return
+	}
+
+	data, err := s.getWorkflowExecutionState(c, workflowId)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusInternalServerError, err.Error(), err)
+		return
+	}
+
+	if s.canAcceptHtml(c) {
+
+		s.renderHtml(c, "execution.html", data)
+
+	} else {
+
+		c.JSON(http.StatusOK, data)
+	}
 
 }

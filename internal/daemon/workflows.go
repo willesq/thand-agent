@@ -95,9 +95,9 @@ func (s *Server) getWorkflowByName(c *gin.Context) {
 		return
 	}
 
-	workflow, exists := s.Config.Workflows.Definitions[workflowName]
+	workflow, err := s.Config.GetWorkflowByName(workflowName)
 
-	if !exists {
+	if err != nil {
 		s.getErrorPage(c, http.StatusNotFound, "Workflow not found")
 		return
 	}
