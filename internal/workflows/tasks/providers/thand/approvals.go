@@ -3,6 +3,7 @@ package thand
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -140,15 +141,28 @@ func (t *thandTask) executeApprovalsTask(
 			return &defaultFlowState, nil
 		}
 
-		// Check if self-approval is disabled and the approver is the requester
+		// Check if self-approval is disabled and the approver is the requester or one of the elevated identities
 		if !notifyReq.SelfApprove {
 			requesterIdentity := elevationRequest.User.GetIdentity()
+
+			// Check if approver is the requester
 			if userIdentity == requesterIdentity {
 				logrus.WithFields(logrus.Fields{
 					"taskName":          taskName,
 					"userIdentity":      userIdentity,
 					"requesterIdentity": requesterIdentity,
 				}).Warn("Self-approval is disabled; ignoring approval from requester")
+
+				// Return to the default flow state to await more approvals
+				return &defaultFlowState, nil
+			}
+
+			// Check if approver is one of the identities being elevated
+			if slices.Contains(elevationRequest.Identities, userIdentity) {
+				logrus.WithFields(logrus.Fields{
+					"taskName":     taskName,
+					"userIdentity": userIdentity,
+				}).Warn("Self-approval is disabled; ignoring approval from identity being elevated")
 
 				// Return to the default flow state to await more approvals
 				return &defaultFlowState, nil
@@ -194,7 +208,6 @@ func (t *thandTask) executeApprovalsTask(
 		notifyReq.Approvals,
 		approvedState,
 		deniedState,
-		defaultFlowState,
 	)
 
 	if err != nil {
@@ -222,7 +235,6 @@ func (t *thandTask) evaluateApprovalSwitch(
 	requiredApprovals int,
 	approvedState string,
 	deniedState string,
-	defaultFlowState model.FlowDirective,
 ) (*model.FlowDirective, error) {
 
 	return runner.SwitchTaskHandler(
@@ -256,7 +268,9 @@ func (t *thandTask) evaluateApprovalSwitch(
 				{
 					"default": model.SwitchCase{
 						// No When condition = default case (return to await more approvals)
-						Then: &defaultFlowState,
+						Then: &model.FlowDirective{
+							Value: taskName, // loop back to await more approvals
+						},
 					},
 				},
 			},

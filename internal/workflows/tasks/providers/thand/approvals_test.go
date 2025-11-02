@@ -1,10 +1,10 @@
 package thand
 
 import (
+	"slices"
 	"testing"
 	"time"
 
-	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/thand-io/agent/internal/models"
@@ -175,11 +175,6 @@ func TestEvaluateApprovalSwitch(t *testing.T) {
 			// Create a thandTask instance
 			task := &thandTask{}
 
-			// Create default flow directive (loop back to task)
-			defaultFlowState := model.FlowDirective{
-				Value: tt.taskName,
-			}
-
 			// Execute the approval switch
 			flowDirective, err := task.evaluateApprovalSwitch(
 				workflowTask,
@@ -188,7 +183,6 @@ func TestEvaluateApprovalSwitch(t *testing.T) {
 				tt.requiredApprovals,
 				tt.approvedState,
 				tt.deniedState,
-				defaultFlowState,
 			) // Assert no error occurred
 			require.NoError(t, err, "evaluateApprovalSwitch should not return an error for test: %s", tt.description)
 
@@ -214,11 +208,6 @@ func TestEvaluateApprovalSwitchProgression(t *testing.T) {
 	approvedState := "authorize"
 	deniedState := "denied"
 
-	// Create default flow directive (loop back to task)
-	defaultFlowState := model.FlowDirective{
-		Value: taskName,
-	}
-
 	// Step 1: No approvals yet - should loop
 	approvals := map[string]any{}
 	workflowTask.SetContextKeyValue("approvals", approvals)
@@ -230,7 +219,6 @@ func TestEvaluateApprovalSwitchProgression(t *testing.T) {
 		requiredApprovals,
 		approvedState,
 		deniedState,
-		defaultFlowState,
 	)
 
 	require.NoError(t, err)
@@ -251,7 +239,6 @@ func TestEvaluateApprovalSwitchProgression(t *testing.T) {
 		requiredApprovals,
 		approvedState,
 		deniedState,
-		defaultFlowState,
 	)
 
 	require.NoError(t, err)
@@ -272,7 +259,6 @@ func TestEvaluateApprovalSwitchProgression(t *testing.T) {
 		requiredApprovals,
 		approvedState,
 		deniedState,
-		defaultFlowState,
 	)
 
 	require.NoError(t, err)
@@ -293,11 +279,6 @@ func TestEvaluateApprovalSwitchDenialProgression(t *testing.T) {
 	approvedState := "authorize"
 	deniedState := "denied"
 
-	// Create default flow directive (loop back to task)
-	defaultFlowState := model.FlowDirective{
-		Value: taskName,
-	}
-
 	// Step 1: First approval comes in
 	approvals := map[string]any{
 		"user1@example.com": map[string]any{
@@ -314,7 +295,6 @@ func TestEvaluateApprovalSwitchDenialProgression(t *testing.T) {
 		requiredApprovals,
 		approvedState,
 		deniedState,
-		defaultFlowState,
 	)
 
 	require.NoError(t, err)
@@ -335,7 +315,6 @@ func TestEvaluateApprovalSwitchDenialProgression(t *testing.T) {
 		requiredApprovals,
 		approvedState,
 		deniedState,
-		defaultFlowState,
 	)
 
 	require.NoError(t, err)
@@ -356,7 +335,6 @@ func TestEvaluateApprovalSwitchDenialProgression(t *testing.T) {
 		requiredApprovals,
 		approvedState,
 		deniedState,
-		defaultFlowState,
 	)
 
 	require.NoError(t, err)
@@ -367,44 +345,85 @@ func TestEvaluateApprovalSwitchDenialProgression(t *testing.T) {
 // TestSelfApprovalLogic tests the self-approval validation logic
 func TestSelfApprovalLogic(t *testing.T) {
 	tests := []struct {
-		name              string
-		selfApprove       bool
-		requesterIdentity string
-		approverIdentity  string
-		shouldBlock       bool
-		description       string
+		name               string
+		selfApprove        bool
+		requesterIdentity  string
+		approverIdentity   string
+		elevatedIdentities []string
+		shouldBlock        bool
+		description        string
 	}{
 		{
-			name:              "self-approval disabled - same user",
-			selfApprove:       false,
-			requesterIdentity: "user@example.com",
-			approverIdentity:  "user@example.com",
-			shouldBlock:       true,
-			description:       "Should block approval when requester and approver are same and selfApprove is false",
+			name:               "self-approval disabled - approver is requester",
+			selfApprove:        false,
+			requesterIdentity:  "user@example.com",
+			approverIdentity:   "user@example.com",
+			elevatedIdentities: []string{"user@example.com"},
+			shouldBlock:        true,
+			description:        "Should block approval when requester and approver are same and selfApprove is false",
 		},
 		{
-			name:              "self-approval disabled - different user",
-			selfApprove:       false,
-			requesterIdentity: "requester@example.com",
-			approverIdentity:  "approver@example.com",
-			shouldBlock:       false,
-			description:       "Should allow approval when requester and approver are different and selfApprove is false",
+			name:               "self-approval disabled - approver is elevated identity",
+			selfApprove:        false,
+			requesterIdentity:  "admin@example.com",
+			approverIdentity:   "user@example.com",
+			elevatedIdentities: []string{"user@example.com", "otheruser@example.com"},
+			shouldBlock:        true,
+			description:        "Should block approval when approver is one of the elevated identities and selfApprove is false",
 		},
 		{
-			name:              "self-approval enabled - same user",
-			selfApprove:       true,
-			requesterIdentity: "user@example.com",
-			approverIdentity:  "user@example.com",
-			shouldBlock:       false,
-			description:       "Should allow approval when requester and approver are same and selfApprove is true",
+			name:               "self-approval disabled - approver is different elevated identity",
+			selfApprove:        false,
+			requesterIdentity:  "admin@example.com",
+			approverIdentity:   "otheruser@example.com",
+			elevatedIdentities: []string{"user@example.com", "otheruser@example.com"},
+			shouldBlock:        true,
+			description:        "Should block approval when approver is any of the elevated identities and selfApprove is false",
 		},
 		{
-			name:              "self-approval enabled - different user",
-			selfApprove:       true,
-			requesterIdentity: "requester@example.com",
-			approverIdentity:  "approver@example.com",
-			shouldBlock:       false,
-			description:       "Should allow approval when requester and approver are different and selfApprove is true",
+			name:               "self-approval disabled - approver not requester or elevated identity",
+			selfApprove:        false,
+			requesterIdentity:  "admin@example.com",
+			approverIdentity:   "approver@example.com",
+			elevatedIdentities: []string{"user@example.com"},
+			shouldBlock:        false,
+			description:        "Should allow approval when approver is neither requester nor elevated identity and selfApprove is false",
+		},
+		{
+			name:               "self-approval disabled - requester elevating someone else",
+			selfApprove:        false,
+			requesterIdentity:  "requester@example.com",
+			approverIdentity:   "approver@example.com",
+			elevatedIdentities: []string{"targetuser@example.com"},
+			shouldBlock:        false,
+			description:        "Should allow approval when requester elevating someone else and approver is external",
+		},
+		{
+			name:               "self-approval enabled - approver is requester",
+			selfApprove:        true,
+			requesterIdentity:  "user@example.com",
+			approverIdentity:   "user@example.com",
+			elevatedIdentities: []string{"user@example.com"},
+			shouldBlock:        false,
+			description:        "Should allow approval when requester and approver are same and selfApprove is true",
+		},
+		{
+			name:               "self-approval enabled - approver is elevated identity",
+			selfApprove:        true,
+			requesterIdentity:  "admin@example.com",
+			approverIdentity:   "user@example.com",
+			elevatedIdentities: []string{"user@example.com"},
+			shouldBlock:        false,
+			description:        "Should allow approval when approver is elevated identity and selfApprove is true",
+		},
+		{
+			name:               "self-approval enabled - different user",
+			selfApprove:        true,
+			requesterIdentity:  "requester@example.com",
+			approverIdentity:   "approver@example.com",
+			elevatedIdentities: []string{"targetuser@example.com"},
+			shouldBlock:        false,
+			description:        "Should allow approval when requester and approver are different and selfApprove is true",
 		},
 	}
 
@@ -417,7 +436,18 @@ func TestSelfApprovalLogic(t *testing.T) {
 			}
 
 			// Simulate the self-approval check logic from the code
-			shouldBlock := !notifyReq.SelfApprove && tt.requesterIdentity == tt.approverIdentity
+			// This matches the logic in approvals.go
+			shouldBlock := false
+			if !notifyReq.SelfApprove {
+				// Check if approver is the requester
+				if tt.approverIdentity == tt.requesterIdentity {
+					shouldBlock = true
+				}
+				// Check if approver is one of the identities being elevated
+				if slices.Contains(tt.elevatedIdentities, tt.approverIdentity) {
+					shouldBlock = true
+				}
+			}
 
 			// Verify the result
 			assert.Equal(t, tt.shouldBlock, shouldBlock, "Test: %s", tt.description)
@@ -502,6 +532,163 @@ func TestSelfApprovalWithMultipleApprovers(t *testing.T) {
 
 		assert.Len(t, approvals, 1, "Self-approval should be allowed and counted")
 		assert.Contains(t, approvals, "user1@example.com", "Requester's self-approval should be in approvals map")
+	})
+}
+
+// TestSelfApprovalWithElevatedIdentities tests scenarios where identities being elevated try to approve
+func TestSelfApprovalWithElevatedIdentities(t *testing.T) {
+	t.Run("self-approval disabled - elevated identity cannot approve", func(t *testing.T) {
+		// Scenario: Admin requests elevation for user1@example.com
+		// user1@example.com tries to approve their own elevation (should be blocked)
+		// user2@example.com (external) approves (should count)
+
+		requesterIdentity := "admin@example.com"
+		elevatedIdentity := "user1@example.com"
+		externalApproverIdentity := "user2@example.com"
+
+		notifyReq := NotifyRequest{
+			Approvals:   1,
+			SelfApprove: false,
+		}
+
+		approvals := map[string]any{}
+
+		// Step 1: Elevated identity tries to approve (should be blocked)
+		shouldBlockElevated := false
+		if !notifyReq.SelfApprove {
+			// Check if approver is requester
+			if elevatedIdentity == requesterIdentity {
+				shouldBlockElevated = true
+			}
+			// Check if approver is one of the elevated identities
+			elevatedIdentities := []string{elevatedIdentity}
+			if slices.Contains(elevatedIdentities, elevatedIdentity) {
+				shouldBlockElevated = true
+			}
+		}
+
+		if !shouldBlockElevated {
+			approvals[elevatedIdentity] = map[string]any{
+				"approved":  true,
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
+			}
+		}
+
+		assert.True(t, shouldBlockElevated, "Elevated identity should be blocked from approving")
+		assert.Empty(t, approvals, "No approvals should be recorded when elevated identity tries to approve")
+
+		// Step 2: External approver approves (should count)
+		shouldBlockExternal := false
+		if !notifyReq.SelfApprove {
+			if externalApproverIdentity == requesterIdentity {
+				shouldBlockExternal = true
+			}
+			elevatedIdentities := []string{elevatedIdentity}
+			if slices.Contains(elevatedIdentities, externalApproverIdentity) {
+				shouldBlockExternal = true
+			}
+		}
+
+		if !shouldBlockExternal {
+			approvals[externalApproverIdentity] = map[string]any{
+				"approved":  true,
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
+			}
+		}
+
+		assert.False(t, shouldBlockExternal, "External approver should not be blocked")
+		assert.Len(t, approvals, 1, "External approval should be counted")
+		assert.Contains(t, approvals, externalApproverIdentity, "External approver's approval should be recorded")
+		assert.NotContains(t, approvals, elevatedIdentity, "Elevated identity's approval should not be recorded")
+	})
+
+	t.Run("self-approval disabled - multiple elevated identities", func(t *testing.T) {
+		// Scenario: Admin requests elevation for user1 and user2
+		// user1 tries to approve (should be blocked)
+		// user2 tries to approve (should be blocked)
+		// user3 (external) approves (should count)
+
+		requesterIdentity := "admin@example.com"
+		elevatedIdentities := []string{"user1@example.com", "user2@example.com"}
+		externalApproverIdentity := "user3@example.com"
+
+		notifyReq := NotifyRequest{
+			Approvals:   2,
+			SelfApprove: false,
+		}
+
+		approvals := map[string]any{}
+
+		// Helper function to check if approval should be blocked
+		checkShouldBlock := func(approverIdentity string) bool {
+			if !notifyReq.SelfApprove {
+				if approverIdentity == requesterIdentity {
+					return true
+				}
+				if slices.Contains(elevatedIdentities, approverIdentity) {
+					return true
+				}
+			}
+			return false
+		}
+
+		// user1 tries to approve
+		if !checkShouldBlock(elevatedIdentities[0]) {
+			approvals[elevatedIdentities[0]] = map[string]any{"approved": true, "timestamp": time.Now().UTC().Format(time.RFC3339)}
+		}
+
+		// user2 tries to approve
+		if !checkShouldBlock(elevatedIdentities[1]) {
+			approvals[elevatedIdentities[1]] = map[string]any{"approved": true, "timestamp": time.Now().UTC().Format(time.RFC3339)}
+		}
+
+		assert.Empty(t, approvals, "No elevated identities should be able to approve")
+
+		// user3 (external) approves
+		if !checkShouldBlock(externalApproverIdentity) {
+			approvals[externalApproverIdentity] = map[string]any{"approved": true, "timestamp": time.Now().UTC().Format(time.RFC3339)}
+		}
+
+		assert.Len(t, approvals, 1, "Only external approval should be counted")
+		assert.Contains(t, approvals, externalApproverIdentity)
+	})
+
+	t.Run("self-approval enabled - elevated identities can approve", func(t *testing.T) {
+		// Scenario: Admin requests elevation for user1
+		// When selfApprove is enabled, user1 can approve their own elevation
+
+		requesterIdentity := "admin@example.com"
+		elevatedIdentity := "user1@example.com"
+
+		notifyReq := NotifyRequest{
+			Approvals:   1,
+			SelfApprove: true,
+		}
+
+		approvals := map[string]any{}
+
+		// user1 tries to approve (should be allowed when selfApprove is true)
+		shouldBlock := false
+		if !notifyReq.SelfApprove {
+			if elevatedIdentity == requesterIdentity {
+				shouldBlock = true
+			}
+			elevatedIdentities := []string{elevatedIdentity}
+			if slices.Contains(elevatedIdentities, elevatedIdentity) {
+				shouldBlock = true
+			}
+		}
+
+		if !shouldBlock {
+			approvals[elevatedIdentity] = map[string]any{
+				"approved":  true,
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
+			}
+		}
+
+		assert.False(t, shouldBlock, "Self-approval should be allowed when selfApprove is true")
+		assert.Len(t, approvals, 1, "Elevated identity's approval should be counted when selfApprove is true")
+		assert.Contains(t, approvals, elevatedIdentity)
 	})
 }
 
