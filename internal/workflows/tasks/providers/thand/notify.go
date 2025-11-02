@@ -539,10 +539,10 @@ func (t *thandTask) createCallbackUrl(
 
 	// Create an Event.
 	event := cloudevents.NewEvent()
-	event.SetSpecVersion("1.0.2")
+	event.SetSpecVersion("1.0")
 	event.SetID(uuid.New().String())
 	event.SetTime(time.Now())
-	event.SetSource("thand:agent") // TODO: provide a better URN
+	event.SetSource("urn:thand:agent")
 	event.SetType(ThandApprovalEventType)
 	event.SetData(cloudevents.ApplicationJSON, map[string]any{
 		"approved": approve,
