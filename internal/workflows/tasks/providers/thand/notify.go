@@ -558,7 +558,9 @@ func (t *thandTask) createCallbackUrl(
 		signaledWorkflow.SetEntrypoint(notifyReq.Entrypoint)
 	}
 
-	callbackUrl := t.config.GetResumeCallbackUrl(signaledWorkflow)
-
-	return callbackUrl
+	if workflowTask.HasTemporalContext() {
+		return t.config.GetSignalCallbackUrl(signaledWorkflow)
+	} else {
+		return t.config.GetResumeCallbackUrl(signaledWorkflow)
+	}
 }

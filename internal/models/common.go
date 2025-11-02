@@ -11,14 +11,17 @@ import (
 )
 
 var ENCODED_WORKFLOW_TASK = "workflow_task"
+var ENCODED_WORKFLOW_SIGNAL = "workflow_signal"
 var ENCODED_AUTH = "auth"
 var ENCODED_SESSION = "session"
 var ENCODED_SESSION_LOCAL = "session_local"
 
 type EncodingWrapper struct {
-	Type       string `json:"type"`
-	Identifier string `json:"identifier,omitempty"`
-	Data       any    `json:"data"`
+	Type string `json:"type"`
+	// The Identifier field is temporarily disabled for debugging purposes.
+	// Restore this field if identifier tracking is required in future updates.
+	//Identifier string `json:"identifier,omitempty"`
+	Data any `json:"data"`
 }
 
 func (e EncodingWrapper) EncodeAndEncrypt(encryptor EncryptionImpl) string {
