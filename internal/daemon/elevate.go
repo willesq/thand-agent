@@ -375,6 +375,50 @@ func (s *Server) getElevateAuthOAuth2(c *gin.Context) {
 
 func (s *Server) resumeWorkflow(c *gin.Context, workflow *models.WorkflowTask) {
 
+	// Get user context
+	if !s.Config.IsServer() {
+		s.getErrorPage(c, http.StatusBadRequest, "Cannot process elevation request")
+		return
+	}
+
+	// Get user context
+	// TODO: Validate the provider that we're using?
+	_, foundUser, err := s.getUser(c)
+
+	if err != nil {
+		logrus.WithError(err).Error("failed to get user")
+		s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized: unable to get user for elevation", err)
+		return
+	}
+
+	if foundUser == nil {
+		s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized: user not found for elevation")
+		return
+	}
+
+	if foundUser.User == nil {
+		s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized: user information is missing for elevation")
+		return
+	}
+
+	// Lets check if the workflow has a cloudevent input to process
+	event := workflow.GetInputAsCloudEvent()
+
+	if event != nil {
+
+		// Extensions only support basic types so we need to set the user identity as a string
+		event.SetExtension(models.VarsContextUser, foundUser.User.GetIdentity())
+
+		if len(event.FieldErrors) > 0 {
+			logrus.WithField("errors", event.FieldErrors).
+				Error("failed to set user extension on cloudevent")
+			s.getErrorPage(c, http.StatusBadRequest, "Failed to set user extension on cloudevent")
+			return
+		}
+
+		workflow.SetInput(event)
+	}
+
 	// Provide no input to resume the workflow as it'll use the saved state
 	// inputs are only for signals
 	workflowTask, err := s.Workflows.ResumeWorkflow(

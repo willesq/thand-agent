@@ -6,10 +6,12 @@ import (
 	"maps"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	swctx "github.com/serverlessworkflow/sdk-go/v3/impl/ctx"
 	"github.com/serverlessworkflow/sdk-go/v3/impl/utils"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 )
 
 func NewWorkflowContext(workflow *Workflow) (*WorkflowTask, error) {
@@ -233,6 +235,36 @@ func (ctx *WorkflowTask) GetInputAsMap() map[string]any {
 	}
 
 	return map[string]any{"input": ctx.Input}
+}
+
+func (ctx *WorkflowTask) GetInputAsCloudEvent() *cloudevents.Event {
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+
+	var event cloudevents.Event
+	if err := common.ConvertInterfaceToInterface(ctx.Input, &event); err != nil {
+		logrus.WithError(err).Error("failed to unmarshal cloudevent from workflow input")
+		return nil
+	}
+
+	if len(event.ID()) == 0 {
+		logrus.Error("cloudevent validation failed: missing ID")
+		return nil
+	}
+	if event.Time().IsZero() {
+		logrus.Error("cloudevent validation failed: missing Time")
+		return nil
+	}
+	if len(event.Source()) == 0 {
+		logrus.Error("cloudevent validation failed: missing Source")
+		return nil
+	}
+	if len(event.Type()) == 0 {
+		logrus.Error("cloudevent validation failed: missing Type")
+		return nil
+	}
+
+	return &event
 }
 
 func (ctx *WorkflowTask) GetContextAsMap() map[string]any {

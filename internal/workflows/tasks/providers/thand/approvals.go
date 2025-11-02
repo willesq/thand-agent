@@ -3,6 +3,7 @@ package thand
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
@@ -21,8 +22,26 @@ func (t *thandTask) executeApprovalsTask(
 	call *taskModel.ThandTask,
 	input any) (any, error) {
 
+	elevationRequest, err := workflowTask.GetContextAsElevationRequest()
+
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to get elevation request from context")
+
+		return nil, err
+	}
+
 	var notifyReq NotifyRequest
-	common.ConvertInterfaceToInterface(call.With, &notifyReq)
+	err = common.ConvertInterfaceToInterface(call.With, &notifyReq)
+
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to parse notification request")
+
+		return nil, err
+	}
 
 	if !notifyReq.IsValid() {
 		return nil, errors.New("invalid notification request")
@@ -82,6 +101,10 @@ func (t *thandTask) executeApprovalsTask(
 		return nil, err
 	}
 
+	defaultFlowState := model.FlowDirective{
+		Value: taskName, // loop back to await more approvals
+	}
+
 	// Set the context to hold all the approvals
 	/*
 		output:
@@ -97,10 +120,10 @@ func (t *thandTask) executeApprovalsTask(
 
 	workflowContext := workflowTask.GetContextAsMap()
 
-	approvals, ok := workflowContext["approvals"].([]any)
+	approvals, ok := workflowContext["approvals"].(map[string]any)
 
 	if !ok {
-		approvals = []any{}
+		approvals = map[string]any{}
 	}
 
 	var approvalData map[string]any
@@ -108,11 +131,35 @@ func (t *thandTask) executeApprovalsTask(
 	if approvalEvent, ok := approval.(*cloudevents.Event); ok {
 
 		approvalEvent.DataAs(&approvalData)
+		extensions := approvalEvent.Extensions()
+
+		userIdentity, userExists := extensions[models.VarsContextUser].(string)
+
+		if !userExists {
+			logrus.Warn("Approval event missing user extension")
+			return &defaultFlowState, nil
+		}
+
+		// Check if self-approval is disabled and the approver is the requester
+		if !notifyReq.SelfApprove {
+			requesterIdentity := elevationRequest.User.GetIdentity()
+			if userIdentity == requesterIdentity {
+				logrus.WithFields(logrus.Fields{
+					"taskName":          taskName,
+					"userIdentity":      userIdentity,
+					"requesterIdentity": requesterIdentity,
+				}).Warn("Self-approval is disabled; ignoring approval from requester")
+
+				// Return to the default flow state to await more approvals
+				return &defaultFlowState, nil
+			}
+		}
 
 		if approved, exists := approvalData["approved"]; exists {
-			approvals = append(approvals, map[string]any{
-				"approved": approved,
-			})
+			approvals[userIdentity] = map[string]any{
+				"approved":  approved,
+				"timestamp": time.Now().UTC().Format(time.RFC3339),
+			}
 		}
 	}
 
@@ -120,14 +167,16 @@ func (t *thandTask) executeApprovalsTask(
 
 	/*
 		# If anyone rejects then reject the entire request
-		# otherwise if there is more than one approval then
-		# authorize
+		# otherwise if the required number of approvals is met then authorize
+		# Approvals are stored as a map[identity]approval_data structure
 		- case1:
-			when: any($context.approvals[]; .approved == false)
+			when: any($context.approvals | to_entries[]; .value.approved == false)
 			then: denied
 		- case2:
-			when: '[$context.approvals[] | select(.approved == true)] | length >= 1'
+			when: '[$context.approvals | to_entries[] | select(.value.approved == true)] | length >= N'
 			then: authorize
+		- default:
+			then: loop back to task to await more approvals
 	*/
 
 	approvedState, foundApprovedState := call.On.GetString("approved")
@@ -138,44 +187,15 @@ func (t *thandTask) executeApprovalsTask(
 	}
 
 	// Create the switch task to handle approval or rejection
-	flowDirective, err := runner.SwitchTaskHandler(
+	flowDirective, err := t.evaluateApprovalSwitch(
 		workflowTask,
-		map[string]any{
-			"approvals": approvals,
-		},
-		fmt.Sprintf("%s.switch", taskName),
-		&model.SwitchTask{
-			Switch: []model.SwitchItem{
-				{
-					"case1": model.SwitchCase{
-						When: &model.RuntimeExpression{
-							Value: "any($context.approvals[]; .approved == false)",
-						},
-						Then: &model.FlowDirective{
-							Value: deniedState, // go to denied state
-						},
-					},
-				},
-				{
-					"case2": model.SwitchCase{
-						When: &model.RuntimeExpression{
-							Value: fmt.Sprintf("[$context.approvals[] | select(.approved == true)] | length >= %d", notifyReq.Approvals),
-						},
-						Then: &model.FlowDirective{
-							Value: approvedState, // proceed to the next state
-						},
-					},
-				},
-				{
-					"default": model.SwitchCase{
-						// No When condition = default case (return to await more approvals)
-						Then: &model.FlowDirective{
-							Value: taskName, // loop back to await more approvals
-						},
-					},
-				},
-			},
-		})
+		taskName,
+		approvals,
+		notifyReq.Approvals,
+		approvedState,
+		deniedState,
+		defaultFlowState,
+	)
 
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
@@ -191,4 +211,54 @@ func (t *thandTask) executeApprovalsTask(
 	}).Info("Completed Thand approvals task")
 
 	return flowDirective, nil
+}
+
+// evaluateApprovalSwitch evaluates the approval logic using a switch task
+// to determine if the request should be approved, denied, or loop back for more approvals
+func (t *thandTask) evaluateApprovalSwitch(
+	workflowTask *models.WorkflowTask,
+	taskName string,
+	approvals map[string]any,
+	requiredApprovals int,
+	approvedState string,
+	deniedState string,
+	defaultFlowState model.FlowDirective,
+) (*model.FlowDirective, error) {
+
+	return runner.SwitchTaskHandler(
+		workflowTask,
+		map[string]any{
+			"approvals": approvals,
+		},
+		fmt.Sprintf("%s.switch", taskName),
+		&model.SwitchTask{
+			Switch: []model.SwitchItem{
+				{
+					"case1": model.SwitchCase{
+						When: &model.RuntimeExpression{
+							Value: "any($context.approvals | to_entries[]; .value.approved == false)",
+						},
+						Then: &model.FlowDirective{
+							Value: deniedState, // go to denied state
+						},
+					},
+				},
+				{
+					"case2": model.SwitchCase{
+						When: &model.RuntimeExpression{
+							Value: fmt.Sprintf("[$context.approvals | to_entries[] | select(.value.approved == true)] | length >= %d", requiredApprovals),
+						},
+						Then: &model.FlowDirective{
+							Value: approvedState, // proceed to the next state
+						},
+					},
+				},
+				{
+					"default": model.SwitchCase{
+						// No When condition = default case (return to await more approvals)
+						Then: &defaultFlowState,
+					},
+				},
+			},
+		})
 }
