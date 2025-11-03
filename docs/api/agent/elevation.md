@@ -130,23 +130,52 @@ Returns HTML form for LLM-assisted elevation.
 
 ## Resume Elevation Workflow
 
-Resume a paused elevation workflow.
+Resume a paused or interrupted elevation workflow.
 
 **GET** `/elevate/resume`
 
-Returns workflow resumption interface.
+### Query Parameters
+
+- `state` - Required. Encrypted workflow state token
+
+### Response
+
+**Redirect (307)**: Redirects to next workflow step or completion page.
+
+### Example Usage
+
+```bash
+curl -L "http://localhost:8080/api/v1/elevate/resume?state=encrypted_state_token"
+```
 
 **POST** `/elevate/resume`
 
+### Query Parameters
+
+- `state` - Optional. If provided, behaves like GET request
+
 ### Request Body
 
+Raw encrypted workflow state or task token for resuming workflows.
+
+### Response
+
+**Redirect (307)**: Redirects to next workflow step.
+
+**JSON Response** (if Accept: application/json):
 ```json
 {
   "workflow_id": "wf_abc123",
-  "task_token": "task_token_xyz",
-  "user_input": {
+  "status": "completed",
+  "output": {
     "approved": true,
-    "additional_context": "Approved for emergency maintenance"
+    "session_created": true
   }
 }
 ```
+
+### Notes
+
+- Used internally by workflow engine to resume paused workflows
+- State parameter contains encrypted workflow context
+- Supports both query parameter and body-based resumption

@@ -11,6 +11,17 @@ import (
 )
 
 // getRoles handles GET /api/v1/roles
+//
+//	@Summary		List roles
+//	@Description	Get a list of all available roles with optional provider filtering
+//	@Tags			roles
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	query		string					false	"Comma-separated list of providers to filter by"
+//	@Success		200			{object}	models.RolesResponse	"List of roles"
+//	@Failure		401			{object}	map[string]interface{}	"Unauthorized"
+//	@Router			/roles [get]
+//	@Security		BearerAuth
 func (s *Server) getRoles(c *gin.Context) {
 
 	var authenticatedUser *models.Session
@@ -86,6 +97,18 @@ func hasAnyProvider(roleProviders []string, requestedProviders []string) bool {
 }
 
 // getRoleByName handles GET /api/v1/role/:role
+//
+//	@Summary		Get role by name
+//	@Description	Retrieve detailed information about a specific role
+//	@Tags			roles
+//	@Accept			json
+//	@Produce		json
+//	@Param			role	path		string					true	"Role name"
+//	@Success		200		{object}	models.RoleResponse		"Role details"
+//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Failure		404		{object}	map[string]interface{}	"Role not found"
+//	@Router			/role/{role} [get]
+//	@Security		BearerAuth
 func (s *Server) getRoleByName(c *gin.Context) {
 	roleName := c.Param("role")
 

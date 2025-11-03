@@ -54,6 +54,23 @@ Get all running workflow executions for the authenticated user.
 }
 ```
 
+### Response
+
+```json
+{
+  "workflow_id": "wf_abc123",
+  "run_id": "run_456789",
+  "status": "running"
+}
+```
+
+### Notes
+
+- Only available in server mode
+- Requires authentication
+- Workflow must exist and be enabled
+- Input is validated against workflow schema
+
 ## Get Execution Details
 
 **GET** `/execution/{id}`
@@ -92,9 +109,23 @@ Gracefully cancel a running workflow execution.
 ```json
 {
   "status": "ok",
-  "message": "Workflow termination signal sent"
+  "message": "Workflow cancellation signal sent"
 }
 ```
+
+### Example Usage
+
+```bash
+curl "http://localhost:8080/api/v1/execution/wf_abc123/cancel"
+```
+
+### Notes
+
+- Only available in server mode
+- Requires authentication
+- User must own the workflow execution
+- Allows workflow to perform cleanup before stopping
+- Workflow receives cancellation signal and can handle gracefully
 
 ## Terminate Execution
 
@@ -110,3 +141,44 @@ Forcefully terminate a running workflow execution.
   "message": "Workflow termination signal sent"
 }
 ```
+
+### Notes
+
+- Only available in server mode
+- User must own the workflow execution
+- Forceful termination doesn't allow cleanup
+- Use cancel for graceful shutdown
+
+## Signal Execution
+
+Send a signal event to a running workflow execution.
+
+**GET** `/execution/{id}/signal`
+
+### Query Parameters
+
+- `input` - Required. Encoded signal data containing the CloudEvents signal
+
+### Response
+
+```json
+{
+  "message": "Signal sent successfully",
+  "workflow_id": "wf_abc123"
+}
+```
+
+### Example Usage
+
+```bash
+curl "http://localhost:8080/api/v1/execution/wf_abc123/signal?input=encrypted_signal_token"
+```
+
+### Notes
+
+- Only available in server mode
+- Requires authentication
+- User must own the workflow execution
+- Input must be encrypted CloudEvents signal data
+- Used for workflow approvals and interactive decisions
+- Signal data is validated before being sent to workflow

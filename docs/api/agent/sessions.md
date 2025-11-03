@@ -106,3 +106,10 @@ Delete a session for a specific provider.
   "message": "Session deleted successfully"
 }
 ```
+
+### Notes
+
+- Only available in agent mode
+- Removes session from local session manager
+- Does not revoke tokens at provider
+- Session is permanently deleted from local storage

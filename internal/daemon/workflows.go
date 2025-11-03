@@ -26,6 +26,16 @@ type WorkflowPageData struct {
 }
 
 // getWorkflows handles GET /api/v1/workflows
+//
+//	@Summary		List workflows
+//	@Description	Get a list of all available workflows
+//	@Tags			workflows
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	models.WorkflowsResponse	"List of workflows"
+//	@Failure		401	{object}	map[string]interface{}		"Unauthorized"
+//	@Router			/workflows [get]
+//	@Security		BearerAuth
 func (s *Server) getWorkflows(c *gin.Context) {
 
 	var authenticatedUser *models.Session
@@ -86,6 +96,18 @@ func (s *Server) getWorkflows(c *gin.Context) {
 }
 
 // getWorkflowByName handles GET /api/v1/workflow/:name
+//
+//	@Summary		Get workflow by name
+//	@Description	Retrieve detailed information about a specific workflow
+//	@Tags			workflows
+//	@Accept			json
+//	@Produce		json
+//	@Param			name	path		string					true	"Workflow name"
+//	@Success		200		{object}	map[string]interface{}	"Workflow details"
+//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Failure		404		{object}	map[string]interface{}	"Workflow not found"
+//	@Router			/workflow/{name} [get]
+//	@Security		BearerAuth
 func (s *Server) getWorkflowByName(c *gin.Context) {
 
 	workflowName := c.Param("name")
@@ -140,11 +162,41 @@ func (s *Server) getWorkflowsPage(c *gin.Context) {
 	s.getWorkflows(c)
 }
 
+// terminateRunningWorkflow forcefully terminates a workflow execution
+//
+//	@Summary		Terminate workflow execution
+//	@Description	Forcefully terminate a running workflow execution
+//	@Tags			executions
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string					true	"Workflow execution ID"
+//	@Success		200	{object}	map[string]interface{}	"Workflow terminated"
+//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
+//	@Failure		403	{object}	map[string]interface{}	"Forbidden"
+//	@Failure		404	{object}	map[string]interface{}	"Workflow not found"
+//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Router			/execution/{id}/terminate [get]
+//	@Security		BearerAuth
 func (s *Server) terminateRunningWorkflow(c *gin.Context) {
 	// TODO: Implement forceful termination logic
 	s.cancelRunningWorkflow(c)
 }
 
+// cancelRunningWorkflow gracefully cancels a workflow execution
+//
+//	@Summary		Cancel workflow execution
+//	@Description	Gracefully cancel a running workflow execution
+//	@Tags			executions
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		string					true	"Workflow execution ID"
+//	@Success		200	{object}	map[string]interface{}	"Workflow cancelled"
+//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
+//	@Failure		403	{object}	map[string]interface{}	"Forbidden"
+//	@Failure		404	{object}	map[string]interface{}	"Workflow not found"
+//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Router			/execution/{id}/cancel [get]
+//	@Security		BearerAuth
 func (s *Server) cancelRunningWorkflow(c *gin.Context) {
 
 	workflowId := c.Param("id")

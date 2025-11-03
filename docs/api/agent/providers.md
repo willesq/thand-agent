@@ -12,13 +12,23 @@ Manage and interact with identity and cloud providers.
 
 ## List Providers
 
-Get all available providers.
+Get all available providers with optional capability filtering.
 
 **GET** `/providers`
 
 ### Query Parameters
 
 - `capability` - Filter by capability (comma-separated): `authenticator`, `authorizer`, `identities`, `notifications`
+
+### Example Usage
+
+```bash
+# Get all providers
+curl http://localhost:8080/api/v1/providers
+
+# Filter by capability
+curl "http://localhost:8080/api/v1/providers?capability=authenticator,authorizer"
+```
 
 ### Response
 
@@ -41,6 +51,14 @@ Get all available providers.
   }
 }
 ```
+
+### Notes
+
+- Only available in server mode
+- Requires authentication
+- Filters providers based on user permissions
+- Only returns enabled providers with initialized clients
+- Supports both JSON and HTML responses
 
 ## Get Provider Details
 

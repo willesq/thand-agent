@@ -36,6 +36,14 @@ Get all available workflows.
 }
 ```
 
+### Notes
+
+- Only available in server mode
+- Requires authentication in server mode
+- Returns only enabled workflows
+- Filters workflows based on user permissions
+- Supports both JSON and HTML responses
+
 ## Get Workflow Details
 
 **GET** `/workflow/{name}`
@@ -66,3 +74,11 @@ Get all available workflows.
   }
 }
 ```
+
+### Notes
+
+- Only available in server mode
+- Requires authentication
+- Returns complete workflow definition including ServerlessWorkflow DSL
+- User must have permission to view the workflow
+- Supports both JSON and HTML responses

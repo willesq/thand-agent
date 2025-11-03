@@ -7,6 +7,20 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// getIdentities retrieves available identities
+//
+//	@Summary		List identities
+//	@Description	Get a list of available identities from all identity providers
+//	@Tags			identities
+//	@Accept			json
+//	@Produce		json
+//	@Param			q	query		string					false	"Filter query"
+//	@Success		200	{object}	map[string]interface{}	"List of identities"
+//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
+//	@Failure		403	{object}	map[string]interface{}	"Forbidden"
+//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Router			/identities [get]
+//	@Security		BearerAuth
 func (s *Server) getIdentities(c *gin.Context) {
 	// Get user information
 	if !s.Config.IsServer() {
