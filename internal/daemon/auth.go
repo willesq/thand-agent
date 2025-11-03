@@ -14,6 +14,20 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// getAuthRequest initiates the authentication flow
+//
+//	@Summary		Initiate authentication
+//	@Description	Start the OAuth2 authentication flow for a provider
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path	string	true	"Provider name"
+//	@Param			callback	query	string	false	"Callback URL"
+//	@Success		307			"Redirect to provider authentication"
+//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Failure		404			{object}	map[string]interface{}	"Provider not found"
+//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Router			/auth/request/{provider} [get]
 func (s *Server) getAuthRequest(c *gin.Context) {
 	provider := c.Param("provider")
 
@@ -68,6 +82,19 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 	)
 }
 
+// getAuthCallback handles the OAuth2 callback
+//
+//	@Summary		Authentication callback
+//	@Description	Handle the OAuth2 callback from the provider
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path	string	true	"Provider name"
+//	@Param			state		query	string	true	"OAuth state"
+//	@Param			code		query	string	true	"OAuth code"
+//	@Success		200			"Authentication successful"
+//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Router			/auth/callback/{provider} [get]
 func (s *Server) getAuthCallback(c *gin.Context) {
 
 	// Handle the callback to the CLI to store the users session state
@@ -114,6 +141,18 @@ type AuthPageData struct {
 	Callback  string
 }
 
+// getAuthPage displays the authentication page
+//
+//	@Summary		Authentication page
+//	@Description	Display the authentication page with available providers
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		html
+//	@Param			callback	query	string	false	"Callback URL"
+//	@Param			provider	query	string	false	"Provider name for direct authentication"
+//	@Success		200			"Authentication page"
+//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Router			/auth [get]
 func (s *Server) getAuthPage(c *gin.Context) {
 
 	foundProviders := s.getAuthProvidersAsProviderResponse(nil)
@@ -227,6 +266,19 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 	}
 }
 
+// getLogoutPage handles user logout
+//
+//	@Summary		Logout
+//	@Description	Clear the user session and logout
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path	string	false	"Provider name"
+//	@Success		200			{object}	map[string]interface{}	"Logged out successfully"
+//	@Success		307			"Redirect to home page"
+//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Router			/auth/logout [get]
+//	@Router			/auth/logout/{provider} [get]
 func (s *Server) getLogoutPage(c *gin.Context) {
 
 	cookie := sessions.DefaultMany(c, ThandCookieName)

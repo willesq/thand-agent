@@ -1,3 +1,21 @@
+// Package daemon provides the HTTP server implementation for the Thand Agent
+//
+//	@title						Thand Agent API
+//	@version					1.0
+//	@description				Thand Agent API for managing access, roles, workflows, and providers
+//	@termsOfService				https://thand.io/terms
+//	@contact.name				Thand Support
+//	@contact.url				https://thand.io/support
+//	@contact.email				support@thand.io
+//	@license.name				BSL
+//	@license.url				https://mariadb.com/bsl11/
+//	@host						localhost:8080
+//	@BasePath					/api/v1
+//	@schemes					http https
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Bearer token authentication
 package daemon
 
 import (
@@ -17,6 +35,9 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/thand-io/agent/docs" // Import generated swagger docs
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
@@ -265,6 +286,9 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 	router.GET("/favicon.ico", s.getFavicon)
 	router.GET("/styles.css", s.getStyle)
 
+	// Swagger documentation
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// Health endpoint
 	if s.Config.Server.Health.Enabled {
 		router.GET(s.Config.Server.Health.Path, s.healthHandler)
@@ -403,6 +427,14 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 }
 
 // healthHandler handles the health check endpoint
+//
+//	@Summary		Health check
+//	@Description	Get the health status of the service and its dependencies
+//	@Tags			health
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	models.HealthResponse	"Health status"
+//	@Router			/health [get]
 func (s *Server) healthHandler(c *gin.Context) {
 
 	servicesHealth := make(map[string]models.HealthState)
@@ -463,6 +495,14 @@ func (s *Server) healthHandler(c *gin.Context) {
 }
 
 // readyHandler handles the readiness check endpoint
+//
+//	@Summary		Readiness check
+//	@Description	Check if the service is ready to accept requests
+//	@Tags			health
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}	"Ready status"
+//	@Router			/ready [get]
 func (s *Server) readyHandler(c *gin.Context) {
 	response := gin.H{
 		"status":    "ready",
@@ -474,6 +514,14 @@ func (s *Server) readyHandler(c *gin.Context) {
 }
 
 // metricsHandler handles the metrics endpoint
+//
+//	@Summary		Service metrics
+//	@Description	Get service metrics including uptime, request counts, and resource counts
+//	@Tags			metrics
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	models.MetricsInfo	"Service metrics"
+//	@Router			/metrics [get]
 func (s *Server) metricsHandler(c *gin.Context) {
 	uptime := time.Since(s.StartTime)
 

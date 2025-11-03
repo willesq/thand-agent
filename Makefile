@@ -66,4 +66,17 @@ generate-data:
 	go run tools/generate-iam-dataset/main.go
 	@echo "Data generation complete!"
 
-.PHONY: all build build-all clean install run test submodules update-submodules compress generate-data
+# Generate Swagger documentation
+swagger:
+	@echo "Generating Swagger documentation..."
+	@if command -v swag >/dev/null 2>&1; then \
+		swag init -g internal/daemon/server.go --parseDependency --parseInternal; \
+		echo "Swagger documentation generated successfully!"; \
+		echo "View at: http://localhost:8080/swagger/index.html"; \
+	else \
+		echo "Error: 'swag' command not found."; \
+		echo "Install with: go install github.com/swaggo/swag/cmd/swag@latest"; \
+		exit 1; \
+	fi
+
+.PHONY: all build build-all clean install run test submodules update-submodules compress generate-data swagger

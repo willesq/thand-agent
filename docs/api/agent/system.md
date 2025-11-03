@@ -16,6 +16,12 @@ Check service health and dependencies.
 
 **GET** `/health`
 
+### Availability
+
+- Server Mode
+- Agent Mode
+- Client Mode
+
 ### Response
 
 ```json
@@ -41,6 +47,12 @@ Check if service is ready to handle requests.
 
 **GET** `/ready`
 
+### Availability
+
+- Server Mode
+- Agent Mode
+- Client Mode
+
 ### Response
 
 ```json
@@ -56,6 +68,12 @@ Check if service is ready to handle requests.
 Get service metrics and statistics.
 
 **GET** `/metrics`
+
+### Availability
+
+- Server Mode
+- Agent Mode
+- Client Mode
 
 ### Response
 

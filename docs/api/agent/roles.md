@@ -12,13 +12,23 @@ Manage access roles and their configurations.
 
 ## List Roles
 
-Get all available roles.
+Get all available roles with optional provider filtering.
 
 **GET** `/roles`
 
 ### Query Parameters
 
 - `provider` - Filter by provider (comma-separated)
+
+### Example Usage
+
+```bash
+# Get all roles
+curl http://localhost:8080/api/v1/roles
+
+# Filter by providers
+curl "http://localhost:8080/api/v1/roles?provider=aws,gcp"
+```
 
 ### Response
 
@@ -55,6 +65,14 @@ Get all available roles.
 }
 ```
 
+### Notes
+
+- Only available in server mode
+- Requires authentication
+- Filters roles based on user permissions
+- Only returns enabled roles
+- Supports both JSON and HTML responses
+
 ## Get Role Details
 
 **GET** `/role/{role}`
@@ -74,3 +92,10 @@ Get all available roles.
   }
 }
 ```
+
+### Notes
+
+- Only available in server mode
+- Requires authentication
+- User must have permission to view the role
+- Returns complete role configuration including permissions and workflows

@@ -10,6 +10,20 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// getProviderRoles lists roles available in a provider
+//
+//	@Summary		List provider roles
+//	@Description	Get a list of roles available in a specific provider
+//	@Tags			providers
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path		string								true	"Provider name"
+//	@Param			q			query		string								false	"Filter query"
+//	@Success		200			{object}	models.ProviderRolesResponse		"Provider roles"
+//	@Failure		404			{object}	map[string]interface{}				"Provider not found"
+//	@Failure		500			{object}	map[string]interface{}				"Internal server error"
+//	@Router			/provider/{provider}/roles [get]
+//	@Security		BearerAuth
 func (s *Server) getProviderRoles(c *gin.Context) {
 
 	providerName := c.Param("provider")
@@ -40,6 +54,18 @@ func (s *Server) getProviderRoles(c *gin.Context) {
 	})
 }
 
+// getProviderByName retrieves a provider by name
+//
+//	@Summary		Get provider by name
+//	@Description	Retrieve detailed information about a specific provider
+//	@Tags			providers
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path		string					true	"Provider name"
+//	@Success		200			{object}	models.ProviderResponse	"Provider details"
+//	@Failure		404			{object}	map[string]interface{}	"Provider not found"
+//	@Router			/provider/{provider} [get]
+//	@Security		BearerAuth
 func (s *Server) getProviderByName(c *gin.Context) {
 
 	providerName := c.Param("provider")
@@ -58,6 +84,20 @@ func (s *Server) getProviderByName(c *gin.Context) {
 	})
 }
 
+// getProviderPermissions lists permissions available in a provider
+//
+//	@Summary		List provider permissions
+//	@Description	Get a list of permissions available in a specific provider
+//	@Tags			providers
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path		string									true	"Provider name"
+//	@Param			q			query		string									false	"Filter query"
+//	@Success		200			{object}	models.ProviderPermissionsResponse		"Provider permissions"
+//	@Failure		404			{object}	map[string]interface{}					"Provider not found"
+//	@Failure		500			{object}	map[string]interface{}					"Internal server error"
+//	@Router			/provider/{provider}/permissions [get]
+//	@Security		BearerAuth
 func (s *Server) getProviderPermissions(c *gin.Context) {
 
 	providerName := c.Param("provider")
@@ -134,6 +174,17 @@ func (s *Server) getProvidersAsProviderResponse(
 }
 
 // getProviders handles GET /api/v1/providers
+//
+//	@Summary		List providers
+//	@Description	Get a list of all available providers with optional capability filtering
+//	@Tags			providers
+//	@Accept			json
+//	@Produce		json
+//	@Param			capability	query		string						false	"Comma-separated list of capabilities to filter by"
+//	@Success		200			{object}	models.ProvidersResponse	"List of providers"
+//	@Failure		401			{object}	map[string]interface{}		"Unauthorized"
+//	@Router			/providers [get]
+//	@Security		BearerAuth
 func (s *Server) getProviders(c *gin.Context) {
 
 	var authenticatedUser *models.Session
@@ -186,6 +237,21 @@ func (s *Server) getProviders(c *gin.Context) {
 	}
 }
 
+// postProviderAuthorizeSession authorizes a session with a provider
+//
+//	@Summary		Authorize provider session
+//	@Description	Authorize a session with a specific provider
+//	@Tags			providers
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path		string						true	"Provider name"
+//	@Param			user		body		models.AuthorizeUser		true	"Authorization request"
+//	@Success		200			{object}	map[string]interface{}		"Authorization response"
+//	@Failure		400			{object}	map[string]interface{}		"Bad request"
+//	@Failure		404			{object}	map[string]interface{}		"Provider not found"
+//	@Failure		500			{object}	map[string]interface{}		"Internal server error"
+//	@Router			/provider/{provider}/authorizeSession [post]
+//	@Security		BearerAuth
 func (s *Server) postProviderAuthorizeSession(c *gin.Context) {
 
 	// User in body

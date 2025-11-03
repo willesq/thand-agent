@@ -21,6 +21,25 @@ All API endpoints are relative to the agent's base URL:
 http://localhost:8080/api/v1
 ```
 
+## Interactive API Documentation
+
+The complete API specification is available through Swagger UI:
+
+```
+http://localhost:8080/swagger/index.html
+```
+
+### OpenAPI Specification
+
+- **JSON Format**: `http://localhost:8080/swagger/doc.json`
+- **YAML Format**: `http://localhost:8080/swagger/doc.yaml`
+
+The Swagger UI provides:
+- Interactive API testing
+- Complete request/response schemas
+- Authentication configuration
+- Real-time API exploration
+
 ## Authentication
 
 The API supports multiple authentication methods depending on the mode:
@@ -83,3 +102,9 @@ All error responses follow this format:
 - `404` - Not Found
 - `409` - Conflict
 - `500` - Internal Server Error
+
+## License
+
+This API is licensed under the Business Source License (BSL 1.1).
+
+**License URL**: [https://mariadb.com/bsl11/](https://mariadb.com/bsl11/)

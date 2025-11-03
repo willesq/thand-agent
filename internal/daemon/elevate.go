@@ -19,6 +19,21 @@ import (
 )
 
 // getElevate handles GET /api/v1/elevate?role=admin&target=server&reason=maintenance
+//
+//	@Summary		Request role elevation
+//	@Description	Request elevation to a specific role with static parameters
+//	@Tags			elevate
+//	@Accept			json
+//	@Produce		json
+//	@Param			role		query		string	true	"Role name"
+//	@Param			provider	query		string	true	"Provider name"
+//	@Param			reason		query		string	true	"Reason for elevation"
+//	@Param			duration	query		string	false	"Duration of elevation"
+//	@Param			workflow	query		string	false	"Workflow name"
+//	@Param			identities	query		string	false	"Identity filter"
+//	@Success		200			{object}	map[string]interface{}	"Elevation request submitted"
+//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Router			/elevate [get]
 func (s *Server) getElevate(c *gin.Context) {
 	var request models.ElevateStaticRequest
 
@@ -55,6 +70,17 @@ func (s *Server) getElevate(c *gin.Context) {
 	})
 }
 
+// postElevate handles elevation requests with JSON or form data
+//
+//	@Summary		Submit elevation request
+//	@Description	Submit an elevation request with dynamic or static parameters
+//	@Tags			elevate
+//	@Accept			json,x-www-form-urlencoded,multipart/form-data
+//	@Produce		json
+//	@Param			request	body		models.ElevateRequest	true	"Elevation request"
+//	@Success		200		{object}	map[string]interface{}	"Elevation request submitted"
+//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Router			/elevate [post]
 func (s *Server) postElevate(c *gin.Context) {
 	// Check content type to determine how to bind the request
 	contentType := c.GetHeader("Content-Type")
@@ -220,6 +246,17 @@ func (s *Server) elevate(c *gin.Context, request models.ElevateRequest) {
 	)
 }
 
+// getElevateResume resumes a workflow from a saved state
+//
+//	@Summary		Resume elevation workflow
+//	@Description	Resume a paused or interrupted elevation workflow
+//	@Tags			elevate
+//	@Accept			json
+//	@Produce		json
+//	@Param			state	query		string					true	"Workflow state token"
+//	@Success		307		"Redirect to next workflow step"
+//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Router			/elevate/resume [get]
 func (s *Server) getElevateResume(c *gin.Context) {
 	// This service is stateless so we need to resume the workflow
 	// based on the request payload. We can store the state as 8KB JSON url.
@@ -244,6 +281,16 @@ func (s *Server) getElevateResume(c *gin.Context) {
 }
 
 // postElevateResume handles POST /api/v1/elevate/resume
+//
+//	@Summary		Resume elevation workflow (POST)
+//	@Description	Resume a paused elevation workflow with POST data
+//	@Tags			elevate
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		map[string]interface{}	true	"Resume request data"
+//	@Success		307		"Redirect to next workflow step"
+//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Router			/elevate/resume [post]
 func (s *Server) postElevateResume(c *gin.Context) {
 
 	// If the query param is provided then we are in a redirect
@@ -476,7 +523,16 @@ func (s *Server) resumeWorkflow(c *gin.Context, workflow *models.WorkflowTask) {
 // getElevateLLM handles POST /elevate/llm?reason=I need access to aws
 // This function is a handler to take a users reason for an
 // elevation and response with a role based on the users request
-
+//
+//	@Summary		LLM-based elevation
+//	@Description	Request elevation using natural language reasoning with LLM
+//	@Tags			elevate
+//	@Accept			json
+//	@Produce		json
+//	@Param			reason	query		string					true	"Natural language reason for elevation"
+//	@Success		200		{object}	map[string]interface{}	"LLM response with suggested role"
+//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Router			/elevate/llm [get]
 func (s *Server) getElevateLLM(c *gin.Context) {
 
 	// Get the reason from the query parameters
@@ -494,6 +550,17 @@ func (s *Server) getElevateLLM(c *gin.Context) {
 	s.handleLargeLanguageModelRequest(c, elevateRequest)
 }
 
+// postElevateLLM handles LLM elevation with POST data
+//
+//	@Summary		LLM-based elevation (POST)
+//	@Description	Request elevation using natural language with POST request
+//	@Tags			elevate
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		models.ElevateLLMRequest	true	"LLM elevation request"
+//	@Success		200		{object}	map[string]interface{}		"LLM response with suggested role"
+//	@Failure		400		{object}	map[string]interface{}		"Bad request"
+//	@Router			/elevate/llm [post]
 func (s *Server) postElevateLLM(c *gin.Context) {
 
 	var elevateRequest models.ElevateLLMRequest

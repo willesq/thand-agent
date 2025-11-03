@@ -7,6 +7,17 @@ import (
 	"github.com/thand-io/agent/internal/config"
 )
 
+// postRegister handles agent registration
+//
+//	@Summary		Register agent
+//	@Description	Register a new agent with the server
+//	@Tags			registration
+//	@Accept			json
+//	@Produce		json
+//	@Param			registration	body		config.RegistrationRequest	true	"Registration request"
+//	@Success		200				{object}	config.RegistrationResponse	"Registration successful"
+//	@Failure		400				{object}	map[string]interface{}		"Bad request"
+//	@Router			/register [post]
 func (s *Server) postRegister(c *gin.Context) {
 
 	var registrationRequest config.RegistrationRequest

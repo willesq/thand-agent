@@ -11,6 +11,18 @@ import (
 	"github.com/thand-io/agent/internal/sessions"
 )
 
+// postSession creates a new session
+//
+//	@Summary		Create a new session
+//	@Description	Create a new session with the provided session token
+//	@Tags			sessions
+//	@Accept			json
+//	@Produce		json
+//	@Param			session	body		models.SessionCreateRequest	true	"Session creation request"
+//	@Success		200		{object}	map[string]interface{}		"Session created successfully"
+//	@Failure		400		{object}	map[string]interface{}		"Bad request"
+//	@Failure		500		{object}	map[string]interface{}		"Internal server error"
+//	@Router			/sessions [post]
 func (s *Server) postSession(c *gin.Context) {
 
 	// Get the post JSON Body as a Session create request
@@ -62,6 +74,17 @@ func (s *Server) postSession(c *gin.Context) {
 	})
 }
 
+// getSessions retrieves all sessions
+//
+//	@Summary		Get all sessions
+//	@Description	Retrieve all active sessions for the user
+//	@Tags			sessions
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	sessions.LoginServer		"List of sessions"
+//	@Failure		400	{object}	map[string]interface{}	"Bad request"
+//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Router			/sessions [get]
 func (s *Server) getSessions(c *gin.Context) {
 
 	if s.Config.IsServer() {
@@ -119,6 +142,19 @@ func (s *Server) getSessions(c *gin.Context) {
 	}
 }
 
+// getSessionByProvider retrieves a session for a specific provider
+//
+//	@Summary		Get session by provider
+//	@Description	Retrieve session information for a specific provider
+//	@Tags			sessions
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path		string					true	"Provider name"
+//	@Success		200			{object}	map[string]interface{}	"Session information"
+//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Failure		404			{object}	map[string]interface{}	"Session not found"
+//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Router			/session/{provider} [get]
 func (s *Server) getSessionByProvider(c *gin.Context) {
 
 	provider := c.Param("provider")
@@ -153,6 +189,18 @@ func (s *Server) getSessionByProvider(c *gin.Context) {
 	})
 }
 
+// deleteSession removes a session
+//
+//	@Summary		Delete session
+//	@Description	Remove a session for a specific provider
+//	@Tags			sessions
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path		string					true	"Provider name"
+//	@Success		200			{object}	map[string]interface{}	"Session deleted successfully"
+//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Router			/session/{provider} [delete]
 func (s *Server) deleteSession(c *gin.Context) {
 
 	provider := c.Param("provider")
