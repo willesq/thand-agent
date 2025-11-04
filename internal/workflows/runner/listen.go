@@ -50,11 +50,10 @@ func ListenTaskHandler(
 			}).Info("Receiving resume signal...")
 
 			// Otherwise receive the new signal
+			var resumeableWorkflow models.WorkflowTask
+			c.Receive(cancelCtx, &resumeableWorkflow)
 
-			var signalEvent models.WorkflowTask
-			c.Receive(cancelCtx, &signalEvent)
-
-			input = signalEvent.Input
+			input = resumeableWorkflow.Input
 
 		})
 
@@ -134,14 +133,22 @@ func ListenTaskHandler(
 
 			workflowSelector.Select(cancelCtx)
 
-			// We now have a signal to process
+			if input == nil {
+				// The signal is empty so lets return
 
+				logrus.WithFields(logrus.Fields{
+					"taskName": taskName,
+				}).Info("Empty signal input yet, continuing to listen...")
+				continue
+
+			}
+
+			// We now have a signal to process
 			out, err := handleListenTask(workflowTask, taskName, listen, input)
 
 			if err != nil {
 
 				logrus.WithError(err).Error("Failed to handle listen task")
-
 				return nil, err
 			}
 
@@ -150,7 +157,6 @@ func ListenTaskHandler(
 				logrus.WithFields(logrus.Fields{
 					"taskName": taskName,
 				}).Info("Still listening for more events...")
-
 				continue
 			}
 

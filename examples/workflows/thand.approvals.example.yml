@@ -62,6 +62,7 @@ workflows:
             # Authorize the user for the requested role
             thand: authorize
             with:
+              revocation: revoke
               notifier:
                 # provider: slack
                 provider: email

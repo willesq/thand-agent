@@ -306,11 +306,11 @@ func (a *approvalsNotifier) addActionSection(
 					),
 				).WithURL(a.createCallbackUrl(workflowTask, notifyReq, true)).WithStyle(slack.StylePrimary),
 				slack.NewButtonBlockElement(
-					"revoke",
-					"Revoke",
+					"deny",
+					"Deny",
 					slack.NewTextBlockObject(
 						slack.PlainTextType,
-						"❌ Revoke",
+						"❌ Deny",
 						false,
 						false,
 					),

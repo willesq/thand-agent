@@ -55,6 +55,9 @@ func (m *WorkflowManager) createPrimaryWorkflowHandler() func(workflow.Context, 
 
 		cancelCtx, cancelHandler := workflow.WithCancel(rootCtx)
 
+		// Variable to store termination request, accessible to both goroutine and defer
+		var terminationRequest *models.TemporalTerminationRequest
+
 		// Setup cleanup handler
 		defer func() {
 
@@ -64,7 +67,7 @@ func (m *WorkflowManager) createPrimaryWorkflowHandler() func(workflow.Context, 
 				return
 			}
 
-			cleanupErr := m.runCleanup(rootCtx, workflowTask)
+			cleanupErr := m.runCleanup(rootCtx, workflowTask, terminationRequest)
 
 			outputTask = workflowTask
 
@@ -81,19 +84,18 @@ func (m *WorkflowManager) createPrimaryWorkflowHandler() func(workflow.Context, 
 
 		// Setup query handler
 		if err := m.setupIsApprovedQueryHandler(cancelCtx, workflowTask); err != nil {
-			logrus.Error("Failed to set query handler", "Error", err)
+			logrus.WithError(err).Error("Failed to set query handler")
 			return nil, err
 		}
 
 		// Setup get workflow task query handler
 		if err := m.setupGetWorkflowTaskQueryHandler(cancelCtx, workflowTask); err != nil {
-			logrus.Error("Failed to set get workflow task query handler", "Error", err)
+			logrus.WithError(err).Error("Failed to set get workflow task query handler")
 			return nil, err
 		}
-
 		// Setup signal channels and handlers
 		resumeSignal, terminateSignal := m.setupSignalChannels(cancelCtx)
-		m.setupTerminationHandler(rootCtx, terminateSignal, cancelHandler)
+		m.setupTerminationHandler(rootCtx, terminateSignal, cancelHandler, &terminationRequest)
 
 		// Setup workflow selector
 		workflowSelector := m.setupWorkflowSelector(
@@ -111,7 +113,17 @@ func (m *WorkflowManager) createPrimaryWorkflowHandler() func(workflow.Context, 
 func (m *WorkflowManager) runCleanup(
 	rootCtx workflow.Context,
 	workflowTask *models.WorkflowTask,
+	terminationRequest *models.TemporalTerminationRequest,
 ) error {
+
+	// Log termination request if present
+	if terminationRequest != nil {
+		logrus.WithFields(logrus.Fields{
+			"Reason":      terminationRequest.Reason,
+			"EntryPoint":  terminationRequest.EntryPoint,
+			"ScheduledAt": terminationRequest.ScheduledAt,
+		}).Info("Cleanup running with termination request")
+	}
 
 	if approved := workflowTask.IsApproved(); approved == nil || !*approved {
 		logrus.Info("Workflow not approved, skipping cleanup activity.")
@@ -129,32 +141,55 @@ func (m *WorkflowManager) runCleanup(
 	newCtx, _ := workflow.NewDisconnectedContext(rootCtx)
 	workflowTask = workflowTask.WithTemporalContext(newCtx)
 
-	// Get the taskItem from the workflow spec or create a synthetic one
-	revocationTask := &model.TaskItem{
-		Key: "$cleanup",
-		Task: &thandModel.ThandTask{
-			Thand: thandTask.ThandRevokeTask,
-			With:  nil,
-		},
-	}
+	// If a termination request with entrypoint is provided then we need to use it
+	if terminationRequest != nil && len(terminationRequest.EntryPoint) > 0 {
 
-	// Run the revocation task
-	revokeTask, foundTask := m.tasks.GetTaskHandler(revocationTask)
+		// Resume the workflow task with the specified entrypoint
+		workflowTask.SetEntrypoint(terminationRequest.EntryPoint)
 
-	if !foundTask {
-		logrus.WithError(err).Error("Failed to get revoke task handler for cleanup")
-		return err
-	}
+		result, err := m.ResumeWorkflowTask(
+			workflowTask.WithTemporalContext(newCtx),
+		)
 
-	_, err = revokeTask.Execute(
-		workflowTask,
-		revocationTask,
-		nil,
-	)
+		if err != nil {
+			logrus.WithError(err).Error("Failed to resume workflow for cleanup with termination entrypoint")
+			return err
+		}
 
-	if err != nil {
-		logrus.WithError(err).Error("Cleanup activity failed")
-		return err
+		logrus.WithFields(logrus.Fields{
+			"Status": result.GetStatus(),
+		}).Info("Workflow resumed for cleanup with termination entrypoint")
+
+	} else {
+
+		// Get the taskItem from the workflow spec or create a synthetic one
+		revocationTask := &model.TaskItem{
+			Key: "$cleanup",
+			Task: &thandModel.ThandTask{
+				Thand: thandTask.ThandRevokeTask,
+				With:  nil,
+			},
+		}
+
+		// Run the revocation task
+		revokeTask, foundTask := m.tasks.GetTaskHandler(revocationTask)
+
+		if !foundTask {
+			logrus.Error("Failed to get revoke task handler for cleanup")
+			return errors.New("failed to get revoke task handler for cleanup")
+		}
+
+		_, err = revokeTask.Execute(
+			workflowTask,
+			revocationTask,
+			nil,
+		)
+
+		if err != nil {
+			logrus.WithError(err).Error("Cleanup activity failed")
+			return err
+		}
+
 	}
 
 	logrus.Info("Cleanup completed successfully")
@@ -193,21 +228,24 @@ func (m *WorkflowManager) setupSignalChannels(ctx workflow.Context) (workflow.Re
 func (m *WorkflowManager) setupTerminationHandler(
 	rootCtx workflow.Context,
 	terminateSignal workflow.ReceiveChannel,
-	cancelHandler workflow.CancelFunc) {
-	var terminationRequest *models.TemporalTerminationRequest
-
-	terminateSelector := workflow.NewSelector(rootCtx)
-	terminateSelector.AddReceive(terminateSignal, func(c workflow.ReceiveChannel, more bool) {
-		c.Receive(rootCtx, &terminationRequest)
-		logrus.Info("Terminate Signal Received")
-	})
+	cancelHandler workflow.CancelFunc,
+	terminationRequest **models.TemporalTerminationRequest) {
 
 	workflow.Go(rootCtx, func(ctx workflow.Context) {
 		logrus.Info("Listening for terminate signal in background goroutine")
+
+		terminateSelector := workflow.NewSelector(ctx)
+		terminateSelector.AddReceive(terminateSignal, func(c workflow.ReceiveChannel, more bool) {
+			var req models.TemporalTerminationRequest
+			c.Receive(ctx, &req)
+			*terminationRequest = &req
+			logrus.Info("Terminate Signal Received")
+		})
+
 		terminateSelector.Select(ctx)
 
-		if terminationRequest != nil {
-			m.handleTerminationRequest(ctx, terminationRequest)
+		if *terminationRequest != nil {
+			m.handleTerminationRequest(ctx, *terminationRequest)
 		}
 
 		cancelHandler()
@@ -220,10 +258,20 @@ func (m *WorkflowManager) handleTerminationRequest(
 	ctx workflow.Context,
 	terminationRequest *models.TemporalTerminationRequest,
 ) {
-	logrus.Info("Processing termination request", "Reason", terminationRequest.Reason, "ScheduledAt", terminationRequest.ScheduledAt)
+
+	if terminationRequest == nil {
+		logrus.Info("No termination request provided, skipping termination handling")
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"reason":       terminationRequest.Reason,
+		"EntryPoint":   terminationRequest.EntryPoint,
+		"scheduled_at": terminationRequest.ScheduledAt,
+	}).Info("Processing termination request")
 
 	var timerDuration time.Duration
-	if !terminationRequest.ScheduledAt.IsZero() {
+	if terminationRequest.ScheduledAt != nil && !terminationRequest.ScheduledAt.IsZero() {
 		// Use workflow.Now() instead of time.Now() for deterministic time
 		now := workflow.Now(ctx)
 		delay := terminationRequest.ScheduledAt.Sub(now)
@@ -236,7 +284,7 @@ func (m *WorkflowManager) handleTerminationRequest(
 	}
 	timer := workflow.NewTimer(ctx, timerDuration)
 	timer.Get(ctx, nil)
-	logrus.Info("Termination timer completed", "Duration", timerDuration)
+	logrus.WithField("Duration", timerDuration).Info("Termination timer completed")
 
 }
 
@@ -254,9 +302,9 @@ func (m *WorkflowManager) setupWorkflowSelector(
 	})
 
 	workflowSelector.AddFuture(workflow.NewTimer(ctx, 0), func(f workflow.Future) {
-		logrus.Info("Timer triggered for context cancellation check")
+		logrus.Debug("Timer triggered for context cancellation check")
 		if ctx.Err() != nil {
-			logrus.Info("Context cancellation detected via timer")
+			logrus.Debug("Context cancellation detected via timer")
 		}
 	})
 
@@ -283,7 +331,7 @@ func (m *WorkflowManager) executeWorkflowLoop(
 				logrus.Info("Workflow context cancelled, exiting main loop")
 				break
 			}
-			logrus.Error("Error while waiting for signal", "Error", cancelCtx.Err())
+			logrus.WithError(cancelCtx.Err()).Error("Error while waiting for signal")
 			return nil, cancelCtx.Err()
 		}
 
@@ -310,21 +358,28 @@ func (m *WorkflowManager) executeWorkflowLoop(
 				logrus.Info("Workflow context cancelled during execution, exiting main loop")
 				return result, nil
 			}
-			logrus.Error("Error while executing workflow step", "Error", cancelCtx.Err())
+			logrus.WithError(cancelCtx.Err()).Error("Error while executing workflow step")
 			return result, cancelCtx.Err()
 		}
 
-		return result, err
+		// If execution completed or failed, return the result
+		if err != nil || (result != nil && result.GetStatus() != swctx.RunningStatus) {
+			return result, err
+		}
+
+		// Continue loop for running workflows
+		workflowTask = result
 	}
 
-	return workflowTask, fmt.Errorf("workflow terminated")
+	// Loop exited due to cancellation
+	return workflowTask, nil
 }
 
 // waitForSignal waits for any signals to be available
 func (m *WorkflowManager) waitForSignal(cancelCtx workflow.Context, workflowSelector workflow.Selector) error {
 	return workflow.Await(cancelCtx, func() bool {
 		if cancelCtx.Err() != nil {
-			logrus.Info("Context error", "Error", cancelCtx.Err())
+			logrus.WithError(cancelCtx.Err()).Info("Context error")
 			if errors.Is(cancelCtx.Err(), context.Canceled) {
 				logrus.Info("Context was cancelled")
 			}
@@ -332,7 +387,7 @@ func (m *WorkflowManager) waitForSignal(cancelCtx workflow.Context, workflowSele
 		}
 
 		pending := workflowSelector.HasPending()
-		logrus.Info("Signal pending", "Pending", pending)
+		logrus.WithField("Pending", pending).Info("Signal pending")
 		return pending
 	})
 }
@@ -346,12 +401,12 @@ func (m *WorkflowManager) executeWorkflowStep(
 	err := f.Get(ctx, &workflowTask)
 
 	if err != nil {
-		logrus.Error("Workflow execution failed", "Error", err)
+		logrus.WithError(err).Error("Workflow execution failed")
 		workflowTask.SetStatus(swctx.FaultedStatus)
 		return workflowTask, err
 	}
 
-	logrus.Info("Workflow execution step completed", "Status", workflowTask.GetStatus())
+	logrus.WithField("Status", workflowTask.GetStatus()).Info("Workflow execution step completed")
 
 	return m.handleWorkflowStatus(workflowTask)
 }
@@ -360,8 +415,11 @@ func (m *WorkflowManager) executeWorkflowStep(
 func (m *WorkflowManager) handleWorkflowStatus(workflowTask *models.WorkflowTask) (*models.WorkflowTask, error) {
 	switch workflowTask.GetStatus() {
 	case swctx.RunningStatus:
-		logrus.Info("Workflow is still running", "workflow_id", workflowTask.WorkflowID, "task_name", workflowTask.GetTaskName())
-		return nil, nil // Continue loop
+		logrus.WithFields(logrus.Fields{
+			"workflow_id": workflowTask.WorkflowID,
+			"task_name":   workflowTask.GetTaskName(),
+		}).Info("Workflow is still running")
+		return workflowTask, nil // Continue loop
 
 	case swctx.CompletedStatus:
 		logrus.Info("Workflow completed successfully.")
@@ -369,25 +427,25 @@ func (m *WorkflowManager) handleWorkflowStatus(workflowTask *models.WorkflowTask
 
 	case swctx.FaultedStatus:
 		logrus.Error("Workflow failed.")
-		return nil, fmt.Errorf("workflow failed")
+		return workflowTask, fmt.Errorf("workflow failed")
 
 	case swctx.WaitingStatus:
 		logrus.Info("Workflow is waiting, pausing execution.")
-		return workflowTask, fmt.Errorf("workflow terminated") // Break loop
+		return workflowTask, nil
 
 	case swctx.PendingStatus:
 		logrus.Info("Workflow is pending, pausing execution.")
-		return nil, nil // Continue loop
+		return workflowTask, nil
 
 	default:
-		logrus.Error("Workflow ended in unknown state.")
-		return nil, fmt.Errorf("workflow ended in unknown state: %s", workflowTask.GetStatus())
+		logrus.WithField("status", workflowTask.GetStatus()).Error("Workflow ended in unknown state")
+		return workflowTask, fmt.Errorf("workflow ended in unknown state: %s", workflowTask.GetStatus())
 	}
 }
 
 func (m *WorkflowManager) StartWorkflow(ctx workflow.Context, workflowTask *models.WorkflowTask) workflow.Future {
 
-	logrus.Info("Starting workflow execution loop", "WorkflowID", workflowTask.WorkflowID)
+	logrus.WithField("WorkflowID", workflowTask.WorkflowID).Info("Starting workflow execution loop")
 
 	future, settable := workflow.NewFuture(ctx)
 
@@ -404,7 +462,7 @@ func (m *WorkflowManager) StartWorkflow(ctx workflow.Context, workflowTask *mode
 
 		settable.Set(result, err)
 
-		logrus.Info("Workflow resumed", "Status", workflowTask.GetStatus())
+		logrus.WithField("Status", workflowTask.GetStatus()).Info("Workflow resumed")
 
 	})
 

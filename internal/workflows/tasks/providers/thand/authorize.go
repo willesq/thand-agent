@@ -414,21 +414,13 @@ func (t *thandTask) scheduleRevocation(
 	// If we have a temporal client, we can use that to schedule the revocation
 	if serviceClient.HasTemporal() && serviceClient.GetTemporal().HasClient() {
 
-		signalName := models.TemporalResumeSignalName
-		var signalInput any
+		signalInput := models.TemporalTerminationRequest{
+			Reason:      "Revocation scheduled",
+			ScheduledAt: &revocationAt,
+		}
 
-		// If the user has not provided a revocation task, we just terminate
-		if len(revocationTask) == 0 {
-			signalName = models.TemporalTerminateSignalName
-			signalInput = models.TemporalTerminationRequest{
-				Reason:      "No revocation state provided",
-				ScheduledAt: revocationAt,
-			}
-		} else {
-			// Otherwise send the new task as the signal input to resume the workflow
-			// and set an execution timeout
-			// TODO: Figure out how to delay the signal until the revocation time
-			signalInput = newTask
+		if len(revocationTask) > 0 {
+			signalInput.EntryPoint = revocationTask
 		}
 
 		temporalClient := serviceClient.GetTemporal().GetClient()
@@ -437,7 +429,7 @@ func (t *thandTask) scheduleRevocation(
 			workflowTask.GetContext(),
 			workflowTask.WorkflowID,
 			models.TemporalEmptyRunId,
-			signalName,
+			models.TemporalTerminateSignalName,
 			signalInput,
 		)
 
