@@ -62,6 +62,7 @@ type TemporalImpl interface {
 }
 
 type TemporalTerminationRequest struct {
-	Reason      string    `json:"reason,omitempty"`
-	ScheduledAt time.Time `json:"scheduled_at,omitempty"`
+	Reason      string     `json:"reason,omitempty"`
+	EntryPoint  string     `json:"entrypoint,omitempty"`
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 }
