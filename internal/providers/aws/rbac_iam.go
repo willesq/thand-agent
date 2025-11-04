@@ -240,7 +240,7 @@ func (p *awsProvider) unbindUserFromRole(ctx context.Context, user *models.User,
 	var newStatements []Statement
 	for _, stmt := range currentPolicy.Statement {
 		// Check if this statement references our user
-		if principal, ok := stmt.Principal.(map[string]interface{}); ok {
+		if principal, ok := stmt.Principal.(map[string]any); ok {
 			if awsPrincipal, exists := principal["AWS"]; exists {
 				if awsStr, ok := awsPrincipal.(string); ok && awsStr == userArn {
 					// Skip this statement - we're removing the user

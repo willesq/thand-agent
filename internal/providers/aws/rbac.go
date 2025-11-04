@@ -56,6 +56,17 @@ func (p *awsProvider) RevokeRole(
 	}
 }
 
+func (p *awsProvider) GetAuthorizedAccessUrl(
+	ctx context.Context,
+	req *models.AuthorizeRoleRequest,
+	resp *models.AuthorizeRoleResponse,
+) string {
+
+	return p.GetConfig().GetStringWithDefault(
+		"sso_start_url", "https://console.aws.amazon.com/")
+
+}
+
 // shouldUseIdentityCenter determines if we should use Identity Center based on user context
 func (p *awsProvider) shouldUseIdentityCenter(user *models.User) bool {
 	// For now, assume Identity Center if user source suggests SSO

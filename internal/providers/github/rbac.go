@@ -63,6 +63,16 @@ func (p *githubProvider) RevokeRole(
 	return nil, nil
 }
 
+func (p *githubProvider) GetAuthorizedAccessUrl(
+	ctx context.Context,
+	req *models.AuthorizeRoleRequest,
+	resp *models.AuthorizeRoleResponse,
+) string {
+
+	return p.GetConfig().GetStringWithDefault(
+		"sso_start_url", "https://github.com/login")
+}
+
 // authorizeResource handles authorization for a single resource
 func (p *githubProvider) authorizeResource(ctx context.Context, username, resource string, role *models.Role) error {
 	// Parse resource format to determine what type of GitHub entity it is

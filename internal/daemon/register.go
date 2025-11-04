@@ -16,7 +16,7 @@ import (
 //	@Produce		json
 //	@Param			registration	body		config.RegistrationRequest	true	"Registration request"
 //	@Success		200				{object}	config.RegistrationResponse	"Registration successful"
-//	@Failure		400				{object}	map[string]interface{}		"Bad request"
+//	@Failure		400				{object}	map[string]any		"Bad request"
 //	@Router			/register [post]
 func (s *Server) postRegister(c *gin.Context) {
 

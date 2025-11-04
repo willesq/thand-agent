@@ -11,6 +11,7 @@ providers:
       access_key_id: aws_access_key_id
       # If the secret access key is not provided IAM will be used.
       secret_access_key: aws_secret_access_key
+      sso_start_url: sso_start_url
   aws-dev:
     name: AWS Development
     description: Development AWS environment
@@ -22,3 +23,4 @@ providers:
       access_key_id: aws_access_key_id
       # If the secret access key is not provided IAM will be used.
       secret_access_key: aws_secret_access_key
+      sso_start_url: sso_start_url

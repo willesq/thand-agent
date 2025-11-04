@@ -54,7 +54,7 @@ func (p *emailProvider) Initialize(provider models.Provider) error {
 
 type EmailNotificationRequest struct {
 	From    string
-	To      string
+	To      []string
 	Subject string
 	Body    EmailNotificationBody
 	Headers map[string][]string
@@ -90,8 +90,17 @@ func (p *emailProvider) SendNotification(
 		m.SetHeader("Subject", emailRequest.Subject)
 	}
 
+	// From field is required
+	if len(emailRequest.From) == 0 {
+		return fmt.Errorf("from address is required")
+	}
 	m.SetAddressHeader("From", emailRequest.From, "")
-	m.SetAddressHeader("To", emailRequest.To, "")
+
+	// Set multiple recipients
+	if len(emailRequest.To) == 0 {
+		return fmt.Errorf("at least one recipient is required")
+	}
+	m.SetHeader("To", emailRequest.To...)
 
 	err := p.mailer.DialAndSend(m)
 

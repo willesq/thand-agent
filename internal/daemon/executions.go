@@ -34,9 +34,9 @@ type ExecutionsPageData struct {
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	ExecutionsPageData		"List of workflow executions"
-//	@Failure		400	{object}	map[string]interface{}	"Bad request"
-//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Failure		400	{object}	map[string]any	"Bad request"
+//	@Failure		401	{object}	map[string]any	"Unauthorized"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/executions [get]
 //	@Security		BearerAuth
 func (s *Server) listRunningWorkflows(c *gin.Context) {
@@ -113,9 +113,9 @@ func (s *Server) listRunningWorkflows(c *gin.Context) {
 //	@Tags			executions
 //	@Accept			json
 //	@Produce		json
-//	@Param			workflow	body		map[string]interface{}	true	"Workflow creation request"
-//	@Success		201			{object}	map[string]interface{}	"Workflow created"
-//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Param			workflow	body		map[string]any	true	"Workflow creation request"
+//	@Success		201			{object}	map[string]any	"Workflow created"
+//	@Failure		400			{object}	map[string]any	"Bad request"
 //	@Router			/execution [post]
 //	@Security		BearerAuth
 func (s *Server) createWorkflow(c *gin.Context) {
@@ -131,9 +131,9 @@ func (s *Server) createWorkflow(c *gin.Context) {
 //	@Produce		json
 //	@Param			id	path		string					true	"Workflow execution ID"
 //	@Success		200	{object}	ExecutionStatePageData	"Workflow execution details"
-//	@Failure		400	{object}	map[string]interface{}	"Bad request"
-//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Failure		400	{object}	map[string]any	"Bad request"
+//	@Failure		401	{object}	map[string]any	"Unauthorized"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/execution/{id} [get]
 //	@Security		BearerAuth
 func (s *Server) getRunningWorkflow(c *gin.Context) {
@@ -405,11 +405,11 @@ func workflowExecutionInfo(
 //	@Produce		json
 //	@Param			id		path		string					true	"Workflow execution ID"
 //	@Param			input	query		string					true	"Encoded signal data"
-//	@Success		200		{object}	map[string]interface{}	"Signal sent successfully"
-//	@Failure		400		{object}	map[string]interface{}	"Bad request"
-//	@Failure		401		{object}	map[string]interface{}	"Unauthorized"
-//	@Failure		403		{object}	map[string]interface{}	"Forbidden"
-//	@Failure		500		{object}	map[string]interface{}	"Internal server error"
+//	@Success		200		{object}	map[string]any	"Signal sent successfully"
+//	@Failure		400		{object}	map[string]any	"Bad request"
+//	@Failure		401		{object}	map[string]any	"Unauthorized"
+//	@Failure		403		{object}	map[string]any	"Forbidden"
+//	@Failure		500		{object}	map[string]any	"Internal server error"
 //	@Router			/execution/{id}/signal [get]
 //	@Security		BearerAuth
 func (s *Server) signalRunningWorkflow(c *gin.Context) {

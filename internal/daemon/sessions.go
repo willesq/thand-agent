@@ -19,9 +19,9 @@ import (
 //	@Accept			json
 //	@Produce		json
 //	@Param			session	body		models.SessionCreateRequest	true	"Session creation request"
-//	@Success		200		{object}	map[string]interface{}		"Session created successfully"
-//	@Failure		400		{object}	map[string]interface{}		"Bad request"
-//	@Failure		500		{object}	map[string]interface{}		"Internal server error"
+//	@Success		200		{object}	map[string]any		"Session created successfully"
+//	@Failure		400		{object}	map[string]any		"Bad request"
+//	@Failure		500		{object}	map[string]any		"Internal server error"
 //	@Router			/sessions [post]
 func (s *Server) postSession(c *gin.Context) {
 
@@ -82,8 +82,8 @@ func (s *Server) postSession(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	sessions.LoginServer		"List of sessions"
-//	@Failure		400	{object}	map[string]interface{}	"Bad request"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Failure		400	{object}	map[string]any	"Bad request"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/sessions [get]
 func (s *Server) getSessions(c *gin.Context) {
 
@@ -150,10 +150,10 @@ func (s *Server) getSessions(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			provider	path		string					true	"Provider name"
-//	@Success		200			{object}	map[string]interface{}	"Session information"
-//	@Failure		400			{object}	map[string]interface{}	"Bad request"
-//	@Failure		404			{object}	map[string]interface{}	"Session not found"
-//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Success		200			{object}	map[string]any	"Session information"
+//	@Failure		400			{object}	map[string]any	"Bad request"
+//	@Failure		404			{object}	map[string]any	"Session not found"
+//	@Failure		500			{object}	map[string]any	"Internal server error"
 //	@Router			/session/{provider} [get]
 func (s *Server) getSessionByProvider(c *gin.Context) {
 
@@ -197,9 +197,9 @@ func (s *Server) getSessionByProvider(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			provider	path		string					true	"Provider name"
-//	@Success		200			{object}	map[string]interface{}	"Session deleted successfully"
-//	@Failure		400			{object}	map[string]interface{}	"Bad request"
-//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Success		200			{object}	map[string]any	"Session deleted successfully"
+//	@Failure		400			{object}	map[string]any	"Bad request"
+//	@Failure		500			{object}	map[string]any	"Internal server error"
 //	@Router			/session/{provider} [delete]
 func (s *Server) deleteSession(c *gin.Context) {
 

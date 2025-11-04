@@ -157,3 +157,14 @@ func (p *salesForceProvider) RevokeRole(
 
 	return nil, nil
 }
+
+func (p *salesForceProvider) GetAuthorizedAccessUrl(
+	ctx context.Context,
+	req *models.AuthorizeRoleRequest,
+	resp *models.AuthorizeRoleResponse,
+) string {
+
+	return p.GetConfig().GetStringWithDefault(
+		"sso_start_url", "https://login.salesforce.com/")
+
+}

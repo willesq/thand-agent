@@ -15,10 +15,10 @@ import (
 //	@Accept			json
 //	@Produce		json
 //	@Param			q	query		string					false	"Filter query"
-//	@Success		200	{object}	map[string]interface{}	"List of identities"
-//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
-//	@Failure		403	{object}	map[string]interface{}	"Forbidden"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Success		200	{object}	map[string]any	"List of identities"
+//	@Failure		401	{object}	map[string]any	"Unauthorized"
+//	@Failure		403	{object}	map[string]any	"Forbidden"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/identities [get]
 //	@Security		BearerAuth
 func (s *Server) getIdentities(c *gin.Context) {
