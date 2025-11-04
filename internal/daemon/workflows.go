@@ -33,7 +33,7 @@ type WorkflowPageData struct {
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	models.WorkflowsResponse	"List of workflows"
-//	@Failure		401	{object}	map[string]interface{}		"Unauthorized"
+//	@Failure		401	{object}	map[string]any		"Unauthorized"
 //	@Router			/workflows [get]
 //	@Security		BearerAuth
 func (s *Server) getWorkflows(c *gin.Context) {
@@ -103,9 +103,9 @@ func (s *Server) getWorkflows(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			name	path		string					true	"Workflow name"
-//	@Success		200		{object}	map[string]interface{}	"Workflow details"
-//	@Failure		400		{object}	map[string]interface{}	"Bad request"
-//	@Failure		404		{object}	map[string]interface{}	"Workflow not found"
+//	@Success		200		{object}	map[string]any	"Workflow details"
+//	@Failure		400		{object}	map[string]any	"Bad request"
+//	@Failure		404		{object}	map[string]any	"Workflow not found"
 //	@Router			/workflow/{name} [get]
 //	@Security		BearerAuth
 func (s *Server) getWorkflowByName(c *gin.Context) {
@@ -170,11 +170,11 @@ func (s *Server) getWorkflowsPage(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			id	path		string					true	"Workflow execution ID"
-//	@Success		200	{object}	map[string]interface{}	"Workflow terminated"
-//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
-//	@Failure		403	{object}	map[string]interface{}	"Forbidden"
-//	@Failure		404	{object}	map[string]interface{}	"Workflow not found"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Success		200	{object}	map[string]any	"Workflow terminated"
+//	@Failure		401	{object}	map[string]any	"Unauthorized"
+//	@Failure		403	{object}	map[string]any	"Forbidden"
+//	@Failure		404	{object}	map[string]any	"Workflow not found"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/execution/{id}/terminate [get]
 //	@Security		BearerAuth
 func (s *Server) terminateRunningWorkflow(c *gin.Context) {
@@ -190,11 +190,11 @@ func (s *Server) terminateRunningWorkflow(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			id	path		string					true	"Workflow execution ID"
-//	@Success		200	{object}	map[string]interface{}	"Workflow cancelled"
-//	@Failure		401	{object}	map[string]interface{}	"Unauthorized"
-//	@Failure		403	{object}	map[string]interface{}	"Forbidden"
-//	@Failure		404	{object}	map[string]interface{}	"Workflow not found"
-//	@Failure		500	{object}	map[string]interface{}	"Internal server error"
+//	@Success		200	{object}	map[string]any	"Workflow cancelled"
+//	@Failure		401	{object}	map[string]any	"Unauthorized"
+//	@Failure		403	{object}	map[string]any	"Forbidden"
+//	@Failure		404	{object}	map[string]any	"Workflow not found"
+//	@Failure		500	{object}	map[string]any	"Internal server error"
 //	@Router			/execution/{id}/cancel [get]
 //	@Security		BearerAuth
 func (s *Server) cancelRunningWorkflow(c *gin.Context) {

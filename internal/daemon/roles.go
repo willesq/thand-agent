@@ -19,7 +19,7 @@ import (
 //	@Produce		json
 //	@Param			provider	query		string					false	"Comma-separated list of providers to filter by"
 //	@Success		200			{object}	models.RolesResponse	"List of roles"
-//	@Failure		401			{object}	map[string]interface{}	"Unauthorized"
+//	@Failure		401			{object}	map[string]any	"Unauthorized"
 //	@Router			/roles [get]
 //	@Security		BearerAuth
 func (s *Server) getRoles(c *gin.Context) {
@@ -105,8 +105,8 @@ func hasAnyProvider(roleProviders []string, requestedProviders []string) bool {
 //	@Produce		json
 //	@Param			role	path		string					true	"Role name"
 //	@Success		200		{object}	models.RoleResponse		"Role details"
-//	@Failure		400		{object}	map[string]interface{}	"Bad request"
-//	@Failure		404		{object}	map[string]interface{}	"Role not found"
+//	@Failure		400		{object}	map[string]any	"Bad request"
+//	@Failure		404		{object}	map[string]any	"Role not found"
 //	@Router			/role/{role} [get]
 //	@Security		BearerAuth
 func (s *Server) getRoleByName(c *gin.Context) {

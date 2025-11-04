@@ -1,6 +1,7 @@
 package thand
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -92,21 +93,70 @@ func (t *notifyFunction) ValidateRequest(
 
 /*
 provider: slack # or slack, email
-to: "#access-requests"
+to: "#access-requests"  # Can be a string or array of strings
 message: "Workflow validation passed for user ${ $.user.name }"
 approvals: true
 */
 type NotifierRequest struct {
-	Provider string `json:"provider"`
-	To       string `json:"to"` // Email, channel Id, username etc.
-	Message  string `json:"message"`
+	Provider string   `json:"provider"`
+	To       []string `json:"-"`       // Email, channel Id, username etc. - handled by custom marshal/unmarshal
+	Message  string   `json:"message"` // Message body
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling to handle both string and []string for To field
+func (r *NotifierRequest) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct with the same fields but To as any
+	type Alias struct {
+		Provider string `json:"provider"`
+		To       any    `json:"to"`
+		Message  string `json:"message"`
+	}
+
+	var temp Alias
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	r.Provider = temp.Provider
+	r.Message = temp.Message
+
+	// Handle To field - can be string or []string
+	switch v := temp.To.(type) {
+	case nil:
+		return fmt.Errorf("a contact 'to' must be provided for notifiers")
+	case string:
+		// Split by comma if it contains commas
+		if strings.Contains(v, ",") {
+			for _, recipient := range strings.Split(v, ",") {
+				recipient = strings.TrimSpace(recipient)
+				if len(recipient) > 0 {
+					r.To = append(r.To, recipient)
+				}
+			}
+		} else {
+			r.To = []string{v}
+		}
+	case []any:
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				r.To = append(r.To, str)
+			}
+		}
+	case []string:
+		r.To = v
+	default:
+		return fmt.Errorf("invalid type for 'to' field: %T", v)
+	}
+
+	return nil
 }
 
 func (r *NotifierRequest) IsValid() bool {
-	return len(r.Provider) > 0 && len(r.To) > 0 && len(r.Message) > 0
+	return len(r.Provider) > 0 && len(r.To) > 0
 }
 
 func (r *NotifierRequest) AsMap() map[string]any {
+	// Return 'to' as array for consistency
 	return map[string]any{
 		"provider": r.Provider,
 		"to":       r.To,
@@ -132,6 +182,10 @@ func (t *notifyFunction) Execute(
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert request: %w", err)
+	}
+
+	if !notificationReq.IsValid() {
+		return nil, errors.New("elevation request is not valid")
 	}
 
 	elevationReq, err := workflowTask.GetContextAsElevationRequest()

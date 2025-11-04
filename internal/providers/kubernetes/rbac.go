@@ -59,6 +59,19 @@ func (p *kubernetesProvider) RevokeRole(
 	}
 }
 
+func (p *kubernetesProvider) GetAuthorizedAccessUrl(
+	ctx context.Context,
+	req *models.AuthorizeRoleRequest,
+	resp *models.AuthorizeRoleResponse,
+) string {
+
+	// TODO: Detect Kubernetes dashboard URL from cluster config or environment
+
+	return p.GetConfig().GetStringWithDefault(
+		"sso_start_url", "https://docs.thand.io/environments/kubernetes/")
+
+}
+
 // authorizeNamespacedRole creates Role and RoleBinding for namespace-scoped access
 func (p *kubernetesProvider) authorizeNamespacedRole(
 	ctx context.Context,

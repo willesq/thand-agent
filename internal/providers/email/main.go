@@ -16,7 +16,8 @@ import (
 // emailProvider implements the ProviderImpl interface for Email
 type emailProvider struct {
 	*models.BaseProvider
-	mailer *gomail.Dialer
+	mailer             *gomail.Dialer
+	defaultFromAddress string
 }
 
 func (p *emailProvider) Initialize(provider models.Provider) error {
@@ -31,21 +32,41 @@ func (p *emailProvider) Initialize(provider models.Provider) error {
 	smtpPort, foundSmtpPort := emailerConfig.GetInt("port")
 	smtpUser, foundSmtpUser := emailerConfig.GetString("user")
 	smtpPass, foundSmtpPass := emailerConfig.GetString("pass")
+	smtpFrom, foundFrom := emailerConfig.GetString("from")
 
-	if !foundSmtpHost || !foundSmtpPort || !foundSmtpUser || !foundSmtpPass {
-		return fmt.Errorf("missing email configuration")
+	var missingFields []string
+	if !foundSmtpHost {
+		missingFields = append(missingFields, "host")
+	}
+	if !foundSmtpPort {
+		missingFields = append(missingFields, "port")
+	}
+	if !foundSmtpUser {
+		missingFields = append(missingFields, "user")
+	}
+	if !foundSmtpPass {
+		missingFields = append(missingFields, "pass")
+	}
+	if !foundFrom {
+		missingFields = append(missingFields, "from")
+	}
+	if len(missingFields) > 0 {
+		return fmt.Errorf("missing email configuration field(s): %v", missingFields)
 	}
 
 	tlsSkipVerify, foundTlsSkipVerify := emailerConfig.GetBool("tls_skip_verify")
 
-	if !foundTlsSkipVerify {
-		tlsSkipVerify = false
+	d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
+
+	if foundTlsSkipVerify {
+		d.TLSConfig = &tls.Config{
+			ServerName:         smtpHost,
+			InsecureSkipVerify: tlsSkipVerify,
+		}
 	}
 
-	d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
-	d.TLSConfig = &tls.Config{InsecureSkipVerify: tlsSkipVerify}
-
 	p.mailer = d
+	p.defaultFromAddress = smtpFrom
 
 	// Send emails using d.
 	// TODO: Implement Email initialization logic
@@ -54,7 +75,7 @@ func (p *emailProvider) Initialize(provider models.Provider) error {
 
 type EmailNotificationRequest struct {
 	From    string
-	To      string
+	To      []string
 	Subject string
 	Body    EmailNotificationBody
 	Headers map[string][]string
@@ -73,7 +94,7 @@ func (p *emailProvider) SendNotification(
 	emailRequest := &EmailNotificationRequest{}
 	common.ConvertMapToInterface(notification, emailRequest)
 
-	m := &gomail.Message{}
+	m := gomail.NewMessage()
 
 	if len(emailRequest.Body.Text) > 0 {
 		m.SetBody("text/plain", emailRequest.Body.Text, gomail.SetPartEncoding(gomail.Unencoded))
@@ -90,8 +111,18 @@ func (p *emailProvider) SendNotification(
 		m.SetHeader("Subject", emailRequest.Subject)
 	}
 
-	m.SetAddressHeader("From", emailRequest.From, "")
-	m.SetAddressHeader("To", emailRequest.To, "")
+	// From field is required
+	if len(emailRequest.From) > 0 {
+		m.SetAddressHeader("From", emailRequest.From, "")
+	} else {
+		m.SetAddressHeader("From", p.defaultFromAddress, "")
+	}
+
+	// Set multiple recipients
+	if len(emailRequest.To) == 0 {
+		return fmt.Errorf("at least one recipient is required")
+	}
+	m.SetHeader("To", emailRequest.To...)
 
 	err := p.mailer.DialAndSend(m)
 

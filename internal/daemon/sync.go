@@ -15,7 +15,7 @@ import (
 //	@Tags			sync
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	map[string]interface{}	"Sync status"
+//	@Success		200	{object}	map[string]any	"Sync status"
 //	@Router			/sync [get]
 //	@Security		BearerAuth
 func (s *Server) getSync(c *gin.Context) {

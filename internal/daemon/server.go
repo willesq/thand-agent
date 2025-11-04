@@ -501,7 +501,7 @@ func (s *Server) healthHandler(c *gin.Context) {
 //	@Tags			health
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	map[string]interface{}	"Ready status"
+//	@Success		200	{object}	map[string]any	"Ready status"
 //	@Router			/ready [get]
 func (s *Server) readyHandler(c *gin.Context) {
 	response := gin.H{

@@ -1,0 +1,56 @@
+<div style="margin-bottom: 1.5rem;">
+    {{if .Message}}
+    <p style="background-color: #dcfce7; padding: 1rem; border-radius: 0.375rem; border-left: 4px solid #22c55e;">
+        <strong>{{.Message}}</strong>
+    </p>
+    {{else}}
+    <p style="background-color: #dcfce7; padding: 1rem; border-radius: 0.375rem; border-left: 4px solid #22c55e;">
+        <strong>Good news! Your access request has been approved.</strong>
+    </p>
+    {{end}}
+</div>
+
+{{if .Role}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Granted Access</h3>
+    <p><strong>Role:</strong> {{.Role.Name}}</p>
+    {{if .Role.Description}}
+    <p><strong>Description:</strong> {{.Role.Description}}</p>
+    {{end}}
+</div>
+{{end}}
+
+{{if or .Providers .Duration}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Access Details</h3>
+    {{if .Providers}}
+    <p><strong>Providers:</strong> {{.Providers}}</p>
+    {{end}}
+    {{if .Duration}}
+    <p><strong>Duration:</strong> {{.Duration}}</p>
+    {{end}}
+</div>
+{{end}}
+
+{{if .Permissions}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Permissions</h3>
+    <ul style="list-style: none; padding: 0; margin: 0;">
+    {{range .Permissions}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">✓ {{.}}</li>
+    {{end}}
+    </ul>
+</div>
+{{end}}
+
+{{if .ProviderButtons}}
+<div style="margin: 2rem 0; text-align: center;">
+    {{range .ProviderButtons}}
+        <a href="{{.URL}}" style="display: inline-block; padding: 12px 32px; margin: 8px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 1rem;">Access {{.Name}}</a>
+    {{end}}
+</div>
+{{end}}
+
+<div style="margin-top: 1.5rem;">
+    <p style="font-style: italic; color: #64748b;">Your access is now active. Please use it responsibly.</p>
+</div>

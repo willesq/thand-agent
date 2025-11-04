@@ -24,7 +24,7 @@ roles:
         - oidc:user
         - oidc:eng
       users:
-        - hugh@thand.io
+        - user@example.com
     providers:  # Only allow these providers for role elevation
       - aws-prod
       - aws-dev

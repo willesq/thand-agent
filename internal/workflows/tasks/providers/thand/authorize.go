@@ -20,11 +20,16 @@ import (
 const ThandAuthorizeTask = "authorize"
 
 type ThandAuthorizeCallTask struct {
-	Revocation string `json:"revocation"` // This is the state to request the revocation
+	Revocation string                        `json:"revocation"` // This is the state to request the revocation
+	Notifier   thandFunction.NotifierRequest `json:"notifier"`   // Notifier configuration for sending approval notifications
 }
 
 func (t *ThandAuthorizeCallTask) HasRevocation() bool {
 	return len(t.Revocation) > 0
+}
+
+func (t *ThandAuthorizeCallTask) HasNotifier() bool {
+	return t.Notifier.IsValid()
 }
 
 func (t *thandTask) executeAuthorizeTask(
@@ -62,25 +67,27 @@ func (t *thandTask) buildBasicModelOutput(elevateRequest *models.ElevateRequestI
 
 // authResult holds the result of an authorization operation
 type authResult struct {
-	Identity string
-	Output   any
-	Error    error
+	Identity     string
+	AuthRequest  *models.AuthorizeRoleRequest
+	AuthResponse *models.AuthorizeRoleResponse
+	Error        error
 }
 
 // authTask represents an authorization task with all necessary context
 type authTask struct {
 	ProviderName string
 	Identity     string
-	AuthReq      models.AuthorizeRoleRequest
+	AuthRequest  models.AuthorizeRoleRequest
 	ThandAuthReq thandFunction.ThandAuthorizeRequest
 }
 
 // temporalAuthResult represents the result of an authorization operation for temporal communication
 type temporalAuthResult struct {
-	Index    int
-	Identity string
-	Output   any
-	Err      error
+	Index        int
+	Identity     string
+	AuthRequest  *models.AuthorizeRoleRequest
+	AuthResponse *models.AuthorizeRoleResponse
+	Err          error
 }
 
 // executeAuthorization performs the main authorization workflow
@@ -90,6 +97,15 @@ func (t *thandTask) executeAuthorization(
 	call *taskModel.ThandTask,
 	elevateRequest *models.ElevateRequestInternal,
 ) (any, error) {
+
+	// Send notification to the requester if notifier is configured
+	var authorizeCallTask ThandAuthorizeCallTask
+	err := common.ConvertInterfaceToInterface(call.With, &authorizeCallTask)
+
+	if err != nil {
+		logrus.WithError(err).Error("Failed to convert call.With to authorizeCallTask")
+		return nil, err
+	}
 
 	duration, err := elevateRequest.AsDuration()
 
@@ -151,7 +167,7 @@ func (t *thandTask) executeAuthorization(
 			authTasks = append(authTasks, authTask{
 				ProviderName: providerName,
 				Identity:     identity,
-				AuthReq:      authReq,
+				AuthRequest:  authReq,
 				ThandAuthReq: thandAuthReq,
 			})
 
@@ -180,7 +196,8 @@ func (t *thandTask) executeAuthorization(
 	}
 
 	// Process results
-	authorizations := make(map[string]any)
+	requests := make(map[string]*models.AuthorizeRoleRequest)
+	authorizations := make(map[string]*models.AuthorizeRoleResponse)
 	hasErrors := false
 
 	if len(authResults) == 0 {
@@ -193,7 +210,11 @@ func (t *thandTask) executeAuthorization(
 			hasErrors = true
 			continue
 		}
-		authorizations[result.Identity] = result.Output
+		authorizations[result.Identity] = result.AuthResponse
+	}
+
+	for _, req := range authTasks {
+		requests[req.Identity] = &req.AuthRequest
 	}
 
 	if hasErrors && len(authorizations) == 0 {
@@ -201,13 +222,37 @@ func (t *thandTask) executeAuthorization(
 	}
 
 	// Schedule revocation if revocation state provided
-	if err := t.scheduleRevocation(workflowTask, "", revocationDate); err != nil {
+	if err := t.scheduleRevocation(workflowTask, authorizeCallTask.Revocation, revocationDate); err != nil {
 		logrus.WithError(err).Error("Failed to schedule revocation")
 		return nil, fmt.Errorf("failed to schedule revocation: %w", err)
 	}
 
 	workflowTask.SetContextKeyValue(models.VarsContextApproved, true)
 	workflowTask.SetContextKeyValue("authorizations", authorizations)
+
+	if authorizeCallTask.HasNotifier() {
+		logrus.Info("Sending authorization notification")
+
+		authorizeNotifier := NewAuthorizerNotifier(
+			t.config,
+			workflowTask,
+			elevateRequest,
+			&authorizeCallTask.Notifier,
+			requests,
+			authorizations,
+		)
+
+		_, err := t.executeNotify(
+			workflowTask,
+			fmt.Sprintf("%s.notify", taskName),
+			authorizeNotifier,
+		)
+
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to send authorization notification, continuing anyway")
+			// Don't fail the authorization if notification fails
+		}
+	}
 
 	return modelOutput, nil
 }
@@ -239,7 +284,7 @@ func (t *thandTask) executeTemporalParallel(
 		authTask := task
 
 		workflow.Go(temporalContext, func(ctx workflow.Context) {
-			var authOut any
+			var authOut models.AuthorizeRoleResponse
 			err := workflow.ExecuteActivity(
 				aoctx,
 				thandFunction.ThandAuthorizeFunction,
@@ -254,10 +299,11 @@ func (t *thandTask) executeTemporalParallel(
 
 			// Send result through channel
 			resultCh.Send(ctx, temporalAuthResult{
-				Index:    taskIndex,
-				Identity: authTask.Identity,
-				Output:   authOut,
-				Err:      err,
+				Index:        taskIndex,
+				Identity:     authTask.Identity,
+				AuthRequest:  &authTask.AuthRequest,
+				AuthResponse: &authOut,
+				Err:          err,
 			})
 		})
 	}
@@ -267,9 +313,10 @@ func (t *thandTask) executeTemporalParallel(
 		var result temporalAuthResult
 		resultCh.Receive(temporalContext, &result)
 		results[result.Index] = authResult{
-			Identity: result.Identity,
-			Output:   result.Output,
-			Error:    result.Err,
+			Identity:     result.Identity,
+			AuthRequest:  result.AuthRequest,
+			AuthResponse: result.AuthResponse,
+			Error:        result.Err,
 		}
 	}
 
@@ -293,21 +340,23 @@ func (t *thandTask) executeGoParallel(
 			providerCall, err := t.config.GetProviderByName(authTask.ProviderName)
 			if err != nil {
 				results[index] = authResult{
-					Identity: authTask.Identity,
-					Output:   nil,
-					Error:    fmt.Errorf("failed to get provider: %w", err),
+					Identity:     authTask.Identity,
+					AuthRequest:  &authTask.AuthRequest,
+					AuthResponse: nil,
+					Error:        fmt.Errorf("failed to get provider: %w", err),
 				}
 				return
 			}
 
 			authOut, err := providerCall.GetClient().AuthorizeRole(
-				workflowTask.GetContext(), &authTask.AuthReq,
+				workflowTask.GetContext(), &authTask.AuthRequest,
 			)
 
 			results[index] = authResult{
-				Identity: authTask.Identity,
-				Output:   authOut,
-				Error:    err,
+				Identity:     authTask.Identity,
+				AuthRequest:  &authTask.AuthRequest,
+				AuthResponse: authOut,
+				Error:        err,
 			}
 		}(i, task)
 	}

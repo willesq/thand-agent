@@ -59,9 +59,20 @@ func (t *thandTask) executeApprovalsTask(
 
 		call.With = newConfig
 
+		// Set the context for the notification
+		approvalNotifier := NewApprovalsNotifier(
+			t.config,
+			workflowTask,
+			elevationRequest,
+			&notifyReq,
+		)
+
 		// First lets notify the approvers
-		_, err := t.executeNotifyTask(
-			workflowTask, fmt.Sprintf("%s.notify", taskName), call)
+		_, err := t.executeNotify(
+			workflowTask,
+			fmt.Sprintf("%s.notify", taskName),
+			approvalNotifier,
+		)
 
 		if err != nil {
 
@@ -244,35 +255,31 @@ func (t *thandTask) evaluateApprovalSwitch(
 		},
 		fmt.Sprintf("%s.switch", taskName),
 		&model.SwitchTask{
-			Switch: []model.SwitchItem{
-				{
-					"case1": model.SwitchCase{
-						When: &model.RuntimeExpression{
-							Value: "any($context.approvals | to_entries[]; .value.approved == false)",
-						},
-						Then: &model.FlowDirective{
-							Value: deniedState, // go to denied state
-						},
+			Switch: []model.SwitchItem{{
+				"case1": model.SwitchCase{
+					When: &model.RuntimeExpression{
+						Value: "any($context.approvals | to_entries[]; .value.approved == false)",
+					},
+					Then: &model.FlowDirective{
+						Value: deniedState, // go to denied state
 					},
 				},
-				{
-					"case2": model.SwitchCase{
-						When: &model.RuntimeExpression{
-							Value: fmt.Sprintf("[$context.approvals | to_entries[] | select(.value.approved == true)] | length >= %d", requiredApprovals),
-						},
-						Then: &model.FlowDirective{
-							Value: approvedState, // proceed to the next state
-						},
+			}, {
+				"case2": model.SwitchCase{
+					When: &model.RuntimeExpression{
+						Value: fmt.Sprintf("[$context.approvals | to_entries[] | select(.value.approved == true)] | length >= %d", requiredApprovals),
+					},
+					Then: &model.FlowDirective{
+						Value: approvedState, // proceed to the next state
 					},
 				},
-				{
-					"default": model.SwitchCase{
-						// No When condition = default case (return to await more approvals)
-						Then: &model.FlowDirective{
-							Value: taskName, // loop back to await more approvals
-						},
+			}, {
+				"default": model.SwitchCase{
+					// No When condition = default case (return to await more approvals)
+					Then: &model.FlowDirective{
+						Value: taskName, // loop back to await more approvals
 					},
 				},
-			},
+			}},
 		})
 }

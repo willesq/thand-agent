@@ -31,8 +31,8 @@ import (
 //	@Param			duration	query		string	false	"Duration of elevation"
 //	@Param			workflow	query		string	false	"Workflow name"
 //	@Param			identities	query		string	false	"Identity filter"
-//	@Success		200			{object}	map[string]interface{}	"Elevation request submitted"
-//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Success		200			{object}	map[string]any	"Elevation request submitted"
+//	@Failure		400			{object}	map[string]any	"Bad request"
 //	@Router			/elevate [get]
 func (s *Server) getElevate(c *gin.Context) {
 	var request models.ElevateStaticRequest
@@ -78,8 +78,8 @@ func (s *Server) getElevate(c *gin.Context) {
 //	@Accept			json,x-www-form-urlencoded,multipart/form-data
 //	@Produce		json
 //	@Param			request	body		models.ElevateRequest	true	"Elevation request"
-//	@Success		200		{object}	map[string]interface{}	"Elevation request submitted"
-//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Success		200		{object}	map[string]any	"Elevation request submitted"
+//	@Failure		400		{object}	map[string]any	"Bad request"
 //	@Router			/elevate [post]
 func (s *Server) postElevate(c *gin.Context) {
 	// Check content type to determine how to bind the request
@@ -255,7 +255,7 @@ func (s *Server) elevate(c *gin.Context, request models.ElevateRequest) {
 //	@Produce		json
 //	@Param			state	query		string					true	"Workflow state token"
 //	@Success		307		"Redirect to next workflow step"
-//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Failure		400		{object}	map[string]any	"Bad request"
 //	@Router			/elevate/resume [get]
 func (s *Server) getElevateResume(c *gin.Context) {
 	// This service is stateless so we need to resume the workflow
@@ -287,9 +287,9 @@ func (s *Server) getElevateResume(c *gin.Context) {
 //	@Tags			elevate
 //	@Accept			json
 //	@Produce		json
-//	@Param			request	body		map[string]interface{}	true	"Resume request data"
+//	@Param			request	body		map[string]any	true	"Resume request data"
 //	@Success		307		"Redirect to next workflow step"
-//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Failure		400		{object}	map[string]any	"Bad request"
 //	@Router			/elevate/resume [post]
 func (s *Server) postElevateResume(c *gin.Context) {
 
@@ -530,8 +530,8 @@ func (s *Server) resumeWorkflow(c *gin.Context, workflow *models.WorkflowTask) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			reason	query		string					true	"Natural language reason for elevation"
-//	@Success		200		{object}	map[string]interface{}	"LLM response with suggested role"
-//	@Failure		400		{object}	map[string]interface{}	"Bad request"
+//	@Success		200		{object}	map[string]any	"LLM response with suggested role"
+//	@Failure		400		{object}	map[string]any	"Bad request"
 //	@Router			/elevate/llm [get]
 func (s *Server) getElevateLLM(c *gin.Context) {
 
@@ -558,8 +558,8 @@ func (s *Server) getElevateLLM(c *gin.Context) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			request	body		models.ElevateLLMRequest	true	"LLM elevation request"
-//	@Success		200		{object}	map[string]interface{}		"LLM response with suggested role"
-//	@Failure		400		{object}	map[string]interface{}		"Bad request"
+//	@Success		200		{object}	map[string]any		"LLM response with suggested role"
+//	@Failure		400		{object}	map[string]any		"Bad request"
 //	@Router			/elevate/llm [post]
 func (s *Server) postElevateLLM(c *gin.Context) {
 

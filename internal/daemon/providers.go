@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -20,8 +21,8 @@ import (
 //	@Param			provider	path		string								true	"Provider name"
 //	@Param			q			query		string								false	"Filter query"
 //	@Success		200			{object}	models.ProviderRolesResponse		"Provider roles"
-//	@Failure		404			{object}	map[string]interface{}				"Provider not found"
-//	@Failure		500			{object}	map[string]interface{}				"Internal server error"
+//	@Failure		404			{object}	map[string]any				"Provider not found"
+//	@Failure		500			{object}	map[string]any				"Internal server error"
 //	@Router			/provider/{provider}/roles [get]
 //	@Security		BearerAuth
 func (s *Server) getProviderRoles(c *gin.Context) {
@@ -63,7 +64,7 @@ func (s *Server) getProviderRoles(c *gin.Context) {
 //	@Produce		json
 //	@Param			provider	path		string					true	"Provider name"
 //	@Success		200			{object}	models.ProviderResponse	"Provider details"
-//	@Failure		404			{object}	map[string]interface{}	"Provider not found"
+//	@Failure		404			{object}	map[string]any	"Provider not found"
 //	@Router			/provider/{provider} [get]
 //	@Security		BearerAuth
 func (s *Server) getProviderByName(c *gin.Context) {
@@ -94,8 +95,8 @@ func (s *Server) getProviderByName(c *gin.Context) {
 //	@Param			provider	path		string									true	"Provider name"
 //	@Param			q			query		string									false	"Filter query"
 //	@Success		200			{object}	models.ProviderPermissionsResponse		"Provider permissions"
-//	@Failure		404			{object}	map[string]interface{}					"Provider not found"
-//	@Failure		500			{object}	map[string]interface{}					"Internal server error"
+//	@Failure		404			{object}	map[string]any					"Provider not found"
+//	@Failure		500			{object}	map[string]any					"Internal server error"
 //	@Router			/provider/{provider}/permissions [get]
 //	@Security		BearerAuth
 func (s *Server) getProviderPermissions(c *gin.Context) {
@@ -182,7 +183,7 @@ func (s *Server) getProvidersAsProviderResponse(
 //	@Produce		json
 //	@Param			capability	query		string						false	"Comma-separated list of capabilities to filter by"
 //	@Success		200			{object}	models.ProvidersResponse	"List of providers"
-//	@Failure		401			{object}	map[string]interface{}		"Unauthorized"
+//	@Failure		401			{object}	map[string]any		"Unauthorized"
 //	@Router			/providers [get]
 //	@Security		BearerAuth
 func (s *Server) getProviders(c *gin.Context) {
@@ -246,10 +247,10 @@ func (s *Server) getProviders(c *gin.Context) {
 //	@Produce		json
 //	@Param			provider	path		string						true	"Provider name"
 //	@Param			user		body		models.AuthorizeUser		true	"Authorization request"
-//	@Success		200			{object}	map[string]interface{}		"Authorization response"
-//	@Failure		400			{object}	map[string]interface{}		"Bad request"
-//	@Failure		404			{object}	map[string]interface{}		"Provider not found"
-//	@Failure		500			{object}	map[string]interface{}		"Internal server error"
+//	@Success		200			{object}	map[string]any		"Authorization response"
+//	@Failure		400			{object}	map[string]any		"Bad request"
+//	@Failure		404			{object}	map[string]any		"Provider not found"
+//	@Failure		500			{object}	map[string]any		"Internal server error"
 //	@Router			/provider/{provider}/authorizeSession [post]
 //	@Security		BearerAuth
 func (s *Server) postProviderAuthorizeSession(c *gin.Context) {
@@ -261,28 +262,36 @@ func (s *Server) postProviderAuthorizeSession(c *gin.Context) {
 		return
 	}
 
-	// Call provider to authorize session
-	providerName := c.Param("provider")
-	provider, foundProvider := s.Config.Providers.Definitions[providerName]
+	provider, err := s.getProvider(c, c.Param("provider"))
 
-	if !foundProvider {
-		s.getErrorPage(c, http.StatusNotFound, "Provider not found")
-		return
-	}
-
-	if provider.GetClient() == nil {
-		s.getErrorPage(c, http.StatusNotFound, "Provider has no client defined")
+	if err != nil {
+		s.getErrorPage(c, http.StatusNotFound, "Provider not found", err)
 		return
 	}
 
 	authResponse, err := provider.GetClient().AuthorizeSession(context.Background(), &user)
 
 	if err != nil {
-		s.getErrorPage(c, http.StatusInternalServerError, "Failed to authorize session")
+		s.getErrorPage(c, http.StatusInternalServerError, "Failed to authorize session", err)
 		return
 	}
 
 	c.JSON(http.StatusOK, authResponse)
+}
+
+func (s *Server) getProvider(c *gin.Context, providerName string) (*models.Provider, error) {
+
+	provider, err := s.Config.GetProviderByName(providerName)
+
+	if err != nil {
+		return nil, fmt.Errorf("provider '%s' not found", providerName)
+	}
+
+	if provider.GetClient() == nil {
+		return nil, fmt.Errorf("Provider has no client defined")
+	}
+
+	return provider, nil
 }
 
 func (s *Server) getProvidersPage(c *gin.Context) {

@@ -200,7 +200,7 @@ func TestAWSProviderFunctional(t *testing.T) {
 		err = providerImpl.Initialize(*providerConfig)
 		require.NoError(t, err, "Failed to initialize AWS provider")
 
-		// Get IAM client from the provider using interface{} and reflection
+		// Get IAM client from the provider using any and reflection
 		// Since awsProvider is not exported, we need to use reflection or add a method to the interface
 		type IAMClientProvider interface {
 			GetIamClient() *iam.Client

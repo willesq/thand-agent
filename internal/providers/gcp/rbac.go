@@ -84,6 +84,16 @@ func (p *gcpProvider) RevokeRole(
 	return nil, nil
 }
 
+func (p *gcpProvider) GetAuthorizedAccessUrl(
+	ctx context.Context,
+	req *models.AuthorizeRoleRequest,
+	resp *models.AuthorizeRoleResponse,
+) string {
+
+	return p.GetConfig().GetStringWithDefault(
+		"sso_start_url", "https://console.cloud.google.com/")
+}
+
 // createRole creates a custom role.
 func (p *gcpProvider) createRole(projectID, name, title, description, stage string, permissions []string) (*iam.Role, error) {
 

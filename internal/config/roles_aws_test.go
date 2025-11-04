@@ -447,7 +447,7 @@ func TestAWSRoleScenarios(t *testing.T) {
 						"oidc:eng",
 					},
 					Users: []string{
-						"hugh@thand.io",
+						"admin@example.com",
 					},
 				},
 				Providers: []string{

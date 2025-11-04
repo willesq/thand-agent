@@ -24,9 +24,9 @@ import (
 //	@Param			provider	path	string	true	"Provider name"
 //	@Param			callback	query	string	false	"Callback URL"
 //	@Success		307			"Redirect to provider authentication"
-//	@Failure		400			{object}	map[string]interface{}	"Bad request"
-//	@Failure		404			{object}	map[string]interface{}	"Provider not found"
-//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Failure		400			{object}	map[string]any	"Bad request"
+//	@Failure		404			{object}	map[string]any	"Provider not found"
+//	@Failure		500			{object}	map[string]any	"Internal server error"
 //	@Router			/auth/request/{provider} [get]
 func (s *Server) getAuthRequest(c *gin.Context) {
 	provider := c.Param("provider")
@@ -93,7 +93,7 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 //	@Param			state		query	string	true	"OAuth state"
 //	@Param			code		query	string	true	"OAuth code"
 //	@Success		200			"Authentication successful"
-//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Failure		400			{object}	map[string]any	"Bad request"
 //	@Router			/auth/callback/{provider} [get]
 func (s *Server) getAuthCallback(c *gin.Context) {
 
@@ -151,7 +151,7 @@ type AuthPageData struct {
 //	@Param			callback	query	string	false	"Callback URL"
 //	@Param			provider	query	string	false	"Provider name for direct authentication"
 //	@Success		200			"Authentication page"
-//	@Failure		400			{object}	map[string]interface{}	"Bad request"
+//	@Failure		400			{object}	map[string]any	"Bad request"
 //	@Router			/auth [get]
 func (s *Server) getAuthPage(c *gin.Context) {
 
@@ -274,9 +274,9 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 //	@Accept			json
 //	@Produce		json
 //	@Param			provider	path	string	false	"Provider name"
-//	@Success		200			{object}	map[string]interface{}	"Logged out successfully"
+//	@Success		200			{object}	map[string]any	"Logged out successfully"
 //	@Success		307			"Redirect to home page"
-//	@Failure		500			{object}	map[string]interface{}	"Internal server error"
+//	@Failure		500			{object}	map[string]any	"Internal server error"
 //	@Router			/auth/logout [get]
 //	@Router			/auth/logout/{provider} [get]
 func (s *Server) getLogoutPage(c *gin.Context) {
