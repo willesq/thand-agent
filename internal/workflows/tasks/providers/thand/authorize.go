@@ -301,6 +301,7 @@ func (t *thandTask) executeTemporalParallel(
 			resultCh.Send(ctx, temporalAuthResult{
 				Index:        taskIndex,
 				Identity:     authTask.Identity,
+				AuthRequest:  &authTask.AuthRequest,
 				AuthResponse: &authOut,
 				Err:          err,
 			})
