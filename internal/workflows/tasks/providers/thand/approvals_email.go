@@ -11,6 +11,7 @@ import (
 func (a *approvalsNotifier) createApprovalEmailBody() (string, string) {
 	elevationReq := a.elevationReq
 	notifyReq := a.req
+	workflowTask := a.workflowTask
 
 	// Build plain text version
 	var plainText strings.Builder
@@ -74,6 +75,66 @@ func (a *approvalsNotifier) createApprovalEmailBody() (string, string) {
 			"Name":        elevationReq.Role.Name,
 			"Description": elevationReq.Role.Description,
 		}
+	}
+
+	// Add approval action section with approval tracking logic
+	if notifyReq.Approvals > 0 {
+		// Get current approvals from workflow context
+		workflowContext := workflowTask.GetContextAsMap()
+		approvals, ok := workflowContext["approvals"].([]any)
+		if !ok {
+			approvals = []any{}
+		}
+
+		// Count existing approved approvals
+		approvedCount := 0
+		for _, approval := range approvals {
+			if approvalMap, ok := approval.(map[string]any); ok {
+				if approved, exists := approvalMap["approved"]; exists {
+					if approvedBool, ok := approved.(bool); ok && approvedBool {
+						approvedCount++
+					}
+				}
+			}
+		}
+
+		remainingApprovals := notifyReq.Approvals - approvedCount
+
+		// Create dynamic message based on approval requirements
+		var actionMessage string
+		if notifyReq.Approvals == 1 {
+			actionMessage = "Action Required:\nOne approval is required. Please review the request and choose an action."
+		} else if remainingApprovals <= 0 {
+			actionMessage = "Action Required:\nSufficient approvals have been received. Please review the request and choose an action."
+		} else if remainingApprovals == 1 {
+			actionMessage = fmt.Sprintf("Action Required:\n%d more approval is needed (%d of %d received). Please review the request and choose an action.", remainingApprovals, approvedCount, notifyReq.Approvals)
+		} else {
+			actionMessage = fmt.Sprintf("Action Required:\n%d more approvals are needed (%d of %d received). Please review the request and choose an action.", remainingApprovals, approvedCount, notifyReq.Approvals)
+		}
+
+		plainText.WriteString(fmt.Sprintf("\n%s\n", actionMessage))
+
+		// Add action buttons with URLs
+		if remainingApprovals > 0 {
+			approveURL := a.createCallbackUrl(workflowTask, notifyReq, true)
+			denyURL := a.createCallbackUrl(workflowTask, notifyReq, false)
+
+			plainText.WriteString(fmt.Sprintf("\nApprove: %s\n", approveURL))
+			plainText.WriteString(fmt.Sprintf("Deny: %s\n", denyURL))
+
+			// Add URLs to template data
+			data["ActionMessage"] = actionMessage
+			data["ApproveURL"] = approveURL
+			data["DenyURL"] = denyURL
+			data["ShowActions"] = true
+		} else {
+			data["ActionMessage"] = actionMessage
+			data["ShowActions"] = false
+		}
+	} else {
+		plainText.WriteString("\nNo action is required. This is a notification only.\n")
+		data["ActionMessage"] = "No action is required. This is a notification only."
+		data["ShowActions"] = false
 	}
 
 	// Render HTML email using template

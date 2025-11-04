@@ -1,0 +1,14 @@
+version: "1.0"
+providers:
+
+  email-prod:
+    name: AWS SES Production
+    description: Production Email environment
+    provider: email
+    enabled: true
+    config:
+      host: email-smtp.eu-central-1.amazonaws.com
+      port: 587
+      user: prod_smtp_user
+      pass: prod_smtp_password
+      from: noreply@example.com

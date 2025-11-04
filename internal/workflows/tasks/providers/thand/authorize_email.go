@@ -1,6 +1,7 @@
 package thand
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -55,14 +56,8 @@ func (a *authorizerNotifier) createAuthorizeEmailBody() (string, string) {
 		}
 	}
 
-	// Add provider access button info if we have a single provider
-	if len(elevationReq.Providers) == 1 {
-		providerName := elevationReq.Providers[0]
-		data["ProviderName"] = providerName
-		// You can customize URL generation based on your provider setup
-		// For now, using a placeholder pattern
-		data["ProviderURL"] = fmt.Sprintf("/provider/%s", providerName)
-	}
+	// Add provider access buttons
+	a.addProviderAccessButtons(context.Background(), data)
 
 	// Render HTML email using template
 	html, err := RenderEmailWithTemplate("Access Request Approved", GetAuthorizeContentTemplate(), data)
@@ -72,4 +67,69 @@ func (a *authorizerNotifier) createAuthorizeEmailBody() (string, string) {
 	}
 
 	return plainText.String(), html
+}
+
+// addProviderAccessButtons adds provider access button data to the template
+func (a *authorizerNotifier) addProviderAccessButtons(ctx context.Context, data map[string]any) {
+	elevationReq := a.elevationReq
+
+	if len(elevationReq.Providers) == 0 || len(a.authRequests) == 0 || len(a.authResponses) == 0 {
+		return
+	}
+
+	identities := a.req.To
+
+	if len(identities) == 0 {
+		logrus.Error("No identity found for access URL generation")
+		return
+	}
+
+	type ProviderButton struct {
+		Name string
+		URL  string
+	}
+
+	var providerButtons []ProviderButton
+
+	for _, providerName := range elevationReq.Providers {
+		// Get provider configuration
+		provider, err := a.config.GetProviderByName(providerName)
+
+		if err != nil {
+			logrus.Errorf("Failed to get provider '%s' for access URL: %v", providerName, err)
+			continue
+		}
+
+		providerClient := provider.GetClient()
+
+		if providerClient == nil {
+			logrus.Errorf("Provider '%s' has no client defined for access URL", providerName)
+			continue
+		}
+
+		for _, identity := range identities {
+			authRequest, foundReq := a.authRequests[identity]
+			authResponse, foundAuth := a.authResponses[identity]
+
+			if !foundAuth || !foundReq {
+				logrus.Errorf("No authorization found for identity '%s' and provider '%s'", identity, providerName)
+				continue
+			}
+
+			accessURL := providerClient.GetAuthorizedAccessUrl(
+				ctx,
+				authRequest,
+				authResponse,
+			)
+
+			providerButtons = append(providerButtons, ProviderButton{
+				Name: providerName,
+				URL:  accessURL,
+			})
+		}
+	}
+
+	if len(providerButtons) > 0 {
+		data["ProviderButtons"] = providerButtons
+	}
 }

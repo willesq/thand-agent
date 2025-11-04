@@ -12,7 +12,7 @@
 
 {{if .User}}
 <div style="margin-bottom: 1.5rem;">
-    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Requested By</h3>
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Requestor</h3>
     <p>{{.User.Name}}{{if .User.Email}} ({{.User.Email}}){{end}}</p>
 </div>
 {{end}}
@@ -50,5 +50,20 @@
         <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">• {{.}}</li>
     {{end}}
     </ul>
+</div>
+{{end}}
+
+{{if .ActionMessage}}
+<div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid #e2e8f0;">
+    <div style="background-color: #fef3c7; padding: 1rem; border-radius: 0.375rem; border-left: 4px solid #f59e0b; margin-bottom: 1.5rem;">
+        <p style="margin: 0; white-space: pre-line;"><strong>{{.ActionMessage}}</strong></p>
+    </div>
+    
+    {{if .ShowActions}}
+    <div style="text-align: center; margin-top: 1.5rem;">
+        <a href="{{.ApproveURL}}" style="display: inline-block; padding: 12px 32px; margin: 0 8px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 1rem;">Approve</a>
+        <a href="{{.DenyURL}}" style="display: inline-block; padding: 12px 32px; margin: 0 8px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 1rem;">Deny</a>
+    </div>
+    {{end}}
 </div>
 {{end}}

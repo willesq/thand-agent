@@ -146,6 +146,12 @@ func (pc *BasicConfig) GetInt(key string) (int, bool) {
 	if value, ok := (*pc)[key]; ok {
 		if intValue, ok := value.(int); ok {
 			return intValue, true
+		} else if floatValue, ok := value.(float64); ok {
+			return int(floatValue), true
+		} else if stringValue, ok := value.(string); ok {
+			if intValue, err := strconv.Atoi(stringValue); err == nil {
+				return intValue, true
+			}
 		}
 	}
 	return 0, false

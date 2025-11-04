@@ -5,7 +5,7 @@
     </p>
     {{else}}
     <p style="background-color: #dcfce7; padding: 1rem; border-radius: 0.375rem; border-left: 4px solid #22c55e;">
-        <strong>✅ Good news! Your access request has been approved.</strong>
+        <strong>Good news! Your access request has been approved.</strong>
     </p>
     {{end}}
 </div>
@@ -43,9 +43,11 @@
 </div>
 {{end}}
 
-{{if .ProviderURL}}
+{{if .ProviderButtons}}
 <div style="margin: 2rem 0; text-align: center;">
-    <a href="{{.ProviderURL}}" style="display: inline-block; padding: 0.75rem 1.5rem; background-color: #22c55e; color: white; text-decoration: none; border-radius: 0.375rem; font-weight: 500;">Access {{.ProviderName}}</a>
+    {{range .ProviderButtons}}
+        <a href="{{.URL}}" style="display: inline-block; padding: 12px 32px; margin: 8px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 1rem;">Access {{.Name}}</a>
+    {{end}}
 </div>
 {{end}}
 

@@ -16,7 +16,8 @@ import (
 // emailProvider implements the ProviderImpl interface for Email
 type emailProvider struct {
 	*models.BaseProvider
-	mailer *gomail.Dialer
+	mailer             *gomail.Dialer
+	defaultFromAddress string
 }
 
 func (p *emailProvider) Initialize(provider models.Provider) error {
@@ -31,21 +32,25 @@ func (p *emailProvider) Initialize(provider models.Provider) error {
 	smtpPort, foundSmtpPort := emailerConfig.GetInt("port")
 	smtpUser, foundSmtpUser := emailerConfig.GetString("user")
 	smtpPass, foundSmtpPass := emailerConfig.GetString("pass")
+	smtpFrom, foundFrom := emailerConfig.GetString("from")
 
-	if !foundSmtpHost || !foundSmtpPort || !foundSmtpUser || !foundSmtpPass {
+	if !foundSmtpHost || !foundSmtpPort || !foundSmtpUser || !foundSmtpPass || !foundFrom {
 		return fmt.Errorf("missing email configuration")
 	}
 
 	tlsSkipVerify, foundTlsSkipVerify := emailerConfig.GetBool("tls_skip_verify")
 
-	if !foundTlsSkipVerify {
-		tlsSkipVerify = false
+	d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
+
+	if foundTlsSkipVerify {
+		d.TLSConfig = &tls.Config{
+			ServerName:         smtpHost,
+			InsecureSkipVerify: tlsSkipVerify,
+		}
 	}
 
-	d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
-	d.TLSConfig = &tls.Config{InsecureSkipVerify: tlsSkipVerify}
-
 	p.mailer = d
+	p.defaultFromAddress = smtpFrom
 
 	// Send emails using d.
 	// TODO: Implement Email initialization logic
@@ -73,7 +78,7 @@ func (p *emailProvider) SendNotification(
 	emailRequest := &EmailNotificationRequest{}
 	common.ConvertMapToInterface(notification, emailRequest)
 
-	m := &gomail.Message{}
+	m := gomail.NewMessage()
 
 	if len(emailRequest.Body.Text) > 0 {
 		m.SetBody("text/plain", emailRequest.Body.Text, gomail.SetPartEncoding(gomail.Unencoded))
@@ -91,10 +96,11 @@ func (p *emailProvider) SendNotification(
 	}
 
 	// From field is required
-	if len(emailRequest.From) == 0 {
-		return fmt.Errorf("from address is required")
+	if len(emailRequest.From) > 0 {
+		m.SetAddressHeader("From", emailRequest.From, "")
+	} else {
+		m.SetAddressHeader("From", p.defaultFromAddress, "")
 	}
-	m.SetAddressHeader("From", emailRequest.From, "")
 
 	// Set multiple recipients
 	if len(emailRequest.To) == 0 {
