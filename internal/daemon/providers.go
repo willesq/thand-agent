@@ -284,7 +284,7 @@ func (s *Server) getProvider(c *gin.Context, providerName string) (*models.Provi
 	provider, err := s.Config.GetProviderByName(providerName)
 
 	if err != nil {
-		return nil, fmt.Errorf("Provider not found")
+		return nil, fmt.Errorf("provider '%s' not found", providerName)
 	}
 
 	if provider.GetClient() == nil {
