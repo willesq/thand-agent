@@ -66,18 +66,26 @@ func (d *defaultNotifierImpl) GetEmailPayload(toIdentity string) models.Notifica
 
 	notificationReq := d.req
 
+	// Render HTML email using template
+	html, err := RenderEmail("Workflow Notification", notificationReq.Message)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to render email template")
+		// Fallback to plain message if template fails
+		// TODO: format markdown
+		html = notificationReq.Message
+	}
+
 	emailReq := emailProvider.EmailNotificationRequest{
 		To:      []string{toIdentity},
 		Subject: "Workflow Notification",
 		Body: emailProvider.EmailNotificationBody{
 			Text: notificationReq.Message,
-			HTML: notificationReq.Message,
+			HTML: html,
 		},
 	}
 
 	var notificationPayload models.NotificationRequest
-
-	err := common.ConvertInterfaceToInterface(emailReq, &notificationPayload)
+	err = common.ConvertInterfaceToInterface(emailReq, &notificationPayload)
 
 	if err != nil {
 		logrus.WithError(err).Error("Failed to convert email request")
