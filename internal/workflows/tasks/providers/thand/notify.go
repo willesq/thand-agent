@@ -63,12 +63,11 @@ func (n *NotifyRequest) IsValid() bool {
 }
 
 func (n *NotifyRequest) AsMap() map[string]any {
-	return map[string]any{
-		"approvals":   n.Approvals,
-		"selfApprove": n.SelfApprove,
-		"notifier":    n.Notifier.AsMap(),
-		"entrypoint":  n.Entrypoint,
+	response, err := common.ConvertInterfaceToMap(n)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert NotifyRequest to map: %v", err))
 	}
+	return response
 }
 
 func (t *thandTask) executeNotifyTask(
@@ -83,20 +82,22 @@ func (t *thandTask) executeNotifyTask(
 		return nil, errors.New("request cannot be nil")
 	}
 
-	var notifyReq NotifyRequest
-	common.ConvertInterfaceToInterface(call.With, &notifyReq)
+	var notifyReq thandFunction.NotifierRequest
+	err := common.ConvertInterfaceToInterface(call.With, &notifyReq)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse notification request: %w", err)
+	}
 
 	if !notifyReq.IsValid() {
 		return nil, errors.New("invalid notification request")
 	}
 
-	notificationReq := notifyReq.Notifier
-
 	notifierProviders := t.config.GetProvidersByCapability(
 		models.ProviderCapabilityNotifier)
 
-	if !hasMatchingProvider(notificationReq, notifierProviders) {
-		return nil, fmt.Errorf("no matching provider found for name: %s", notificationReq.Provider)
+	if !hasMatchingProvider(notifyReq, notifierProviders) {
+		return nil, fmt.Errorf("no matching provider found for name: %s", notifyReq.Provider)
 	}
 
 	elevationReq, err := workflowTask.GetContextAsElevationRequest()
@@ -109,7 +110,7 @@ func (t *thandTask) executeNotifyTask(
 		return nil, errors.New("elevation request is not valid")
 	}
 
-	notifyImpl := NewDefaultNotifierImpl(notificationReq)
+	notifyImpl := NewDefaultNotifierImpl(notifyReq)
 
 	return t.executeNotify(workflowTask, taskName, notifyImpl)
 

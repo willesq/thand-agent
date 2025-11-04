@@ -180,10 +180,34 @@ func (t *thandTask) executeApprovalsTask(
 			}
 		}
 
-		if approved, exists := approvalData["approved"]; exists {
+		approvedVal, exists := approvalData["approved"]
+
+		if exists {
+
+			approved, ok := approvedVal.(bool)
+
+			if !ok {
+				logrus.WithFields(logrus.Fields{
+					"taskName":     taskName,
+					"userIdentity": userIdentity,
+				}).Warn("Approval value is not a boolean; ignoring this approval")
+				return &defaultFlowState, nil
+			}
+
 			approvals[userIdentity] = map[string]any{
 				"approved":  approved,
 				"timestamp": time.Now().UTC().Format(time.RFC3339),
+			}
+
+			// If the approval was denied then mark the approval as denied
+			if !approved {
+
+				logrus.WithFields(logrus.Fields{
+					"taskName":     taskName,
+					"userIdentity": userIdentity,
+				}).Info("Approval denied by user")
+
+				workflowTask.SetContextKeyValue(models.VarsContextApproved, false)
 			}
 		}
 	}
