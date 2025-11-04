@@ -34,8 +34,24 @@ func (p *emailProvider) Initialize(provider models.Provider) error {
 	smtpPass, foundSmtpPass := emailerConfig.GetString("pass")
 	smtpFrom, foundFrom := emailerConfig.GetString("from")
 
-	if !foundSmtpHost || !foundSmtpPort || !foundSmtpUser || !foundSmtpPass || !foundFrom {
-		return fmt.Errorf("missing email configuration")
+	var missingFields []string
+	if !foundSmtpHost {
+		missingFields = append(missingFields, "host")
+	}
+	if !foundSmtpPort {
+		missingFields = append(missingFields, "port")
+	}
+	if !foundSmtpUser {
+		missingFields = append(missingFields, "user")
+	}
+	if !foundSmtpPass {
+		missingFields = append(missingFields, "pass")
+	}
+	if !foundFrom {
+		missingFields = append(missingFields, "from")
+	}
+	if len(missingFields) > 0 {
+		return fmt.Errorf("missing email configuration field(s): %v", missingFields)
 	}
 
 	tlsSkipVerify, foundTlsSkipVerify := emailerConfig.GetBool("tls_skip_verify")
