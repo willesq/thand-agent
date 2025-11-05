@@ -32,11 +32,15 @@ func (m *WorkflowManager) registerWorkflows() error {
 
 	worker := temporalService.GetWorker()
 
-	// Register the primary workflow
+	// Register the primary workflow with Pinned versioning behavior
+	//
+	// This ensures that existing workflows continue to run with the code they started with
+	// preventing non-determinism errors when code changes occur
 	worker.RegisterWorkflowWithOptions(
 		m.createPrimaryWorkflowHandler(),
 		workflow.RegisterOptions{
-			Name: models.TemporalExecuteElevationWorkflowName,
+			Name:               models.TemporalExecuteElevationWorkflowName,
+			VersioningBehavior: workflow.VersioningBehaviorPinned,
 		},
 	)
 
@@ -47,10 +51,13 @@ func (m *WorkflowManager) registerWorkflows() error {
 func (m *WorkflowManager) createPrimaryWorkflowHandler() func(workflow.Context, *models.WorkflowTask) (*models.WorkflowTask, error) {
 	return func(rootCtx workflow.Context, workflowTask *models.WorkflowTask) (outputTask *models.WorkflowTask, outputError error) {
 
+		// Get workflow info including the BuildID set by the worker
+		workflowInfo := workflow.GetInfo(rootCtx)
 		logrus.WithFields(logrus.Fields{
 			"WorkflowID": workflowTask.WorkflowID,
 			"TaskName":   workflowTask.WorkflowName,
 			"StartTime":  workflow.Now(rootCtx),
+			"BuildID":    workflowInfo.GetCurrentBuildID(),
 		}).Info("Primary workflow started.")
 
 		cancelCtx, cancelHandler := workflow.WithCancel(rootCtx)
@@ -311,6 +318,21 @@ func (m *WorkflowManager) setupWorkflowSelector(
 	return workflowSelector
 }
 
+// shouldContinueAsNew checks if the workflow should perform Continue-As-New
+// This allows upgrading to new worker versions and prevents event history size issues
+func (m *WorkflowManager) shouldContinueAsNew(ctx workflow.Context) bool {
+	// Check Temporal's built-in suggestion for Continue-As-New
+	// This is triggered when event history approaches size limits
+	if workflow.GetInfo(ctx).GetContinueAsNewSuggested() {
+		logrus.Info("Continue-As-New suggested by Temporal (event history size)")
+		return true
+	}
+
+	// TODO(hugh): Add custom Continue-As-New triggers here
+
+	return false
+}
+
 // executeWorkflowLoop executes the main workflow execution loop
 func (m *WorkflowManager) executeWorkflowLoop(
 	cancelCtx workflow.Context,
@@ -321,6 +343,22 @@ func (m *WorkflowManager) executeWorkflowLoop(
 	for {
 
 		logrus.Info("Waiting for signal...")
+
+		// Check if we should Continue-As-New before waiting for signal
+		// This allows upgrading to new worker versions at safe checkpoints
+		if m.shouldContinueAsNew(cancelCtx) {
+			currentBuildID := workflow.GetInfo(cancelCtx).GetCurrentBuildID()
+			logrus.WithFields(logrus.Fields{
+				"WorkflowID":     workflowTask.WorkflowID,
+				"CurrentBuildID": currentBuildID,
+			}).Info("Continue-As-New suggested, upgrading workflow to latest version")
+
+			return workflowTask, workflow.NewContinueAsNewError(
+				cancelCtx,
+				models.TemporalExecuteElevationWorkflowName,
+				workflowTask,
+			)
+		}
 
 		if err := m.waitForSignal(cancelCtx, workflowSelector); err != nil {
 			return nil, err

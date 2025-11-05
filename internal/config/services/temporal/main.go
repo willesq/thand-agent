@@ -6,10 +6,12 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
+	"go.temporal.io/sdk/workflow"
 )
 
 type TemporalClient struct {
@@ -76,18 +78,35 @@ func (a *TemporalClient) Initialize() error {
 		logrus.WithError(err).Errorln("failed to validate Temporal namespace")
 	}
 
-	// Lets register the worker
+	// Get agent version for Worker Build ID
+	buildID := common.GetClientIdentifier()
+
+	logrus.WithFields(logrus.Fields{
+		"BuildID":        buildID,
+		"DeploymentName": models.TemporalDeploymentName,
+	}).Info("Configuring Worker with versioning")
+
+	// Lets register the worker with versioning
 	a.worker = worker.New(
 		temporalClient,
 		a.GetTaskQueue(),
 		worker.Options{
 			Identity: a.GetIdentity(),
+			DeploymentOptions: worker.DeploymentOptions{
+				UseVersioning: true,
+				Version: worker.WorkerDeploymentVersion{
+					DeploymentName: models.TemporalDeploymentName,
+					BuildID:        buildID,
+				},
+				// Default workflows to Pinned behavior
+				DefaultVersioningBehavior: workflow.VersioningBehaviorPinned,
+			},
 		},
 	)
 
 	go func() {
 
-		logrus.Infof("Starting Temporal worker")
+		logrus.Infof("Starting Temporal worker with Build ID: %s", buildID)
 
 		err := a.worker.Run(worker.InterruptCh())
 		if err != nil {
