@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
@@ -27,6 +28,25 @@ func (w *Workflow) GetDescription() string {
 
 func (w *Workflow) GetWorkflow() *model.Workflow {
 	return w.Workflow
+}
+
+// Create a clone of the workflow to avoid mutations
+func (w *Workflow) GetWorkflowClone() *model.Workflow {
+	if w.Workflow == nil {
+		return nil
+	}
+
+	// Deep copy via JSON marshaling
+	data, err := json.Marshal(w.Workflow)
+	if err != nil {
+		return nil
+	}
+
+	clone := &model.Workflow{}
+	if err := json.Unmarshal(data, clone); err != nil {
+		return nil
+	}
+	return clone
 }
 
 func (w *Workflow) GetEnabled() bool {
