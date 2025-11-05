@@ -8,22 +8,24 @@ import (
 	"go.temporal.io/sdk/worker"
 )
 
-var TemporalEmptyRunId = ""
+const TemporalDeploymentName = "thand-agent"
 
-var TemporalExecuteElevationWorkflowName = "ExecuteElevationWorkflow"
+const TemporalEmptyRunId = ""
 
-var TemporalCleanupActivityName = "cleanup"
-var TemporalHttpActivityName = "http"
-var TemporalGrpcActivityName = "grpc"
-var TemporalAsyncionActivityName = "asyncio"
-var TemporalOpenAPIActivityName = "openapi"
+const TemporalExecuteElevationWorkflowName = "ExecuteElevationWorkflow"
 
-var TemporalResumeSignalName = "resume"
-var TemporalEventSignalName = "event"
-var TemporalTerminateSignalName = "terminate"
+const TemporalCleanupActivityName = "cleanup"
+const TemporalHttpActivityName = "http"
+const TemporalGrpcActivityName = "grpc"
+const TemporalAsyncionActivityName = "asyncio"
+const TemporalOpenAPIActivityName = "openapi"
 
-var TemporalIsApprovedQueryName = "isApproved"
-var TemporalGetWorkflowTaskQueryName = "getWorkflowTask"
+const TemporalResumeSignalName = "resume"
+const TemporalEventSignalName = "event"
+const TemporalTerminateSignalName = "terminate"
+
+const TemporalIsApprovedQueryName = "isApproved"
+const TemporalGetWorkflowTaskQueryName = "getWorkflowTask"
 
 var TypedSearchAttributeStatus = temporal.NewSearchAttributeKeyKeyword("status")
 var TypedSearchAttributeTask = temporal.NewSearchAttributeKeyString("task")

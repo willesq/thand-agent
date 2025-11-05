@@ -22,6 +22,7 @@ import (
 	taskThand "github.com/thand-io/agent/internal/workflows/tasks/providers/thand"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
+	"go.temporal.io/sdk/worker"
 )
 
 // WorkflowManager manages workflow lifecycle and execution using the official SDK
@@ -413,13 +414,18 @@ func (m *WorkflowManager) createTemporalWorkflow(workflowTask *models.WorkflowTa
 	we, err := temporalClient.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
 		ID:        workflowTask.WorkflowID,
 		TaskQueue: temporalService.GetTaskQueue(),
+		VersioningOverride: &client.PinnedVersioningOverride{
+			Version: worker.WorkerDeploymentVersion{
+				DeploymentName: models.TemporalDeploymentName,
+				BuildID:        common.GetClientIdentifier(),
+			},
+		},
 		TypedSearchAttributes: temporal.NewSearchAttributes(
 			models.TypedSearchAttributeUser.ValueSet(userEmail),
 			models.TypedSearchAttributeRole.ValueSet(roleName),
 			models.TypedSearchAttributeProviders.ValueSet(elevationRequest.Providers),
 			models.TypedSearchAttributeWorkflow.ValueSet(elevationRequest.Workflow),
 			models.TypedSearchAttributeStatus.ValueSet(strings.ToUpper(string(swctx.PendingStatus))),
-			// models.TypedSearchAttributeApproved.ValueSet(false),
 			models.TypedSearchAttributeDuration.ValueSet(int64(duration.Seconds())),
 			models.TypedSearchAttributeReason.ValueSet(elevationRequest.Reason),
 			models.TypedSearchAttributeIdentities.ValueSet(elevationRequest.Identities),

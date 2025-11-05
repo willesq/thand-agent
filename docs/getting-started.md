@@ -140,7 +140,7 @@ Request access to a resource:
 thand request access --provider aws-prod --role Admin --duration 1h --reason "Deploying new version"
 
 # Request GCP access
-thand request access --provider gcp --project my-project --role viewer
+thand request access --provider gcp --role viewer --duration 2h --reason "Data analysis"
 
 # Request via natural language
 thand "Get me admin access to AWS production for 2 hours to perform maintenance"
