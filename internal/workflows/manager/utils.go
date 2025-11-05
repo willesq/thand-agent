@@ -50,7 +50,13 @@ func (m *WorkflowManager) Hydrate(workflowTask *models.WorkflowTask) error {
 			return fmt.Errorf("failed to load workflow: %w", err)
 		}
 
-		workflowTask.SetWorkflowDsl(workflowDsl.GetWorkflow())
+		workflowCopy := workflowDsl.GetWorkflowClone()
+
+		if workflowCopy == nil {
+			return fmt.Errorf("failed to clone workflow definition")
+		}
+
+		workflowTask.SetWorkflowDsl(workflowCopy)
 
 	}
 
