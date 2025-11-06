@@ -21,7 +21,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-const ProviderName = "gcp"
+const GcpProviderName = "gcp"
 
 var DefaultStage = "GA"
 
@@ -103,10 +103,6 @@ func (p *gcpProvider) GetProjectId() string {
 
 func (p *gcpProvider) GetStage() string {
 	return p.client.Stage
-}
-
-func init() {
-	providers.Register(ProviderName, &gcpProvider{})
 }
 
 func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, error) {
@@ -192,4 +188,8 @@ type GcpConfigurationProvider struct {
 
 	// Unexported: only accessible within this package
 	credentialsData []byte
+}
+
+func init() {
+	providers.Register(GcpProviderName, &gcpProvider{})
 }

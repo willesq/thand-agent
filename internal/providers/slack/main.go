@@ -11,6 +11,8 @@ import (
 	"github.com/thand-io/agent/internal/providers"
 )
 
+const SlackProviderName = "slack"
+
 // slackProvider implements the ProviderImpl interface for Slack
 type slackProvider struct {
 	*models.BaseProvider
@@ -132,5 +134,5 @@ func (p *slackProvider) getUserIDByUsername(ctx context.Context, username string
 }
 
 func init() {
-	providers.Register("slack", &slackProvider{})
+	providers.Register(SlackProviderName, &slackProvider{})
 }

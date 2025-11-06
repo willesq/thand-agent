@@ -22,7 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-const ProviderName = "aws"
+const AwsProviderName = "aws"
 
 // awsProvider implements the ProviderImpl interface for AWS
 type awsProvider struct {
@@ -203,5 +203,5 @@ type AwsConfigurationProvider struct {
 }
 
 func init() {
-	providers.Register(ProviderName, &awsProvider{})
+	providers.Register(AwsProviderName, &awsProvider{})
 }

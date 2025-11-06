@@ -7,5 +7,5 @@ import (
 
 func init() {
 	// Register mock GCP provider to override the real one for all tests
-	coreProviders.Set(gcp.ProviderName, gcp.NewMockGcpProvider())
+	coreProviders.Set(gcp.GcpProviderName, gcp.NewMockGcpProvider())
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/thand-io/agent/internal/providers"
 )
 
+const TerraformProviderName = "terraform"
+
 // terraformProvider implements the ProviderImpl interface for Terraform
 type terraformProvider struct {
 	*models.BaseProvider
@@ -164,14 +166,14 @@ func (p *terraformProvider) ListPermissions(ctx context.Context, filters ...stri
 
 func (p *terraformProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
 	// TODO: Implement Terraform GetRole logic
-	return nil, fmt.Errorf("Terraform has no concept of roles")
+	return nil, fmt.Errorf("terraform has no concept of roles")
 }
 
 func (p *terraformProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
 	// TODO: Implement Terraform ListRoles logic
-	return nil, fmt.Errorf("Terraform has no concept of roles")
+	return nil, fmt.Errorf("terraform has no concept of roles")
 }
 
 func init() {
-	providers.Register("terraform", &terraformProvider{})
+	providers.Register(TerraformProviderName, &terraformProvider{})
 }

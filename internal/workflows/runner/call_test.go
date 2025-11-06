@@ -6,6 +6,7 @@ import (
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
+	slackProvider "github.com/thand-io/agent/internal/providers/slack"
 	"github.com/thand-io/agent/internal/workflows/functions"
 )
 
@@ -98,7 +99,7 @@ func TestExecuteCallFunction_MessageInterpolation(t *testing.T) {
 	callFunc := &model.CallFunction{
 		Call: "test.mock",
 		With: map[string]any{
-			"provider":  "slack",
+			"provider":  slackProvider.SlackProviderName,
 			"to":        "C09DDUAVBK4",
 			"message":   `${ "The user \($context.user.name) is requesting access." }`,
 			"approvals": true,
@@ -145,7 +146,7 @@ func TestExecuteCallFunction_MessageInterpolation(t *testing.T) {
 	}
 
 	// Verify other parameters were passed through correctly
-	if provider := withParams["provider"]; provider != "slack" {
+	if provider := withParams["provider"]; provider != slackProvider.SlackProviderName {
 		t.Errorf("Provider parameter incorrect. Got: %v, Expected: slack", provider)
 	}
 
