@@ -14,46 +14,43 @@ import (
 	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 )
 
-// authorizerNotifier handles notifications sent to users after their access request has been approved
-type authorizerNotifier struct {
-	config        *config.Config
-	workflowTask  *models.WorkflowTask
-	elevationReq  *models.ElevateRequestInternal
-	req           *thandFunction.NotifierRequest
-	providerKey   string
-	authRequests  map[string]*models.AuthorizeRoleRequest
-	authResponses map[string]*models.AuthorizeRoleResponse
+// revokeNotifier handles notifications sent to users after their access has been revoked
+type revokeNotifier struct {
+	config       *config.Config
+	workflowTask *models.WorkflowTask
+	elevationReq *models.ElevateRequestInternal
+	req          *thandFunction.NotifierRequest
+	providerKey  string
+	revocations  map[string]any
 }
 
-// NewAuthorizerNotifier creates a new notifier for sending approval confirmation notifications
-func NewAuthorizerNotifier(
+// NewRevokeNotifier creates a new notifier for sending revocation notifications
+func NewRevokeNotifier(
 	config *config.Config,
 	workflowTask *models.WorkflowTask,
 	elevationReq *models.ElevateRequestInternal,
 	req *thandFunction.NotifierRequest,
 	providerKey string,
-	requests map[string]*models.AuthorizeRoleRequest,
-	authorizations map[string]*models.AuthorizeRoleResponse,
+	revocations map[string]any,
 ) NotifierImpl {
-	return &authorizerNotifier{
-		config:        config,
-		workflowTask:  workflowTask,
-		elevationReq:  elevationReq,
-		req:           req,
-		providerKey:   providerKey,
-		authRequests:  requests,
-		authResponses: authorizations,
+	return &revokeNotifier{
+		config:       config,
+		workflowTask: workflowTask,
+		elevationReq: elevationReq,
+		req:          req,
+		providerKey:  providerKey,
+		revocations:  revocations,
 	}
 }
 
-func (a *authorizerNotifier) GetRecipients() []string {
-	return a.req.To
+func (r *revokeNotifier) GetRecipients() []string {
+	return r.req.To
 }
 
-func (a *authorizerNotifier) GetCallFunction(toIdentity string) model.CallFunction {
+func (r *revokeNotifier) GetCallFunction(toIdentity string) model.CallFunction {
 
 	callMap := (&thandFunction.NotifierRequest{
-		Provider: a.req.Provider,
+		Provider: r.req.Provider,
 		To:       []string{toIdentity},
 	}).AsMap()
 
@@ -63,22 +60,22 @@ func (a *authorizerNotifier) GetCallFunction(toIdentity string) model.CallFuncti
 	}
 }
 
-func (a *authorizerNotifier) GetProviderName() string {
-	return a.req.Provider
+func (r *revokeNotifier) GetProviderName() string {
+	return r.req.Provider
 }
 
-func (a *authorizerNotifier) GetPayload(toIdentity string) models.NotificationRequest {
+func (r *revokeNotifier) GetPayload(toIdentity string) models.NotificationRequest {
 
-	elevationReq := a.elevationReq
+	elevationReq := r.elevationReq
 	var notificationPayload models.NotificationRequest
 
-	switch a.GetProviderName() {
+	switch r.GetProviderName() {
 	case "slack":
-		blocks := a.createAuthorizeSlackBlocks()
+		blocks := r.createRevokeSlackBlocks()
 
 		slackReq := slackProvider.SlackNotificationRequest{
 			To: toIdentity,
-			Text: fmt.Sprintf("Your access request for role %s has been approved", func() string {
+			Text: fmt.Sprintf("Your access for role %s has been revoked", func() string {
 				if elevationReq.Role != nil {
 					return elevationReq.Role.Name
 				}
@@ -94,10 +91,10 @@ func (a *authorizerNotifier) GetPayload(toIdentity string) models.NotificationRe
 			return models.NotificationRequest{}
 		}
 	case "email":
-		plainText, html := a.createAuthorizeEmailBody()
+		plainText, html := r.createRevokeEmailBody()
 		emailReq := emailProvider.EmailNotificationRequest{
 			To:      []string{toIdentity},
-			Subject: "Access Request Approved",
+			Subject: "Access Revoked",
 			Body: emailProvider.EmailNotificationBody{
 				Text: plainText,
 				HTML: html,
@@ -109,7 +106,7 @@ func (a *authorizerNotifier) GetPayload(toIdentity string) models.NotificationRe
 			return models.NotificationRequest{}
 		}
 	default:
-		logrus.WithField("provider", a.GetProviderName()).Error("Unsupported provider type")
+		logrus.WithField("provider", r.GetProviderName()).Error("Unsupported provider type")
 		return models.NotificationRequest{}
 	}
 

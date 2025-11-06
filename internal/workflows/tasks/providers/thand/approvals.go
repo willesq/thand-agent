@@ -11,11 +11,34 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
+	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
 )
 
 var ThandApprovalsTask = "approvals"
+
+type ApprovalsTask struct {
+	Approvals   int                                      `json:"approvals" default:"1"`
+	SelfApprove bool                                     `json:"selfApprove" default:"false"`
+	Notifiers   map[string]thandFunction.NotifierRequest `json:"notifiers"`
+}
+
+func (n *ApprovalsTask) IsValid() bool {
+	return n.Approvals != 0
+}
+
+func (t *ApprovalsTask) HasNotifiers() bool {
+	return len(t.Notifiers) > 0
+}
+
+func (n *ApprovalsTask) AsMap() map[string]any {
+	response, err := common.ConvertInterfaceToMap(n)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert ApprovalsTask to map: %v", err))
+	}
+	return response
+}
 
 func (t *thandTask) executeApprovalsTask(
 	workflowTask *models.WorkflowTask,
@@ -33,8 +56,8 @@ func (t *thandTask) executeApprovalsTask(
 		return nil, err
 	}
 
-	var notifyReq NotifyRequest
-	err = common.ConvertInterfaceToInterface(call.With, &notifyReq)
+	var approvalsTask ApprovalsTask
+	err = common.ConvertInterfaceToInterface(call.With, &approvalsTask)
 
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
@@ -44,43 +67,35 @@ func (t *thandTask) executeApprovalsTask(
 		return nil, err
 	}
 
-	if !notifyReq.IsValid() {
+	if !approvalsTask.IsValid() {
 		return nil, errors.New("invalid notification request")
 	}
 
 	if common.IsNilOrZero(input) {
 
-		notifyReq.Entrypoint = taskName
-
 		logrus.Infof("Starting Thand approvals task: %s", taskName)
 
 		newConfig := &models.BasicConfig{}
-		newConfig.Update(notifyReq.AsMap())
+		newConfig.Update(approvalsTask.AsMap())
 
 		call.With = newConfig
 
-		// Set the context for the notification
-		approvalNotifier := NewApprovalsNotifier(
-			t.config,
-			workflowTask,
-			elevationRequest,
-			&notifyReq,
-		)
+		if approvalsTask.HasNotifiers() {
 
-		// First lets notify the approvers
-		_, err := t.executeNotify(
-			workflowTask,
-			fmt.Sprintf("%s.notify", taskName),
-			approvalNotifier,
-		)
+			err = t.makeApprovalNotifications(
+				workflowTask,
+				taskName,
+				&approvalsTask,
+				elevationRequest,
+			)
 
-		if err != nil {
+			if err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"taskName": taskName,
+				}).Error("Failed to create approval notifications")
 
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"taskName": taskName,
-			}).Error("Failed to notify approvers")
-
-			return nil, err
+				return nil, err
+			}
 		}
 
 	} else {
@@ -153,7 +168,7 @@ func (t *thandTask) executeApprovalsTask(
 		}
 
 		// Check if self-approval is disabled and the approver is the requester or one of the elevated identities
-		if !notifyReq.SelfApprove {
+		if !approvalsTask.SelfApprove {
 			requesterIdentity := elevationRequest.User.GetIdentity()
 
 			// Check if approver is the requester
@@ -240,7 +255,7 @@ func (t *thandTask) executeApprovalsTask(
 		workflowTask,
 		taskName,
 		approvals,
-		notifyReq.Approvals,
+		approvalsTask.Approvals,
 		approvedState,
 		deniedState,
 	)
@@ -306,4 +321,83 @@ func (t *thandTask) evaluateApprovalSwitch(
 				},
 			}},
 		})
+}
+
+func (t *thandTask) makeApprovalNotifications(
+	workflowTask *models.WorkflowTask,
+	taskName string,
+	approvalsTask *ApprovalsTask,
+	elevationRequest *models.ElevateRequestInternal,
+) error {
+
+	// In parallel create a notifier for each of the notifiers
+	// Build notification tasks for each provider
+	var notifyTasks []notifyTask
+	for providerKey, notifierRequest := range approvalsTask.Notifiers {
+		// Create an ApprovalNotifier for each provider
+		approvalNotifier := NewApprovalsNotifier(
+			t.config,
+			workflowTask,
+			elevationRequest,
+			&ApprovalNotifier{
+				Approvals:   approvalsTask.Approvals,
+				SelfApprove: approvalsTask.SelfApprove,
+				Notifier:    notifierRequest,
+				Entrypoint:  taskName,
+			},
+		)
+
+		// Get recipients for this notifier
+		recipients := approvalNotifier.GetRecipients()
+
+		// Build notification tasks for each recipient
+		for _, recipient := range recipients {
+
+			recipientPayload := approvalNotifier.GetPayload(recipient)
+
+			notifyTasks = append(notifyTasks, notifyTask{
+				Recipient: recipient,
+				CallFunc:  approvalNotifier.GetCallFunction(recipient),
+				Payload:   recipientPayload,
+				Provider:  approvalNotifier.GetProviderName(),
+			})
+
+			logrus.WithFields(logrus.Fields{
+				"recipient":   recipient,
+				"provider":    approvalNotifier.GetProviderName(),
+				"providerKey": providerKey,
+			}).Debug("Prepared approval notification task")
+		}
+	}
+
+	// Execute all notifications in parallel
+
+	var err error
+	var notifyResults []notifyResult
+
+	if workflowTask.HasTemporalContext() {
+		notifyResults, err = t.executeNotifyTemporalParallel(workflowTask, fmt.Sprintf("%s.notify", taskName), notifyTasks)
+	} else {
+		notifyResults, err = t.executeNotifyGoParallel(workflowTask, notifyTasks)
+	}
+
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to execute approval notifications")
+
+		return err
+	}
+
+	// Process results using shared function
+	if err := processNotificationResults(notifyResults, "Approval notification"); err != nil {
+
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to process approval notification results")
+
+		return err
+	}
+
+	return nil
 }

@@ -121,12 +121,13 @@ workflows:
             thand: approvals
             with:
               approvals: 1
-              notifier:
-                provider: slack
-                to: "#security-team"
-                message: >
-                  User ${ .user.name } is requesting ${ .role.name } access.
-                  Reason: ${ .reason }
+              notifiers:
+                slack:
+                  provider: slack
+                  to: "#security-team"
+                  message: >
+                    User ${ .user.name } is requesting ${ .role.name } access.
+                    Reason: ${ .reason }
             on:
               approved: authorize
               denied: deny-notification
@@ -314,7 +315,10 @@ workflows:
             thand: approvals
             with:
               approvals: 1
-              notifier: { provider: email, to: "manager@company.com" }
+              notifiers:
+                email:
+                  provider: email
+                  to: "manager@company.com"
             on:
               approved: security-approval
               denied: denied
@@ -322,12 +326,19 @@ workflows:
             thand: approvals
             with:
               approvals: 1
-              notifier: { provider: slack, to: "#security" }
+              notifiers: 
+                slack:
+                  provider: slack
+                  to: C1234567890
             on:
               approved: authorize
               denied: denied
-        - authorize: { thand: authorize, then: end }
-        - denied: { call: notify-denial, then: end }
+        - authorize: 
+            thand: authorize
+            then: end
+        - denied:
+            call: notify-denial
+            then: end
 ```
 
 ### Time-Based Approval

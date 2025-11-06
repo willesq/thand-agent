@@ -1,0 +1,66 @@
+package thand
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/sirupsen/logrus"
+)
+
+// createRevokeEmailBody creates the email body for revocation notification
+func (r *revokeNotifier) createRevokeEmailBody() (string, string) {
+	elevationReq := r.elevationReq
+	notifyReq := r.req
+
+	// Build plain text version
+	var plainText strings.Builder
+	plainText.WriteString("Your access has been revoked.\n\n")
+
+	if elevationReq.Role != nil {
+		plainText.WriteString(fmt.Sprintf("Role: %s\n", elevationReq.Role.Name))
+		if len(elevationReq.Role.Description) > 0 {
+			plainText.WriteString(fmt.Sprintf("Description: %s\n", elevationReq.Role.Description))
+		}
+	}
+
+	if len(elevationReq.Providers) > 0 {
+		plainText.WriteString(fmt.Sprintf("Providers: %s\n", strings.Join(elevationReq.Providers, ", ")))
+	}
+
+	if len(elevationReq.Duration) > 0 {
+		plainText.WriteString(fmt.Sprintf("Duration: %s\n", elevationReq.Duration))
+	}
+
+	plainText.WriteString("\nYour access has been successfully revoked. If you need access again, please submit a new request.")
+
+	// Build data map for template
+	data := map[string]any{
+		"Providers": strings.Join(elevationReq.Providers, ", "),
+		"Duration":  elevationReq.Duration,
+	}
+
+	if len(notifyReq.Message) > 0 {
+		data["Message"] = notifyReq.Message
+	}
+
+	if elevationReq.Role != nil {
+		data["Role"] = map[string]any{
+			"Name":        elevationReq.Role.Name,
+			"Description": elevationReq.Role.Description,
+		}
+
+		// Add permissions if available
+		if len(elevationReq.Role.Permissions.Allow) > 0 {
+			data["Permissions"] = elevationReq.Role.Permissions.Allow
+		}
+	}
+
+	// Render HTML email using template
+	html, err := RenderEmailWithTemplate("Access Revoked", GetRevokeContentTemplate(), data)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to render revocation email")
+		return plainText.String(), ""
+	}
+
+	return plainText.String(), html
+}

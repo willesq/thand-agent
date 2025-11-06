@@ -47,14 +47,13 @@ workflows:
               # 3. If a user really wants they can implement the slack or mailer
               #    directly. The user can also just re-quest the notify step to
               #    notify several providers
-              notifier:
-                # provider: slack
-                provider: email
-                # to: C0123456789
-                to: ${ $context.identities // [$context.user.email] }
-                # Message is optional, if not provided a default message will be used
-                message: >
-                  ${ "The user \($context.user.name) is requesting access." }
+              notifiers:
+                email:
+                  provider: email
+                  to: ${ $context.identities // [$context.user.email] }
+                  # Message is optional, if not provided a default message will be used
+                  message: >
+                    ${ "The user \($context.user.name) is requesting access." }
             
             # If approvals not met then deny the request
             then: denied
@@ -63,14 +62,17 @@ workflows:
             thand: authorize
             with:
               revocation: revoke
-              notifier:
-                # provider: slack
-                provider: email
-                # to: C0123456789
-                to: ${ $context.identities // [$context.user.email] }
-                # Message is optional, if not provided a default message will be used
-                message: >
-                  You have been granted access.
+              notifiers:
+                slack:
+                  provider: slack
+                  to: C0123456789
+                  message: >
+                    You have been granted access.
+                email:
+                  provider: email
+                  to: ${ $context.identities // [$context.user.email] }
+                  message: >
+                    You have been granted access.
 
             then: monitor
         - monitor:
@@ -82,12 +84,17 @@ workflows:
         - revoke:
             thand: revoke
             with:
-              notifier:
-                # provider: slack
-                provider: email
-                to: ${ $context.user.email }
-                message: >
-                  ${ "Revoking access for user \($context.user.name)." }
+              notifiers:
+                email:
+                  provider: email
+                  to: ${ $context.user.email }
+                  message: >
+                    ${ "Revoking access for user \($context.user.name)." }
+                slack:
+                  provider: slack
+                  to: ${ $context.user.email }
+                  message: >
+                    Access has been revoked.
             then: end
         - denied:
             thand: notify

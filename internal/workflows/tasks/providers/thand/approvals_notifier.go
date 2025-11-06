@@ -14,18 +14,25 @@ import (
 	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 )
 
+type ApprovalNotifier struct {
+	Approvals   int                           `json:"approvals" default:"1"`
+	SelfApprove bool                          `json:"selfApprove" default:"false"`
+	Notifier    thandFunction.NotifierRequest `json:"notifier"`
+	Entrypoint  string                        `json:"entrypoint"`
+}
+
 type approvalsNotifier struct {
 	config       *config.Config
 	workflowTask *models.WorkflowTask
 	elevationReq *models.ElevateRequestInternal
-	req          *NotifyRequest
+	req          *ApprovalNotifier
 }
 
 func NewApprovalsNotifier(
 	config *config.Config,
 	workflowTask *models.WorkflowTask,
 	elevationReq *models.ElevateRequestInternal,
-	req *NotifyRequest,
+	req *ApprovalNotifier,
 ) NotifierImpl {
 	return &approvalsNotifier{
 		config:       config,
