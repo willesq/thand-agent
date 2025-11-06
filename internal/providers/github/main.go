@@ -11,7 +11,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var ProviderName = "github"
+var GithubProviderName = "github"
 
 // githubProvider implements the ProviderImpl interface for GitHub
 type githubProvider struct {
@@ -101,5 +101,5 @@ func (p *githubProvider) Initialize(provider models.Provider) error {
 }
 
 func init() {
-	providers.Register(ProviderName, &githubProvider{})
+	providers.Register(GithubProviderName, &githubProvider{})
 }

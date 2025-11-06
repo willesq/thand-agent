@@ -18,6 +18,8 @@ import (
 	"github.com/thand-io/agent/internal/providers"
 )
 
+const SamlProviderName = "saml"
+
 // samlProvider implements the ProviderImpl interface for SAML
 type samlProvider struct {
 	*models.BaseProvider
@@ -335,5 +337,5 @@ func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig,
 }
 
 func init() {
-	providers.Register("saml", &samlProvider{})
+	providers.Register(SamlProviderName, &samlProvider{})
 }

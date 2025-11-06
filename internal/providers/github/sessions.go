@@ -31,7 +31,7 @@ func (p *githubProvider) CreateSession(ctx context.Context, authRequest *models.
 			ID:     fmt.Sprintf("%d", user.ID),
 			Email:  user.Email,
 			Name:   user.Name,
-			Source: ProviderName,
+			Source: GithubProviderName,
 		},
 		AccessToken: accessToken,
 		Expiry:      time.Now().Add(24 * time.Hour), // GitHub tokens don't expire, but we set session expiry

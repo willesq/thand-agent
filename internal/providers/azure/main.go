@@ -16,7 +16,7 @@ import (
 	"github.com/thand-io/agent/internal/providers"
 )
 
-const ProviderName = "azure"
+const AzureProviderName = "azure"
 
 var UseLatestVersion = ""
 
@@ -102,7 +102,7 @@ func (p *azureProvider) Initialize(provider models.Provider) error {
 }
 
 func init() {
-	providers.Register(ProviderName, &azureProvider{})
+	providers.Register(AzureProviderName, &azureProvider{})
 }
 
 // CreateAzureConfig creates Azure credentials based on the provided configuration

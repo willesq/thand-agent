@@ -68,7 +68,7 @@ func (a *approvalsNotifier) GetPayload(toIdentity string) models.NotificationReq
 	var notificationPayload models.NotificationRequest
 
 	switch a.GetProviderName() {
-	case "slack":
+	case slackProvider.SlackProviderName:
 		blocks := a.createApprovalSlackBlocks()
 
 		slackReq := slackProvider.SlackNotificationRequest{
@@ -88,7 +88,7 @@ func (a *approvalsNotifier) GetPayload(toIdentity string) models.NotificationReq
 			logrus.WithError(err).Error("Failed to convert slack request")
 			return models.NotificationRequest{}
 		}
-	case "email":
+	case emailProvider.EmailProviderName:
 		plainText, html := a.createApprovalEmailBody()
 		emailReq := emailProvider.EmailNotificationRequest{
 			To:      []string{toIdentity},

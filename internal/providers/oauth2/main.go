@@ -8,6 +8,8 @@ import (
 	"github.com/thand-io/agent/internal/providers"
 )
 
+const Oauth2ProviderName = "oauth2"
+
 // oauth2Provider implements the ProviderImpl interface for OAuth2
 type oauth2Provider struct {
 	*models.BaseProvider
@@ -85,5 +87,5 @@ func (p *oauth2Provider) ListRoles(ctx context.Context, filters ...string) ([]mo
 }
 
 func init() {
-	providers.Register("oauth2", &oauth2Provider{})
+	providers.Register(Oauth2ProviderName, &oauth2Provider{})
 }

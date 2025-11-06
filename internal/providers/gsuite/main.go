@@ -13,6 +13,8 @@ import (
 	"github.com/thand-io/agent/internal/providers/gcp"
 )
 
+const GsuiteProviderName = "gsuite"
+
 // gsuiteProvider implements the ProviderImpl interface for Google Workspace (GSuite)
 type gsuiteProvider struct {
 	*models.BaseProvider
@@ -113,5 +115,5 @@ func (p *gsuiteProvider) Refresh() error {
 }
 
 func init() {
-	providers.Register("gsuite", &gsuiteProvider{})
+	providers.Register(GsuiteProviderName, &gsuiteProvider{})
 }

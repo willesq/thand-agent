@@ -7,5 +7,5 @@ import (
 
 func init() {
 	// Register mock Kubernetes provider to override the real one for all tests
-	coreProviders.Set(kubernetes.ProviderName, kubernetes.NewMockKubernetesProvider())
+	coreProviders.Set(kubernetes.KubernetesProviderName, kubernetes.NewMockKubernetesProvider())
 }

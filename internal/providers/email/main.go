@@ -13,6 +13,8 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+const EmailProviderName = "email"
+
 // emailProvider implements the ProviderImpl interface for Email
 type emailProvider struct {
 	*models.BaseProvider
@@ -134,5 +136,5 @@ func (p *emailProvider) SendNotification(
 }
 
 func init() {
-	providers.Register("email", &emailProvider{})
+	providers.Register(EmailProviderName, &emailProvider{})
 }

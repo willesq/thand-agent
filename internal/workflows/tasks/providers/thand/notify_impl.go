@@ -52,9 +52,9 @@ func (d *defaultNotifierImpl) GetProviderName() string {
 func (d *defaultNotifierImpl) GetPayload(toIdentity string) models.NotificationRequest {
 
 	switch d.GetProviderName() {
-	case "slack":
+	case slackProvider.SlackProviderName:
 		return d.GetSlackPayload(toIdentity)
-	case "email":
+	case emailProvider.EmailProviderName:
 		return d.GetEmailPayload(toIdentity)
 	default:
 		return models.NotificationRequest{}

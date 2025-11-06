@@ -70,7 +70,7 @@ func (r *revokeNotifier) GetPayload(toIdentity string) models.NotificationReques
 	var notificationPayload models.NotificationRequest
 
 	switch r.GetProviderName() {
-	case "slack":
+	case slackProvider.SlackProviderName:
 		blocks := r.createRevokeSlackBlocks()
 
 		slackReq := slackProvider.SlackNotificationRequest{
@@ -90,7 +90,7 @@ func (r *revokeNotifier) GetPayload(toIdentity string) models.NotificationReques
 			logrus.WithError(err).Error("Failed to convert slack request")
 			return models.NotificationRequest{}
 		}
-	case "email":
+	case emailProvider.EmailProviderName:
 		plainText, html := r.createRevokeEmailBody()
 		emailReq := emailProvider.EmailNotificationRequest{
 			To:      []string{toIdentity},

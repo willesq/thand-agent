@@ -18,7 +18,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-var ProviderName = "oauth2.google"
+var Oauth2GoogleProviderName = "oauth2.google"
 
 // oauth2Provider implements the ProviderImpl interface for OAuth2
 type oauth2Provider struct {
@@ -167,5 +167,5 @@ func (p *oauth2Provider) RenewSession(ctx context.Context, session *models.Sessi
 }
 
 func init() {
-	providers.Register(ProviderName, &oauth2Provider{})
+	providers.Register(Oauth2GoogleProviderName, &oauth2Provider{})
 }
