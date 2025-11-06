@@ -25,12 +25,7 @@ type ApprovalsTask struct {
 }
 
 func (n *ApprovalsTask) IsValid() bool {
-
-	if n.Approvals == 0 {
-		return false
-	}
-
-	return true
+	return n.Approvals != 0
 }
 
 func (t *ApprovalsTask) HasNotifiers() bool {

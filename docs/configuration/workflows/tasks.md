@@ -145,7 +145,7 @@ The `approvals` task handles approval workflows by sending notifications to appr
 | `approvals` | number | Yes | Number of approvals required |
 | `notifiers` | object | Yes | Notification configuration |
 
-### Notifier Configuration
+### Notifiers Configuration
 
 The `notifiers` object configures how approval requests are sent:
 

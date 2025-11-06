@@ -316,7 +316,7 @@ workflows:
             with:
               approvals: 1
               notifiers:
-                slack:
+                email:
                   provider: email
                   to: "manager@company.com"
             on:

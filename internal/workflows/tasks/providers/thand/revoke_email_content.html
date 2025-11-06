@@ -1,0 +1,50 @@
+<div style="margin-bottom: 1.5rem;">
+    {{if .Message}}
+    <p style="background-color: #fee2e2; padding: 1rem; border-radius: 0.375rem; border-left: 4px solid #ef4444;">
+        <strong>{{.Message}}</strong>
+    </p>
+    {{else}}
+    <p style="background-color: #fee2e2; padding: 1rem; border-radius: 0.375rem; border-left: 4px solid #ef4444;">
+        <strong>Your access has been revoked.</strong>
+    </p>
+    {{end}}
+</div>
+
+{{if .Role}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Revoked Access</h3>
+    <p><strong>Role:</strong> {{.Role.Name}}</p>
+    {{if .Role.Description}}
+    <p><strong>Description:</strong> {{.Role.Description}}</p>
+    {{end}}
+</div>
+{{end}}
+
+{{if or .Providers .Duration}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Revocation Details</h3>
+    {{if .Providers}}
+    <p><strong>Providers:</strong> {{.Providers}}</p>
+    {{end}}
+    {{if .Duration}}
+    <p><strong>Original Duration:</strong> {{.Duration}}</p>
+    {{end}}
+</div>
+{{end}}
+
+{{if .Permissions}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Revoked Permissions</h3>
+    <ul style="list-style: none; padding: 0; margin: 0;">
+    {{range .Permissions}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">✗ {{.}}</li>
+    {{end}}
+    </ul>
+</div>
+{{end}}
+
+<div style="margin-top: 2rem; padding: 1rem; background-color: #f8fafc; border-radius: 0.375rem;">
+    <p style="margin: 0; font-size: 0.875rem; color: #64748b;">
+        Your access has been successfully revoked. If you need access again, please submit a new request through the appropriate channels.
+    </p>
+</div>

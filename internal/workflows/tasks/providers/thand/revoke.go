@@ -17,6 +17,14 @@ import (
 
 const ThandRevokeTask = "revoke"
 
+type RevokeTask struct {
+	Notifiers map[string]thandFunction.NotifierRequest `json:"notifiers"` // Notifier configurations for sending revocation notifications
+}
+
+func (t *RevokeTask) HasNotifiers() bool {
+	return len(t.Notifiers) > 0
+}
+
 // ThandRevokeTask represents a custom task for Thand revocation
 func (t *thandTask) executeRevokeTask(
 	workflowTask *models.WorkflowTask,
@@ -29,7 +37,15 @@ func (t *thandTask) executeRevokeTask(
 		return nil, err
 	}
 
-	return t.executeRevocationTask(workflowTask, taskName, call, elevateRequest)
+	// Parse the revoke task configuration
+	var revokeCallTask RevokeTask
+	err = common.ConvertInterfaceToInterface(call.With, &revokeCallTask)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to parse revoke task configuration")
+		// Continue without notifiers if parsing fails
+	}
+
+	return t.executeRevocationTask(workflowTask, taskName, call, elevateRequest, &revokeCallTask)
 }
 
 // revokeResult holds the result of a revocation operation
@@ -60,6 +76,7 @@ func (t *thandTask) executeRevocationTask(
 	taskName string,
 	call *taskModel.ThandTask,
 	elevateRequest *models.ElevateRequestInternal,
+	revokeCallTask *RevokeTask,
 ) (any, error) {
 
 	if !elevateRequest.IsValid() {
@@ -157,6 +174,23 @@ func (t *thandTask) executeRevocationTask(
 	}
 
 	modelOutput["revocations"] = revocations
+
+	// Send notifications if configured
+	if revokeCallTask.HasNotifiers() {
+
+		err = t.makeRevocationNotifications(
+			workflowTask,
+			taskName,
+			revokeCallTask,
+			elevateRequest,
+			revocations,
+		)
+
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to send revocation notifications, continuing anyway")
+			// Don't fail the revocation if notification fails
+		}
+	}
 
 	return &modelOutput, nil
 }
@@ -266,4 +300,82 @@ func executeGoRevokeParallel(
 	wg.Wait()
 
 	return results, nil
+}
+
+// makeRevocationNotifications sends notifications about access revocation
+func (t *thandTask) makeRevocationNotifications(
+	workflowTask *models.WorkflowTask,
+	taskName string,
+	revokeTask *RevokeTask,
+	elevateRequest *models.ElevateRequestInternal,
+	revocations map[string]any,
+) error {
+
+	logrus.Info("Preparing revocation notifications")
+
+	// Build notification tasks for each provider
+	var notifyTasks []notifyTask
+	for providerKey, notifierRequest := range revokeTask.Notifiers {
+		// Create a RevokeNotifier for each provider
+		revokeNotifier := NewRevokeNotifier(
+			t.config,
+			workflowTask,
+			elevateRequest,
+			&notifierRequest,
+			providerKey,
+			revocations,
+		)
+
+		// Get recipients for this notifier
+		recipients := revokeNotifier.GetRecipients()
+
+		// Build notification tasks for each recipient
+		for _, recipient := range recipients {
+
+			recipientPayload := revokeNotifier.GetPayload(recipient)
+
+			notifyTasks = append(notifyTasks, notifyTask{
+				Recipient: recipient,
+				CallFunc:  revokeNotifier.GetCallFunction(recipient),
+				Payload:   recipientPayload,
+				Provider:  revokeNotifier.GetProviderName(),
+			})
+
+			logrus.WithFields(logrus.Fields{
+				"recipient":   recipient,
+				"provider":    revokeNotifier.GetProviderName(),
+				"providerKey": providerKey,
+			}).Debug("Prepared revocation notification task")
+		}
+	}
+
+	// Execute all notifications in parallel
+	var err error
+	var notifyResults []notifyResult
+
+	if workflowTask.HasTemporalContext() {
+		notifyResults, err = t.executeNotifyTemporalParallel(workflowTask, fmt.Sprintf("%s.notify", taskName), notifyTasks)
+	} else {
+		notifyResults, err = t.executeNotifyGoParallel(workflowTask, notifyTasks)
+	}
+
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to execute revocation notifications")
+
+		return err
+	}
+
+	// Process results using shared helper
+	if err := processNotificationResults(notifyResults, "Revocation notification"); err != nil {
+
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to process revocation notification results")
+
+		return err
+	}
+
+	return nil
 }
