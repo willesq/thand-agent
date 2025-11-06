@@ -20,6 +20,7 @@ type authorizerNotifier struct {
 	workflowTask  *models.WorkflowTask
 	elevationReq  *models.ElevateRequestInternal
 	req           *thandFunction.NotifierRequest
+	providerKey   string
 	authRequests  map[string]*models.AuthorizeRoleRequest
 	authResponses map[string]*models.AuthorizeRoleResponse
 }
@@ -30,6 +31,7 @@ func NewAuthorizerNotifier(
 	workflowTask *models.WorkflowTask,
 	elevationReq *models.ElevateRequestInternal,
 	req *thandFunction.NotifierRequest,
+	providerKey string,
 	requests map[string]*models.AuthorizeRoleRequest,
 	authorizations map[string]*models.AuthorizeRoleResponse,
 ) NotifierImpl {
@@ -38,6 +40,7 @@ func NewAuthorizerNotifier(
 		workflowTask:  workflowTask,
 		elevationReq:  elevationReq,
 		req:           req,
+		providerKey:   providerKey,
 		authRequests:  requests,
 		authResponses: authorizations,
 	}

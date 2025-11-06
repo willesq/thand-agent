@@ -19,17 +19,17 @@ import (
 
 const ThandAuthorizeTask = "authorize"
 
-type ThandAuthorizeCallTask struct {
-	Revocation string                        `json:"revocation"` // This is the state to request the revocation
-	Notifier   thandFunction.NotifierRequest `json:"notifier"`   // Notifier configuration for sending approval notifications
+type AuthorizeTask struct {
+	Revocation string                                   `json:"revocation"` // This is the state to request the revocation
+	Notifiers  map[string]thandFunction.NotifierRequest `json:"notifiers"`  // Notifier configurations for sending authorization notifications
 }
 
-func (t *ThandAuthorizeCallTask) HasRevocation() bool {
+func (t *AuthorizeTask) HasRevocation() bool {
 	return len(t.Revocation) > 0
 }
 
-func (t *ThandAuthorizeCallTask) HasNotifier() bool {
-	return t.Notifier.IsValid()
+func (t *AuthorizeTask) HasNotifiers() bool {
+	return len(t.Notifiers) > 0
 }
 
 func (t *thandTask) executeAuthorizeTask(
@@ -99,7 +99,7 @@ func (t *thandTask) executeAuthorization(
 ) (any, error) {
 
 	// Send notification to the requester if notifier is configured
-	var authorizeCallTask ThandAuthorizeCallTask
+	var authorizeCallTask AuthorizeTask
 	err := common.ConvertInterfaceToInterface(call.With, &authorizeCallTask)
 
 	if err != nil {
@@ -230,26 +230,19 @@ func (t *thandTask) executeAuthorization(
 	workflowTask.SetContextKeyValue(models.VarsContextApproved, true)
 	workflowTask.SetContextKeyValue("authorizations", authorizations)
 
-	if authorizeCallTask.HasNotifier() {
-		logrus.Info("Sending authorization notification")
+	if authorizeCallTask.HasNotifiers() {
 
-		authorizeNotifier := NewAuthorizerNotifier(
-			t.config,
+		err = t.makeAuthorizationNotifications(
 			workflowTask,
+			taskName,
+			&authorizeCallTask,
 			elevateRequest,
-			&authorizeCallTask.Notifier,
 			requests,
 			authorizations,
 		)
 
-		_, err := t.executeNotify(
-			workflowTask,
-			fmt.Sprintf("%s.notify", taskName),
-			authorizeNotifier,
-		)
-
 		if err != nil {
-			logrus.WithError(err).Warn("Failed to send authorization notification, continuing anyway")
+			logrus.WithError(err).Warn("Failed to send authorization notifications, continuing anyway")
 			// Don't fail the authorization if notification fails
 		}
 	}
@@ -502,4 +495,83 @@ func (t *thandTask) scheduleRevocation(
 
 	return nil
 
+}
+
+func (t *thandTask) makeAuthorizationNotifications(
+	workflowTask *models.WorkflowTask,
+	taskName string,
+	authorizeTask *AuthorizeTask,
+	elevateRequest *models.ElevateRequestInternal,
+	authRequests map[string]*models.AuthorizeRoleRequest,
+	authorizations map[string]*models.AuthorizeRoleResponse,
+) error {
+
+	logrus.Info("Preparing authorization notifications")
+
+	// Build notification tasks for each provider
+	var notifyTasks []notifyTask
+	for providerKey, notifierRequest := range authorizeTask.Notifiers {
+		// Create an AuthorizerNotifier for each provider
+		authorizeNotifier := NewAuthorizerNotifier(
+			t.config,
+			workflowTask,
+			elevateRequest,
+			&notifierRequest,
+			providerKey,
+			authRequests,
+			authorizations,
+		)
+
+		// Get recipients for this notifier
+		recipients := authorizeNotifier.GetRecipients()
+
+		// Build notification tasks for each recipient
+		for _, recipient := range recipients {
+
+			recipientPayload := authorizeNotifier.GetPayload(recipient)
+
+			notifyTasks = append(notifyTasks, notifyTask{
+				Recipient: recipient,
+				CallFunc:  authorizeNotifier.GetCallFunction(recipient),
+				Payload:   recipientPayload,
+				Provider:  authorizeNotifier.GetProviderName(),
+			})
+
+			logrus.WithFields(logrus.Fields{
+				"recipient":   recipient,
+				"provider":    authorizeNotifier.GetProviderName(),
+				"providerKey": providerKey,
+			}).Debug("Prepared authorization notification task")
+		}
+	}
+
+	// Execute all notifications in parallel
+	var err error
+	var notifyResults []notifyResult
+
+	if workflowTask.HasTemporalContext() {
+		notifyResults, err = t.executeNotifyTemporalParallel(workflowTask, fmt.Sprintf("%s.notify", taskName), notifyTasks)
+	} else {
+		notifyResults, err = t.executeNotifyGoParallel(workflowTask, notifyTasks)
+	}
+
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to execute authorization notifications")
+
+		return err
+	}
+
+	// Process results using shared helper
+	if err := processNotificationResults(notifyResults, "Authorization notification"); err != nil {
+
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"taskName": taskName,
+		}).Error("Failed to process authorization notification results")
+
+		return err
+	}
+
+	return nil
 }

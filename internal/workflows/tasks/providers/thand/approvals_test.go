@@ -430,7 +430,7 @@ func TestSelfApprovalLogic(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test the self-approval check logic
-			notifyReq := NotifyRequest{
+			notifyReq := ApprovalsTask{
 				Approvals:   1,
 				SelfApprove: tt.selfApprove,
 			}
@@ -466,7 +466,7 @@ func TestSelfApprovalWithMultipleApprovers(t *testing.T) {
 		// User3 approves (should count)
 		// Result: 2 valid approvals
 
-		notifyReq := NotifyRequest{
+		notifyReq := ApprovalsTask{
 			Approvals:   2,
 			SelfApprove: false,
 		}
@@ -514,7 +514,7 @@ func TestSelfApprovalWithMultipleApprovers(t *testing.T) {
 		// Test scenario: selfApprove = true, requires 1 approval
 		// User1 (requester) approves their own request (should count)
 
-		notifyReq := NotifyRequest{
+		notifyReq := ApprovalsTask{
 			Approvals:   1,
 			SelfApprove: true,
 		}
@@ -546,7 +546,7 @@ func TestSelfApprovalWithElevatedIdentities(t *testing.T) {
 		elevatedIdentity := "user1@example.com"
 		externalApproverIdentity := "user2@example.com"
 
-		notifyReq := NotifyRequest{
+		notifyReq := ApprovalsTask{
 			Approvals:   1,
 			SelfApprove: false,
 		}
@@ -612,7 +612,7 @@ func TestSelfApprovalWithElevatedIdentities(t *testing.T) {
 		elevatedIdentities := []string{"user1@example.com", "user2@example.com"}
 		externalApproverIdentity := "user3@example.com"
 
-		notifyReq := NotifyRequest{
+		notifyReq := ApprovalsTask{
 			Approvals:   2,
 			SelfApprove: false,
 		}
@@ -660,7 +660,7 @@ func TestSelfApprovalWithElevatedIdentities(t *testing.T) {
 		requesterIdentity := "admin@example.com"
 		elevatedIdentity := "user1@example.com"
 
-		notifyReq := NotifyRequest{
+		notifyReq := ApprovalsTask{
 			Approvals:   1,
 			SelfApprove: true,
 		}

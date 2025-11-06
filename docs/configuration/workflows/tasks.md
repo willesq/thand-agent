@@ -127,10 +127,11 @@ The `approvals` task handles approval workflows by sending notifications to appr
     thand: approvals
     with:
       approvals: number          # Required approvals
-      notifier:                  # Notification configuration
-        provider: string
-        to: string
-        message: string
+      notifiers:                  # Notification configuration
+        key:
+          provider: string
+          to: string
+          message: string
     on:
       approved: target-step
       denied: target-step
@@ -142,17 +143,18 @@ The `approvals` task handles approval workflows by sending notifications to appr
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `approvals` | number | Yes | Number of approvals required |
-| `notifier` | object | Yes | Notification configuration |
+| `notifiers` | object | Yes | Notification configuration |
 
 ### Notifier Configuration
 
-The `notifier` object configures how approval requests are sent:
+The `notifiers` object configures how approval requests are sent:
 
 ```yaml
-notifier:
-  provider: slack               # Notification provider
-  to: "C0123456789"            # Channel ID or user ID
-  message: "Approval needed"    # Custom message (supports templating)
+notifiers:
+  slack:
+    provider: slack               # Notification provider
+    to: "C0123456789"            # Channel ID or user ID
+    message: "Approval needed"    # Custom message (supports templating)
 ```
 
 ### Supported Providers
@@ -171,7 +173,7 @@ The approvals task uses the `on` directive for conditional flow:
     thand: approvals
     with:
       approvals: 2
-      notifier: { ... }
+      notifiers: ...
     on:
       approved: grant-access     # If approved
       denied: send-denial        # If denied
@@ -196,12 +198,12 @@ The approvals task implements the following logic:
     thand: approvals
     with:
       approvals: 1
-      notifier:
-        provider: slack
-        to: "C0123456789"
-        message: >
-          The user ${ .user.name } is requesting ${ .role.name } access.
-          Reason: ${ .reason }
+      notifiers:
+        slack:
+          provider: slack
+          to: "C0123456789"
+          message: >
+            Access request needs your approval.
     on:
       approved: grant-access
       denied: deny-request
@@ -214,10 +216,11 @@ The approvals task implements the following logic:
     thand: approvals
     with:
       approvals: 1
-      notifier:
-        provider: email
-        to: "manager@company.com"
-        message: "Access request needs approval"
+      notifiers:
+        email:
+          provider: email
+          to: "manager@company.com"
+          message: "Access request needs approval"
     on:
       approved: authorize
       denied: denied
@@ -384,10 +387,11 @@ The `notify` task sends notifications to users, administrators, or external syst
     thand: notify
     with:
       approvals: number          # Number of approvals needed
-      notifier:                  # Notification configuration
-        provider: string
-        to: string
-        message: string
+      notifiers:                  # Notification configuration
+        key:
+          provider: string
+          to: string
+          message: string
     then: next-step
 ```
 
@@ -419,10 +423,11 @@ The notify task:
     thand: notify
     with:
       approvals: 1
-      notifier:
-        provider: slack
-        to: "C0123456789"
-        message: "Access granted to user"
+      notifiers:
+        slack:
+          provider: slack
+          to: "C0123456789"
+          message: "Access granted to user"
 ```
 
 **Note**: The notify task is primarily used internally by the approvals task. For standalone notifications, consider using standard Serverless Workflow `call` tasks to external APIs.
@@ -452,10 +457,11 @@ do:
       thand: approvals
       with:
         approvals: 1
-        notifier:
-          provider: slack
-          to: "C0123456789"
-          message: "Approval needed"
+        notifiers:
+          slack:
+            provider: slack
+            to: "C0123456789"
+            message: "Approval needed"
       on:
         approved: grant-access
         denied: deny-access
@@ -518,7 +524,7 @@ do:
     thand: approvals
     with:
       approvals: 1
-      notifier: { ... }
+      notifiers: ...
     on:
       approved: grant-access     # Required
       denied: send-denial        # Required

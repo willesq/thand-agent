@@ -40,36 +40,6 @@ type temporalNotifyResult struct {
 	Err       error
 }
 
-type NotifyRequest struct {
-	Approvals   int                           `json:"approvals" default:"1"`
-	SelfApprove bool                          `json:"selfApprove" default:"false"`
-	Notifier    thandFunction.NotifierRequest `json:"notifier"`
-
-	// Internal use only: entrypoint for resuming workflow
-	Entrypoint string `json:"entrypoint"`
-}
-
-func (n *NotifyRequest) IsValid() bool {
-
-	if n.Approvals == 0 {
-		return false
-	}
-
-	if !n.Notifier.IsValid() {
-		return false
-	}
-
-	return true
-}
-
-func (n *NotifyRequest) AsMap() map[string]any {
-	response, err := common.ConvertInterfaceToMap(n)
-	if err != nil {
-		panic(fmt.Sprintf("failed to convert NotifyRequest to map: %v", err))
-	}
-	return response
-}
-
 func (t *thandTask) executeNotifyTask(
 	workflowTask *models.WorkflowTask,
 	taskName string,
@@ -310,4 +280,37 @@ func (t *thandTask) executeNotifyGoParallel(
 	wg.Wait()
 
 	return results, nil
+}
+
+// processNotificationResults processes notification results and logs errors/successes.
+// Returns an error if all notifications failed, otherwise logs warnings for partial failures.
+func processNotificationResults(results []notifyResult, notificationType string) error {
+	hasErrors := false
+	successCount := 0
+
+	for _, result := range results {
+		if result.Error != nil {
+			logrus.WithError(result.Error).
+				WithField("recipient", result.Recipient).
+				Error(fmt.Sprintf("%s failed", notificationType))
+			hasErrors = true
+		} else {
+			successCount++
+			logrus.WithField("recipient", result.Recipient).
+				Info(fmt.Sprintf("%s sent successfully", notificationType))
+		}
+	}
+
+	if hasErrors && successCount == 0 {
+		return fmt.Errorf("all %s requests failed", notificationType)
+	}
+
+	if hasErrors {
+		logrus.WithFields(logrus.Fields{
+			"success": successCount,
+			"total":   len(results),
+		}).Warn(fmt.Sprintf("Some %s requests failed", notificationType))
+	}
+
+	return nil
 }

@@ -54,12 +54,12 @@ func (a *approvalsNotifier) createApprovalSlackBlocks() []slack.Block {
 }
 
 // addUserMessageSection adds the user message block if message is provided
-func (a *approvalsNotifier) addUserMessageSection(blocks *[]slack.Block, notifyReq *NotifyRequest) {
-	if len(notifyReq.Notifier.Message) > 0 {
+func (a *approvalsNotifier) addUserMessageSection(blocks *[]slack.Block, approvalNotifier *ApprovalNotifier) {
+	if len(approvalNotifier.Notifier.Message) > 0 {
 		*blocks = append(*blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
-				notifyReq.Notifier.Message,
+				approvalNotifier.Notifier.Message,
 				false,
 				false,
 			),
@@ -244,9 +244,9 @@ func (a *approvalsNotifier) addIdentitiesSection(blocks *[]slack.Block, elevateR
 func (a *approvalsNotifier) addActionSection(
 	blocks *[]slack.Block,
 	workflowTask *models.WorkflowTask,
-	notifyReq *NotifyRequest,
+	approvalNotifier *ApprovalNotifier,
 ) {
-	if notifyReq.Approvals > 0 {
+	if approvalNotifier.Approvals > 0 {
 		// Get current approvals from workflow context
 		workflowContext := workflowTask.GetContextAsMap()
 		approvals, ok := workflowContext["approvals"].([]any)
@@ -266,18 +266,18 @@ func (a *approvalsNotifier) addActionSection(
 			}
 		}
 
-		remainingApprovals := notifyReq.Approvals - approvedCount
+		remainingApprovals := approvalNotifier.Approvals - approvedCount
 
 		// Create dynamic message based on approval requirements
 		var actionMessage string
-		if notifyReq.Approvals == 1 {
+		if approvalNotifier.Approvals == 1 {
 			actionMessage = "*Action Required:*\n*One approval is required.* Please review the request and choose an action."
 		} else if remainingApprovals <= 0 {
 			actionMessage = "*Action Required:*\n*Sufficient approvals have been received.* Please review the request and choose an action."
 		} else if remainingApprovals == 1 {
-			actionMessage = fmt.Sprintf("*Action Required:*\n*%d more approval is needed (%d of %d received).* Please review the request and choose an action.", remainingApprovals, approvedCount, notifyReq.Approvals)
+			actionMessage = fmt.Sprintf("*Action Required:*\n*%d more approval is needed (%d of %d received).* Please review the request and choose an action.", remainingApprovals, approvedCount, approvalNotifier.Approvals)
 		} else {
-			actionMessage = fmt.Sprintf("*Action Required:*\n*%d more approvals are needed (%d of %d received).* Please review the request and choose an action.", remainingApprovals, approvedCount, notifyReq.Approvals)
+			actionMessage = fmt.Sprintf("*Action Required:*\n*%d more approvals are needed (%d of %d received).* Please review the request and choose an action.", remainingApprovals, approvedCount, approvalNotifier.Approvals)
 		}
 
 		*blocks = append(*blocks, slack.NewSectionBlock(
@@ -304,7 +304,7 @@ func (a *approvalsNotifier) addActionSection(
 						false,
 						false,
 					),
-				).WithURL(a.createCallbackUrl(workflowTask, notifyReq, true)).WithStyle(slack.StylePrimary),
+				).WithURL(a.createCallbackUrl(workflowTask, approvalNotifier, true)).WithStyle(slack.StylePrimary),
 				slack.NewButtonBlockElement(
 					"deny",
 					"Deny",
@@ -314,7 +314,7 @@ func (a *approvalsNotifier) addActionSection(
 						false,
 						false,
 					),
-				).WithURL(a.createCallbackUrl(workflowTask, notifyReq, false)).WithStyle(slack.StyleDanger),
+				).WithURL(a.createCallbackUrl(workflowTask, approvalNotifier, false)).WithStyle(slack.StyleDanger),
 			))
 
 		}
@@ -334,7 +334,7 @@ func (a *approvalsNotifier) addActionSection(
 
 func (a *approvalsNotifier) createCallbackUrl(
 	workflowTask *models.WorkflowTask,
-	notifyReq *NotifyRequest,
+	approvalNotifier *ApprovalNotifier,
 	approve bool,
 ) string {
 
@@ -355,8 +355,8 @@ func (a *approvalsNotifier) createCallbackUrl(
 	signaledWorkflow := workflowTask.Clone().(*models.WorkflowTask)
 	signaledWorkflow.SetInput(&event)
 
-	if len(notifyReq.Entrypoint) > 0 {
-		signaledWorkflow.SetEntrypoint(notifyReq.Entrypoint)
+	if len(approvalNotifier.Entrypoint) > 0 {
+		signaledWorkflow.SetEntrypoint(approvalNotifier.Entrypoint)
 	}
 
 	if workflowTask.HasTemporalContext() {
