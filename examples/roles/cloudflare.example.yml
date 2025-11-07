@@ -45,9 +45,9 @@ roles:
 
   # ============================================================================
   # RESOURCE-SCOPED POLICIES (Granular RBAC)
-  # Use inherits to inherit permissions from Cloudflare roles
-  # Use permissions.allow to add additional specific permissions
-  # Use permissions.deny to explicitly block certain permissions
+  # IMPORTANT: Use EITHER inherits OR permissions, but NOT both
+  # - inherits: Use predefined Cloudflare role permissions
+  # - permissions: Specify explicit permission keys
   # Use resources to specify which zones/accounts to scope the permissions to
   # ============================================================================
 
@@ -105,10 +105,6 @@ roles:
       - security_team_approval
     inherits:
       - Firewall  # Inherit all Firewall role permissions (includes WAF)
-    permissions:
-      allow:
-        - logs      # Add log access for security monitoring
-        - analytics # Add analytics for traffic analysis
     resources:
       allow:
         - zone:*  # All zones for security management
@@ -177,9 +173,6 @@ roles:
       - senior_engineer_approval
     inherits:
       - SSL/TLS, Caching, Performance, Page Rules, and Customization  # SSL and related permissions
-    permissions:
-      allow:
-        - analytics  # Add analytics for certificate monitoring
     resources:
       allow:
         - zone:example.com
@@ -226,16 +219,12 @@ roles:
 
   cloudflare_customer_a_dns:
     name: DNS Editor - Customer A
-    description: DNS management for Customer A's zones only
+    description: DNS management for Customer A's zones only (with billing denied)
     authenticators:
       - google_oauth2
     workflows:
       - customer_approval
-    inherits:
-      - DNS  # Inherit DNS role permissions
-    permissions:
-      deny:
-        - billing  # Explicitly deny billing access for customer isolation
+    # Using explicit permissions to have granular control with deny rules
     resources:
       allow:
         - zone:customer-a.com
@@ -269,9 +258,6 @@ roles:
       - SSL/TLS, Caching, Performance, Page Rules, and Customization # SSL/TLS and caching
       - Cache Purge                                                   # Cache management
       - Analytics                                                     # Analytics viewing
-    permissions:
-      allow:
-        - logs  # Add log access for debugging
     resources:
       allow:
         - zone:*  # All zones in dev account
@@ -282,4 +268,40 @@ roles:
       groups:
         - oidc:developers
         - oidc:qa-team
+    enabled: true
+
+  # ============================================================================
+  # EXAMPLE WITH EXPLICIT PERMISSIONS (Alternative Approach)
+  # Use this when you need custom permission combinations not matching any role
+  # ============================================================================
+
+  cloudflare_custom_security:
+    name: Custom Security Access
+    description: Custom combination of security permissions with explicit deny rules
+    authenticators:
+      - google_oauth2
+    workflows:
+      - security_team_approval
+    # Using explicit permissions for fine-grained control
+    permissions:
+      allow:
+        - firewall_services:read
+        - firewall_services:edit
+        - waf:read
+        - waf:edit
+        - logs:read
+        - analytics:read
+      deny:
+        - billing:read
+        - billing:edit
+        - organization:read
+        - organization:edit
+    resources:
+      allow:
+        - zone:*  # All zones
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security
     enabled: true

@@ -217,7 +217,9 @@ Creates Cloudflare Policies that combine specific permissions with specific reso
 - Implementing least-privilege security model
 - Managing multi-tenant or multi-zone environments
 
-**Example configuration using inherits:**
+**Important:** Cloudflare supports EITHER `inherits` (to use predefined role permissions) OR `permissions` (to specify explicit permissions), but NOT both. Choose the approach that best fits your needs.
+
+**Approach 1: Using inherits (recommended for standard access patterns)**
 
 ```yaml
 roles:
@@ -236,49 +238,29 @@ roles:
     enabled: true
 ```
 
-**Example configuration using explicit permissions:**
+**Approach 2: Using explicit permissions (for custom permission combinations)**
 
 ```yaml
 roles:
-  cloudflare-dns-editor:
-    name: DNS Editor for Production Zones
-    description: DNS and analytics access for specific production zones
+  cloudflare-custom-access:
+    name: Custom Access
+    description: Specific permission combination
     providers:
       - cloudflare-prod
     permissions:
       allow:
-        - dns          # DNS read/write
-        - dns_records  # DNS records management
-        - analytics    # View analytics
-    resources:
-      allow:
-        - zone:example.com      # Specific zone
-        - zone:api.example.com  # Another specific zone
-    enabled: true
-```
-
-**Combining inherits with permission overrides:**
-
-You can inherit a Cloudflare role's permissions and then add or deny specific permissions:
-
-```yaml
-roles:
-  cloudflare-restricted-admin:
-    name: Restricted Administrator
-    description: Admin access but without billing permissions
-    providers:
-      - cloudflare-prod
-    inherits:
-      - Administrator  # Inherit all Administrator permissions
-    permissions:
+        - dns_records:edit  # Edit DNS records
+        - analytics:read    # View analytics
       deny:
-        - billing       # Explicitly deny billing access
-        - organization  # Explicitly deny organization settings
+        - billing:read      # Explicitly deny billing read
+        - billing:edit      # Explicitly deny billing edit
     resources:
       allow:
-        - zone:*
+        - zone:example.com
     enabled: true
 ```
+
+> **Note:** Do not use both `inherits` and `permissions` in the same role. Cloudflare's API requires you to choose one approach or the other.
 
 ## Resource Specification Format
 
@@ -294,7 +276,7 @@ When using resource-scoped policies, you can specify resources in the following 
 
 ## Supported Permissions
 
-Cloudflare provides two ways to specify permissions for resource-scoped policies:
+Cloudflare provides two ways to specify permissions for resource-scoped policies. **You must choose ONE approach - do not mix them.**
 
 ### 1. Using Inherits (Recommended for Standard Roles)
 
@@ -305,37 +287,55 @@ inherits:
   - DNS              # All DNS-related permissions
   - Analytics        # All analytics permissions
   - Firewall         # All firewall permissions
+# Do NOT add a permissions: section when using inherits
 ```
 
-### 2. Using Explicit Permissions (Granular Control)
+### 2. Using Explicit Permissions (For Custom Combinations)
 
-Specify individual permission keys for fine-grained control. Available permission keys:
-
-- `analytics` - View analytics and reports
-- `billing` - Manage billing and subscriptions
-- `cache_purge` - Purge cache
-- `dns` - Manage DNS settings
-- `dns_records` - Manage DNS records
-- `lb` - Manage load balancers
-- `logs` - Access and manage logs
-- `organization` - Manage organization settings
-- `ssl` - Manage SSL/TLS certificates
-- `waf` - Manage Web Application Firewall
-- `zone_settings` - Manage zone settings
-- `zones` - Manage zones
-
-### 3. Combining Both Approaches
-
-You can inherit a role's permissions and then override specific permissions:
+Specify individual permission keys for fine-grained control. Permission keys use the format `permission:action` where action is either `read` or `edit`.
 
 ```yaml
-inherits:
-  - Administrator    # Inherit all admin permissions
 permissions:
+  allow:
+    - dns_records:edit  # Edit DNS records
+    - analytics:read    # View analytics
   deny:
-    - billing       # But deny billing access
-    - organization  # And deny org settings
+    - billing:read      # Deny billing access
+# Do NOT add an inherits: section when using permissions
 ```
+
+**Available permission keys:**
+
+- `analytics:read` - View analytics and reports
+- `billing:read` - View billing information
+- `billing:edit` - Manage billing and subscriptions
+- `cache_purge:edit` - Purge cache
+- `dns_records:read` - View DNS records
+- `dns_records:edit` - Manage DNS records
+- `lb:read` - View load balancers
+- `lb:edit` - Manage load balancers
+- `logs:read` - View logs
+- `logs:edit` - Manage log configuration
+- `organization:read` - View organization settings
+- `organization:edit` - Manage organization settings
+- `ssl:read` - View SSL/TLS certificates
+- `ssl:edit` - Manage SSL/TLS certificates
+- `waf:read` - View Web Application Firewall rules
+- `waf:edit` - Manage Web Application Firewall rules
+- `zone_settings:read` - View zone settings
+- `zone_settings:edit` - Manage zone settings
+- `zone:read` - View zones
+- `zone:edit` - Manage zones
+- `access:read` - View Access applications and policies
+- `access:edit` - Manage Access applications and policies
+- `firewall_services:read` - View firewall services
+- `firewall_services:edit` - Manage firewall services
+- `workers:read` - View Workers scripts
+- `workers:edit` - Manage Workers scripts
+- `workers_kv_storage:read` - View Workers KV storage
+- `workers_kv_storage:edit` - Manage Workers KV storage
+- `workers_r2:read` - View R2 storage
+- `workers_r2:edit` - Manage R2 storage
 
 Use `agent providers permissions list --provider cloudflare-prod` to see all available permissions with their exact key names.
 
@@ -438,7 +438,9 @@ roles:
     enabled: true
 ```
 
-### Example 5: Security Team Access with Permission Override
+### Example 5: Security Team Access
+
+Using explicit permissions for custom access pattern:
 
 ```yaml
 roles:
@@ -449,15 +451,17 @@ roles:
       - google_oauth2
     workflows:
       - security_lead_approval
-    inherits:
-      - Firewall                      # All firewall permissions
-      - Cloudflare Zero Trust         # Zero Trust permissions
     permissions:
       allow:
-        - logs                         # Add log access
-        - analytics                    # Add analytics
+        - firewall_services:read
+        - firewall_services:edit
+        - waf:read
+        - waf:edit
+        - logs:read
+        - analytics:read
       deny:
-        - billing                      # Explicitly deny billing
+        - billing:read
+        - billing:edit
     resources:
       allow:
         - zone:*  # All zones for security monitoring
@@ -535,35 +539,33 @@ agent providers identities list --provider cloudflare-prod --filter "user@exampl
 
 ### How Policy-Based Access Works
 
-When you define a role with `inherits`, `permissions`, and `resources`:
+When you define a role with `inherits` OR `permissions` and `resources`:
 
-1. **Role Inheritance Processing**: If `inherits` is specified, fetches permission groups from the inherited Cloudflare roles (e.g., "DNS", "Firewall")
-2. **Permission Groups Creation**: 
-   - For `inherits`: Extracts all permission groups from the specified Cloudflare roles
-   - For `permissions.allow`: Creates additional permission group objects for each specified permission key
-   - For `permissions.deny`: Creates permission group objects to explicitly deny
-3. **Resource Group Creation**: Creates Resource Groups for each specified resource:
-   - Zones are looked up by domain name
-   - Wildcard zones are expanded to all zones in the account
-   - Account resources are created with account-level scope
-4. **Policy Construction**: 
-   - Combines allowed Permission Groups (from both inherits and permissions.allow) with Resource Groups into Cloudflare Policies with `access: "allow"`
-   - If deny permissions are specified, creates separate policies with `access: "deny"`
-5. **Member Creation**: Invites the user as an account member with the generated policies
+**Using inherits:**
+1. **Role Inheritance Processing**: Fetches permission groups from the inherited Cloudflare roles (e.g., "DNS", "Firewall")
+2. **Resource Group Creation**: Creates Resource Groups for each specified resource
+3. **Policy Construction**: Combines inherited Permission Groups with Resource Groups into Cloudflare Policies
+4. **Member Creation**: Invites the user as an account member with the generated policies
 
-### Permission Allow/Deny Behavior
+**Using permissions:**
+1. **Permission Groups Creation**: Creates permission group objects for each specified permission key
+2. **Resource Group Creation**: Creates Resource Groups for each specified resource
+3. **Policy Construction**: 
+   - For `permissions.allow`: Creates policies with `access: "allow"`
+   - For `permissions.deny`: Creates policies with `access: "deny"`
+4. **Member Creation**: Invites the user as an account member with the generated policies
 
-- **Inherits**: Brings in all permissions from one or more Cloudflare roles
-- **Allow permissions**: Adds additional individual permissions beyond what's inherited
-- **Deny permissions**: Explicitly denies specific permissions (overrides inherited permissions)
-- Both allow and deny policies are applied to the same resource groups specified in `resources.allow`
+### Permission Specification Rules
+
+- **Use EITHER `inherits` OR `permissions`** - Cloudflare does not support combining both approaches
+- **`inherits`**: Best for standard access patterns that match Cloudflare's predefined roles
+- **`permissions`**: Best for custom permission combinations or when you need explicit allow/deny control
+- When using `permissions`, you can specify both `allow` and `deny` lists
 
 ### Recommended Approaches
 
 1. **Use `inherits` for standard access patterns**: When you need a well-defined set of permissions that match a Cloudflare role (e.g., DNS, Firewall, Workers Platform Admin)
-2. **Use `permissions.allow` for custom combinations**: When you need a specific mix of permissions that doesn't match any single role
-3. **Use both together for fine-tuning**: Inherit a role's permissions, then use `permissions.allow` to add extras or `permissions.deny` to remove specific permissions
-4. **Use `inherits` with optional role IDs**: The `inherits` field can also accept Cloudflare role IDs for backward compatibility
+2. **Use `permissions` for custom combinations**: When you need a specific mix of permissions that doesn't match any single role, or when you need to explicitly deny certain permissions
 
 ### Caching and Performance
 

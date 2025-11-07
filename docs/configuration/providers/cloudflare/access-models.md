@@ -97,8 +97,8 @@ roles:
       - Firewall  # Inherit all Firewall permissions
     permissions:
       allow:
-        - analytics  # Add analytics access
-        - logs       # Add log access
+        - analytics:read  # Add analytics read access
+        - logs:read       # Add log read access
     resources:
       allow:
         - zone:*  # Wildcard for all zones
@@ -127,8 +127,8 @@ roles:
       - Administrator  # Inherit all admin permissions
     permissions:
       deny:
-        - billing       # Explicitly deny billing
-        - organization  # Explicitly deny org settings
+        - billing:read  # Explicitly deny billing read
+        - billing:edit  # Explicitly deny billing edit
     resources:
       allow:
         - zone:*
@@ -219,7 +219,7 @@ roles:
       - Load Balancer # Load balancer permissions
     permissions:
       allow:
-        - analytics  # Add analytics
+        - analytics:read  # Add analytics read access
     resources:
       allow:
         - zone:api.example.com
@@ -240,8 +240,8 @@ roles:
       - Cloudflare Zero Trust # Zero Trust permissions
     permissions:
       allow:
-        - analytics  # Add analytics
-        - logs       # Add logs
+        - analytics:read  # Add analytics read access
+        - logs:read       # Add log read access
     resources:
       allow:
         - zone:*  # All zones for security monitoring

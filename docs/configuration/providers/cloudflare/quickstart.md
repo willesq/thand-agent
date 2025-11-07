@@ -219,7 +219,7 @@ roles:
       - Firewall  # Firewall permissions
     permissions:
       allow:
-        - analytics  # Add analytics access
+        - analytics:read  # Add analytics read access
     resources:
       allow:
         - zone:app.example.com

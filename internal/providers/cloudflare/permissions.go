@@ -30,99 +30,99 @@ func (p *cloudflareProvider) LoadPermissions() error {
 	// https://developers.cloudflare.com/fundamentals/api/reference/permissions/
 	permissionsData := map[string]string{
 		// Account-level permission groups
-		"#account:read":           "Read account settings",
-		"#account:edit":           "Edit account settings",
-		"#account_analytics:read": "Read account analytics",
-		"#account_settings:read":  "Read account settings",
-		"#account_settings:edit":  "Edit account settings",
-		"#account_rulesets:read":  "Read account rulesets",
-		"#account_rulesets:edit":  "Edit account rulesets",
+		"account:read":           "Read account settings",
+		"account:edit":           "Edit account settings",
+		"account_analytics:read": "Read account analytics",
+		"account_settings:read":  "Read account settings",
+		"account_settings:edit":  "Edit account settings",
+		"account_rulesets:read":  "Read account rulesets",
+		"account_rulesets:edit":  "Edit account rulesets",
 
 		// Access permission groups
-		"#access:read": "Read Access applications and policies",
-		"#access:edit": "Edit Access applications and policies",
+		"access:read": "Read Access applications and policies",
+		"access:edit": "Edit Access applications and policies",
 
 		// API Gateway permission groups
-		"#api_gateway:read": "Read API Gateway settings",
-		"#api_gateway:edit": "Edit API Gateway settings",
+		"api_gateway:read": "Read API Gateway settings",
+		"api_gateway:edit": "Edit API Gateway settings",
 
 		// Analytics permission groups
-		"#analytics:read": "Read analytics data",
+		"analytics:read": "Read analytics data",
 
 		// Billing permission groups
-		"#billing:read": "Read billing information",
-		"#billing:edit": "Edit billing information",
+		"billing:read": "Read billing information",
+		"billing:edit": "Edit billing information",
 
 		// Cache permissions
-		"#cache_purge:edit": "Purge cache",
+		"cache_purge:edit": "Purge cache",
 
 		// DNS permissions
-		"#dns_records:read": "Read DNS records",
-		"#dns_records:edit": "Edit DNS records",
+		"dns_records:read": "Read DNS records",
+		"dns_records:edit": "Edit DNS records",
 
 		// Firewall permissions
-		"#waf:read":               "Read WAF rules",
-		"#waf:edit":               "Edit WAF rules",
-		"#firewall_services:read": "Read firewall services",
-		"#firewall_services:edit": "Edit firewall services",
+		"waf:read":               "Read WAF rules",
+		"waf:edit":               "Edit WAF rules",
+		"firewall_services:read": "Read firewall services",
+		"firewall_services:edit": "Edit firewall services",
 
 		// Load Balancing permissions
-		"#lb:read": "Read load balancers",
-		"#lb:edit": "Edit load balancers",
+		"lb:read": "Read load balancers",
+		"lb:edit": "Edit load balancers",
 
 		// Logs permissions
-		"#logs:read": "Read logs",
-		"#logs:edit": "Edit logs configuration",
+		"logs:read": "Read logs",
+		"logs:edit": "Edit logs configuration",
 
 		// Member permissions
-		"#member:read": "Read account members",
-		"#member:edit": "Edit account members",
+		"member:read": "Read account members",
+		"member:edit": "Edit account members",
 
 		// Organization permissions
-		"#organization:read": "Read organization settings",
-		"#organization:edit": "Edit organization settings",
+		"organization:read": "Read organization settings",
+		"organization:edit": "Edit organization settings",
 
 		// Page Rules permissions
-		"#page_rules:read": "Read page rules",
-		"#page_rules:edit": "Edit page rules",
+		"page_rules:read": "Read page rules",
+		"page_rules:edit": "Edit page rules",
 
 		// SSL/TLS permissions
-		"#ssl:read": "Read SSL/TLS settings",
-		"#ssl:edit": "Edit SSL/TLS settings",
+		"ssl:read": "Read SSL/TLS settings",
+		"ssl:edit": "Edit SSL/TLS settings",
 
 		// Stream permissions
-		"#stream:read": "Read Cloudflare Stream",
-		"#stream:edit": "Edit Cloudflare Stream",
+		"stream:read": "Read Cloudflare Stream",
+		"stream:edit": "Edit Cloudflare Stream",
 
 		// Workers permissions
-		"#workers:read":            "Read Workers scripts",
-		"#workers:edit":            "Edit Workers scripts",
-		"#workers_kv_storage:read": "Read Workers KV storage",
-		"#workers_kv_storage:edit": "Edit Workers KV storage",
-		"#workers_r2:read":         "Read R2 storage",
-		"#workers_r2:edit":         "Edit R2 storage",
+		"workers:read":            "Read Workers scripts",
+		"workers:edit":            "Edit Workers scripts",
+		"workers_kv_storage:read": "Read Workers KV storage",
+		"workers_kv_storage:edit": "Edit Workers KV storage",
+		"workers_r2:read":         "Read R2 storage",
+		"workers_r2:edit":         "Edit R2 storage",
 
 		// Zone permissions
-		"#zone:read":          "Read zone settings",
-		"#zone:edit":          "Edit zone settings",
-		"#zone_settings:read": "Read zone settings",
-		"#zone_settings:edit": "Edit zone settings",
+		"zone:read":          "Read zone settings",
+		"zone:edit":          "Edit zone settings",
+		"zone_settings:read": "Read zone settings",
+		"zone_settings:edit": "Edit zone settings",
 
 		// Images permissions
-		"#images:read": "Read Cloudflare Images",
-		"#images:edit": "Edit Cloudflare Images",
+		"images:read": "Read Cloudflare Images",
+		"images:edit": "Edit Cloudflare Images",
 
 		// Magic Transit permissions
-		"#magic_transit:read": "Read Magic Transit settings",
-		"#magic_transit:edit": "Edit Magic Transit settings",
+		"magic_transit:read": "Read Magic Transit settings",
+		"magic_transit:edit": "Edit Magic Transit settings",
 
 		// Zero Trust permissions
-		"#zero_trust:read": "Read Zero Trust settings",
-		"#zero_trust:edit": "Edit Zero Trust settings",
+		"zero_trust:read": "Read Zero Trust settings",
+		"zero_trust:edit": "Edit Zero Trust settings",
 
 		// DDoS permissions
-		"#ddos:read": "Read DDoS settings",
-		"#ddos:edit": "Edit DDoS settings",
+		"ddos:read": "Read DDoS settings",
+		"ddos:edit": "Edit DDoS settings",
 	}
 
 	var permissions []models.ProviderPermission
