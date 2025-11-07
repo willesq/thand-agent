@@ -10,6 +10,9 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+const CloudflareAllow = "allow"
+const CloudflareDeny = "deny"
+
 // AuthorizeRole grants access for a user to a role in Cloudflare
 // Supports both account-wide roles and resource-scoped policies
 func (p *cloudflareProvider) AuthorizeRole(
@@ -208,80 +211,143 @@ func (p *cloudflareProvider) GetAuthorizedAccessUrl(
 }
 
 // buildMembershipFromRole creates Cloudflare policies from role definition
-// Uses the role's Permissions field to set allow/deny permission groups
-// Optionally uses Inherits field for backward compatibility with Cloudflare role IDs
+// If only inherits are provided, assigns those roles directly
+// If permissions are provided, builds granular policies based on inherited role permissions
 func (p *cloudflareProvider) buildMembershipFromRole(
 	ctx context.Context,
 	params *cloudflare.CreateAccountMemberParams,
 	role *models.Role,
 ) error {
 
-	var policies []cloudflare.Policy
-	var roleIDs []string
+	// Check if we have any permissions specified
+	hasPermissions := len(role.Permissions.Allow) > 0 || len(role.Permissions.Deny) > 0
 
-	// Get role IDs from inherited Cloudflare roles if specified (optional, uses cached data)
-	if len(role.Inherits) > 0 {
-		ids, err := p.getRoleIDsFromInherits(role.Inherits)
+	// If only inherits provided (no permissions), just assign the roles directly
+	if len(role.Inherits) > 0 && !hasPermissions {
+		roleIDs, err := p.getRoleIDsFromInherits(role.Inherits)
 		if err != nil {
-			// Log warning but don't fail - inherits is optional when using permissions directly
+			return fmt.Errorf("failed to get role IDs from inherits: %w", err)
+		}
+		params.Roles = roleIDs
+
+		logrus.WithFields(logrus.Fields{
+			"role":       role.Name,
+			"role_ids":   roleIDs,
+			"role_count": len(roleIDs),
+		}).Debug("Assigned roles directly from inherits")
+
+		return nil
+	}
+
+	// If permissions are provided, build granular policies
+	if hasPermissions {
+		// Build a map of all available permissions from inherited roles
+		availablePermissions := make(map[string]bool)
+
+		if len(role.Inherits) > 0 {
+			for _, roleName := range role.Inherits {
+				cfRole, ok := p.cfRolesMap[strings.ToLower(roleName)]
+				if !ok {
+					logrus.WithFields(logrus.Fields{
+						"role":           role.Name,
+						"inherited_role": roleName,
+					}).Warn("Inherited role not found in cache, skipping")
+					continue
+				}
+
+				// Add all permissions from this role to available permissions
+				for permKey := range cfRole.Permissions {
+					availablePermissions[permKey] = true
+				}
+			}
+
 			logrus.WithFields(logrus.Fields{
-				"role":     role.Name,
-				"inherits": role.Inherits,
-				"error":    err,
-			}).Warn("Failed to get role IDs from inherits, continuing with permission-based policies")
-		} else {
-			roleIDs = ids
+				"role":                  role.Name,
+				"available_permissions": len(availablePermissions),
+			}).Debug("Built permission map from inherited roles")
 		}
-	}
 
-	// Get permission groups from role's permissions (allow and deny)
-	allowPermissionGroups, err := p.getPermissionGroupsFromPermissions(role.Permissions.Allow)
-	if err != nil {
-		return fmt.Errorf("failed to get allow permission groups: %w", err)
-	}
+		// Build permission groups for allow and deny
+		var allowPermissionGroups []cloudflare.PermissionGroup
+		var denyPermissionGroups []cloudflare.PermissionGroup
 
-	denyPermissionGroups, err := p.getPermissionGroupsFromPermissions(role.Permissions.Deny)
-	if err != nil {
-		return fmt.Errorf("failed to get deny permission groups: %w", err)
-	}
-
-	// Build resource groups from the role's resource specifications
-	resourceGroups, err := p.buildResourceGroups(ctx, role.Resources.Allow)
-	if err != nil {
-		return fmt.Errorf("failed to build resource groups: %w", err)
-	}
-
-	// Create allow policies for each resource group with the specified permission groups
-	for _, resourceGroup := range resourceGroups {
-		if len(allowPermissionGroups) > 0 {
-			policy := cloudflare.Policy{
-				PermissionGroups: allowPermissionGroups,
-				ResourceGroups: []cloudflare.ResourceGroup{
-					resourceGroup,
-				},
-				Access: "allow",
+		// Process allow permissions
+		for _, permName := range role.Permissions.Allow {
+			// If we have inherited roles, verify the permission is available
+			if len(role.Inherits) > 0 && !availablePermissions[permName] {
+				logrus.WithFields(logrus.Fields{
+					"role":       role.Name,
+					"permission": permName,
+				}).Warn("Allow permission not available in inherited roles, skipping")
+				continue
 			}
-			policies = append(policies, policy)
+
+			allowPermissionGroups = append(allowPermissionGroups, cloudflare.PermissionGroup{
+				ID: permName,
+			})
 		}
 
-		// Create deny policies for each resource group
-		if len(denyPermissionGroups) > 0 {
-			policy := cloudflare.Policy{
-				PermissionGroups: denyPermissionGroups,
-				ResourceGroups: []cloudflare.ResourceGroup{
-					resourceGroup,
-				},
-				Access: "deny",
+		// Process deny permissions
+		for _, permName := range role.Permissions.Deny {
+			// If we have inherited roles, verify the permission is available
+			if len(role.Inherits) > 0 && !availablePermissions[permName] {
+				logrus.WithFields(logrus.Fields{
+					"role":       role.Name,
+					"permission": permName,
+				}).Warn("Deny permission not available in inherited roles, skipping")
+				continue
 			}
-			policies = append(policies, policy)
+
+			denyPermissionGroups = append(denyPermissionGroups, cloudflare.PermissionGroup{
+				ID: permName,
+			})
 		}
+
+		// Build resource groups from the role's resource specifications
+		resourceGroups, err := p.buildResourceGroups(ctx, role.Resources.Allow)
+		if err != nil {
+			return fmt.Errorf("failed to build resource groups: %w", err)
+		}
+
+		// Create policies for each resource group
+		var policies []cloudflare.Policy
+		for _, resourceGroup := range resourceGroups {
+			if len(allowPermissionGroups) > 0 {
+				policy := cloudflare.Policy{
+					PermissionGroups: allowPermissionGroups,
+					ResourceGroups: []cloudflare.ResourceGroup{
+						resourceGroup,
+					},
+					Access: CloudflareAllow,
+				}
+				policies = append(policies, policy)
+			}
+
+			if len(denyPermissionGroups) > 0 {
+				policy := cloudflare.Policy{
+					PermissionGroups: denyPermissionGroups,
+					ResourceGroups: []cloudflare.ResourceGroup{
+						resourceGroup,
+					},
+					Access: CloudflareDeny,
+				}
+				policies = append(policies, policy)
+			}
+		}
+
+		params.Policies = policies
+
+		logrus.WithFields(logrus.Fields{
+			"role":         role.Name,
+			"policy_count": len(policies),
+			"allow_perms":  len(allowPermissionGroups),
+			"deny_perms":   len(denyPermissionGroups),
+		}).Debug("Built granular policies from permissions")
+
+		return nil
 	}
 
-	// Set both role IDs and policies
-	params.Roles = roleIDs
-	params.Policies = policies
-
-	return nil
+	return fmt.Errorf("role must specify either inherits or permissions")
 }
 
 // getRoleIDsFromInherits gets role IDs from multiple Cloudflare roles
@@ -321,43 +387,6 @@ func (p *cloudflareProvider) getRoleIDsFromInherits(inherits []string) ([]string
 	return roleIDs, nil
 }
 
-// getPermissionGroupsFromPermissions creates permission groups from permission names
-// Maps permission names (analytics, dns, billing, etc.) to Cloudflare PermissionGroup objects
-func (p *cloudflareProvider) getPermissionGroupsFromPermissions(permissions []string) ([]cloudflare.PermissionGroup, error) {
-	if len(permissions) == 0 {
-		// Empty permissions is valid - return empty array
-		return []cloudflare.PermissionGroup{}, nil
-	}
-
-	var permissionGroups []cloudflare.PermissionGroup
-	seenGroups := make(map[string]bool) // Track to avoid duplicates
-
-	// Create a permission group for each permission name
-	for _, permissionName := range permissions {
-		// Avoid duplicates
-		if seenGroups[permissionName] {
-			continue
-		}
-
-		// Create a PermissionGroup with the permission name as the ID
-		// Cloudflare uses permission keys like: analytics, dns, billing, etc.
-		permissionGroups = append(permissionGroups, cloudflare.PermissionGroup{
-			ID: permissionName,
-		})
-		seenGroups[permissionName] = true
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"permissions":            permissions,
-		"permission_group_count": len(permissionGroups),
-	}).Debug("Created permission groups from permission names")
-
-	return permissionGroups, nil
-}
-
-// getPermissionGroupsFromInherits gets permission groups from multiple Cloudflare roles
-// DEPRECATED: Use getPermissionGroupsFromPermissions instead
-// This function is kept for backward compatibility but should not be used
 // buildResourceGroups creates Cloudflare resource groups from resource specifications
 func (p *cloudflareProvider) buildResourceGroups(ctx context.Context, resources []string) ([]cloudflare.ResourceGroup, error) {
 	var resourceGroups []cloudflare.ResourceGroup
@@ -370,11 +399,30 @@ func (p *cloudflareProvider) buildResourceGroups(ctx context.Context, resources 
 		// Parse resource specification
 		// Format: "zone:example.com" or "account:*" or "zone:*"
 		if resource == "*" || resource == fmt.Sprintf("%s:*", resourceTypeAccount) {
-			// Full account access
-			account, _, err := p.client.Account(ctx, accountID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get account: %w", err)
+			// Full account access - use cached account
+			var account cloudflare.Account
+			found := false
+
+			// Find the account in cached resources
+			for _, res := range p.resources {
+				if res.Type == resourceTypeAccount && res.Id == accountID {
+					if acc, ok := res.Resource.(cloudflare.Account); ok {
+						account = acc
+						found = true
+						break
+					}
+				}
 			}
+
+			if !found {
+				// Fallback to API call if not found in cache
+				var err error
+				account, _, err = p.client.Account(ctx, accountID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get account: %w", err)
+				}
+			}
+
 			rg = cloudflare.NewResourceGroupForAccount(account)
 		} else if len(resource) > 5 && resource[:5] == fmt.Sprintf("%s:", resourceTypeZone) {
 			// Zone-specific access
@@ -383,24 +431,16 @@ func (p *cloudflareProvider) buildResourceGroups(ctx context.Context, resources 
 				// All zones - use cached resources
 				for _, res := range p.resources {
 					if res.Type == resourceTypeZone {
-						// Look up zone details from cache using ID
-						zoneID, err := p.client.ZoneIDByName(res.Name)
-						if err != nil {
+						// Use cached zone from Resource field (no API calls needed)
+						if zone, ok := res.Resource.(cloudflare.Zone); ok {
+							resourceGroups = append(resourceGroups, cloudflare.NewResourceGroupForZone(zone))
+						} else {
 							logrus.WithFields(logrus.Fields{
 								resourceTypeZone: res.Name,
-								"error":          err,
-							}).Warn("Failed to get zone ID for cached zone, skipping")
+								"zoneID":         res.Id,
+							}).Warn("Zone resource does not contain zone details, skipping")
 							continue
 						}
-						zone, err := p.client.ZoneDetails(ctx, zoneID)
-						if err != nil {
-							logrus.WithFields(logrus.Fields{
-								resourceTypeZone: res.Name,
-								"error":          err,
-							}).Warn("Failed to get zone details for cached zone, skipping")
-							continue
-						}
-						resourceGroups = append(resourceGroups, cloudflare.NewResourceGroupForZone(zone))
 					}
 				}
 				continue
@@ -412,13 +452,12 @@ func (p *cloudflareProvider) buildResourceGroups(ctx context.Context, resources 
 				}
 
 				if cachedResource.Type == resourceTypeZone {
-
-					// Get zone details using the cached zone ID
-					zone, err := p.client.ZoneDetails(ctx, cachedResource.Id)
-					if err != nil {
-						return nil, fmt.Errorf("failed to get zone details for %s: %w", zoneName, err)
+					// Use cached zone from Resource field (no API calls needed)
+					if zone, ok := cachedResource.Resource.(cloudflare.Zone); ok {
+						rg = cloudflare.NewResourceGroupForZone(zone)
+					} else {
+						return nil, fmt.Errorf("zone resource does not contain zone details: %s", zoneName)
 					}
-					rg = cloudflare.NewResourceGroupForZone(zone)
 				} else {
 					return nil, fmt.Errorf("cached resource is not a zone: %s", zoneName)
 				}

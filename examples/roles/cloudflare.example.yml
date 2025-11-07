@@ -45,23 +45,32 @@ roles:
 
   # ============================================================================
   # RESOURCE-SCOPED POLICIES (Granular RBAC)
-  # IMPORTANT: Use EITHER inherits OR permissions, but NOT both
-  # - inherits: Use predefined Cloudflare role permissions
-  # - permissions: Specify explicit permission keys
-  # Use resources to specify which zones/accounts to scope the permissions to
+  # 
+  # Two approaches:
+  # 1. Inherits Only: Assigns Cloudflare roles directly (simple role assignment)
+  # 2. Inherits + Permissions: Uses inherited roles to provide base permissions,
+  #    then permissions provide granular allow/deny control
+  # 
+  # How it works when combining inherits + permissions:
+  # - All inherited roles are examined to build a map of available permissions
+  # - Only permissions that exist in the inherited roles can be used
+  # - Allow permissions: explicitly grant specific permissions from inherited roles
+  # - Deny permissions: explicitly deny specific permissions from inherited roles
+  # - Resources specify which zones/accounts to scope the permissions to
   # ============================================================================
 
   cloudflare_dns_specific_zones:
-    name: DNS Editor - Specific Zones
-    description: DNS management for specific production zones only
+    name: DNS Editor - Specific Zones (Simple)
+    description: DNS management for specific production zones using direct role assignment
     authenticators:
       - google_oauth2
       - github_oauth
     workflows:
       - peer_approval
     inherits:
-      - DNS       # Inherit all DNS role permissions
-      - Analytics # Inherit all Analytics role permissions
+      - DNS       # Assign DNS role - provides all DNS permissions
+      - Analytics # Assign Analytics role - provides all Analytics permissions
+    # No permissions specified = direct role assignment (simple mode)
     resources:
       allow:
         - zone:example.com          # Specific zone
@@ -73,6 +82,33 @@ roles:
       groups:
         - oidc:platform-team
         - oidc:devops
+    enabled: true
+
+  cloudflare_dns_granular:
+    name: DNS Editor - Granular Control
+    description: Limited DNS permissions for specific zones (granular control)
+    authenticators:
+      - google_oauth2
+    workflows:
+      - self_service
+    inherits:
+      - DNS       # Provides available DNS permissions to choose from
+      - Analytics # Provides available Analytics permissions to choose from
+    permissions:
+      allow:
+        - dns_records:read   # Only allow reading DNS records
+        - dns_records:edit   # And editing DNS records
+        - analytics:read     # And viewing analytics
+        # Note: Other DNS role permissions (zone settings, etc.) are NOT granted
+    resources:
+      allow:
+        - zone:staging.example.com
+        - zone:dev.example.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:junior-developers
     enabled: true
 
   cloudflare_dns_all_zones:
@@ -98,13 +134,20 @@ roles:
 
   cloudflare_firewall_all_zones:
     name: Firewall Administrator
-    description: Manage firewall rules and WAF across all zones
+    description: Manage firewall rules and WAF across all zones with granular control
     authenticators:
       - google_oauth2
     workflows:
       - security_team_approval
     inherits:
-      - Firewall  # Inherit all Firewall role permissions (includes WAF)
+      - Firewall  # Provides Firewall-related permissions
+    permissions:
+      allow:
+        - firewall_services:read
+        - firewall_services:edit
+        - waf:read
+        - waf:edit
+        - analytics:read  # If available in Firewall role
     resources:
       allow:
         - zone:*  # All zones for security management
@@ -219,12 +262,20 @@ roles:
 
   cloudflare_customer_a_dns:
     name: DNS Editor - Customer A
-    description: DNS management for Customer A's zones only (with billing denied)
+    description: DNS management for Customer A's zones with restricted permissions
     authenticators:
       - google_oauth2
     workflows:
       - customer_approval
-    # Using explicit permissions to have granular control with deny rules
+    inherits:
+      - DNS  # Provides DNS permissions
+    permissions:
+      allow:
+        - dns_records:read
+        - dns_records:edit
+        - zone:read
+      deny:
+        - zone:edit  # Cannot modify zone settings
     resources:
       allow:
         - zone:customer-a.com
@@ -277,11 +328,14 @@ roles:
 
   cloudflare_custom_security:
     name: Custom Security Access
-    description: Custom combination of security permissions with explicit deny rules
+    description: Firewall access with explicit allow/deny for fine-grained control
     authenticators:
       - google_oauth2
     workflows:
       - security_team_approval
+    inherits:
+      - Firewall   # Provides base firewall permissions
+      - Analytics  # Provides analytics permissions
     # Using explicit permissions for fine-grained control
     permissions:
       allow:
@@ -292,10 +346,8 @@ roles:
         - logs:read
         - analytics:read
       deny:
-        - billing:read
+        - billing:read    # These would be skipped if not in inherited roles anyway
         - billing:edit
-        - organization:read
-        - organization:edit
     resources:
       allow:
         - zone:*  # All zones

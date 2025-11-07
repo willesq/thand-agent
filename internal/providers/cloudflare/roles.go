@@ -37,6 +37,7 @@ func (p *cloudflareProvider) LoadRoles(ctx context.Context) error {
 			Id:          role.ID,
 			Name:        role.Name,
 			Description: role.Description,
+			Role:        role, // Store the full Cloudflare role object for later use
 		}
 		rolesData = append(rolesData, newRole)
 		rolesMap[strings.ToLower(role.Name)] = &rolesData[len(rolesData)-1]

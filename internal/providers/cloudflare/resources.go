@@ -61,6 +61,7 @@ func (p *cloudflareProvider) LoadResources(ctx context.Context) error {
 }
 
 // loadZoneResources loads zone resources from the Cloudflare API
+// and stores full zone details in the Resource field for later use
 func (p *cloudflareProvider) loadZoneResources(ctx context.Context) ([]models.ProviderResource, error) {
 	zones, err := p.client.ListZones(ctx)
 	if err != nil {
@@ -74,6 +75,7 @@ func (p *cloudflareProvider) loadZoneResources(ctx context.Context) ([]models.Pr
 			Type:        resourceTypeZone,
 			Name:        zone.Name,
 			Description: fmt.Sprintf("Zone: %s (Status: %s)", zone.Name, zone.Status),
+			Resource:    zone, // Store the full zone object to avoid ZoneDetails API calls later
 		}
 		resources = append(resources, resource)
 	}
@@ -82,6 +84,7 @@ func (p *cloudflareProvider) loadZoneResources(ctx context.Context) ([]models.Pr
 }
 
 // loadAccountResources loads account resources from the Cloudflare API
+// and stores full account details in the Resource field for later use
 func (p *cloudflareProvider) loadAccountResources(ctx context.Context) ([]models.ProviderResource, error) {
 	accounts, _, err := p.client.Accounts(ctx, cloudflare.AccountsListParams{})
 	if err != nil {
@@ -95,6 +98,7 @@ func (p *cloudflareProvider) loadAccountResources(ctx context.Context) ([]models
 			Type:        resourceTypeAccount,
 			Name:        account.Name,
 			Description: fmt.Sprintf("Account: %s (Type: %s)", account.Name, account.Type),
+			Resource:    account, // Store the full account object to avoid Account API calls later
 		}
 		resources = append(resources, resource)
 	}

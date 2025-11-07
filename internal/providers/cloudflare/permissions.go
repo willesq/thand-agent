@@ -135,6 +135,7 @@ func (p *cloudflareProvider) LoadPermissions() error {
 			Description: description,
 		}
 		permissions = append(permissions, perm)
+		// Ensure all lookups use the new format (without '#' prefix)
 		permissionsMap[strings.ToLower(name)] = &permissions[len(permissions)-1]
 	}
 
@@ -150,7 +151,8 @@ func (p *cloudflareProvider) LoadPermissions() error {
 
 // GetPermission retrieves a specific permission by name
 func (p *cloudflareProvider) GetPermission(ctx context.Context, permission string) (*models.ProviderPermission, error) {
-	permission = strings.ToLower(permission)
+	// Remove any legacy '#' prefix to support old references
+	permission = strings.TrimPrefix(strings.ToLower(permission), "#")
 	// Fast map lookup
 	if perm, exists := p.permissionsMap[permission]; exists {
 		return perm, nil

@@ -202,25 +202,6 @@ func (p *BaseProvider) HasAnyCapability(capabilities ...ProviderCapability) bool
 	return slices.ContainsFunc(capabilities, p.HasCapability)
 }
 
-type ProviderPermissionsResponse struct {
-	Version     string               `json:"version"`
-	Provider    string               `json:"provider"`
-	Permissions []ProviderPermission `json:"permissions"`
-}
-
-type ProviderRolesResponse struct {
-	Version  string         `json:"version"`
-	Provider string         `json:"provider"`
-	Roles    []ProviderRole `json:"roles"`
-}
-
-type ProviderRole struct {
-	Id          string `json:"id,omitempty"`
-	Name        string `json:"name"`
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
-}
-
 func (p *BaseProvider) Initialize(provider Provider) error {
 	// Initialize the provider
 	return nil

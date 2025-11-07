@@ -67,38 +67,77 @@ roles:
 - Managing multi-tenant environments
 - Different teams manage different zones
 
+### How Inherits and Permissions Work Together
+
+**Inherits Only (Simple Role Assignment)**
+- When only `inherits` is specified (no permissions), the role IDs are assigned directly
+- User gets all permissions from the inherited Cloudflare roles
+- Simple and efficient for standard role assignments
+
+**Inherits + Permissions (Granular Control)**
+- When `permissions` are specified along with `inherits`:
+  1. All inherited roles are examined to build a map of available permissions
+  2. Only permissions that exist in the inherited roles can be used in allow/deny
+  3. `permissions.allow`: Explicitly grants specific permissions from the inherited roles
+  4. `permissions.deny`: Explicitly denies specific permissions from the inherited roles
+- This provides fine-grained control while ensuring permissions are valid for the inherited roles
+
 ### Example Configuration
 
 ```yaml
 version: "1.0"
 roles:
-  # Specific zone access with inherited permissions
-  cloudflare-dns-specific:
-    name: DNS Editor - Specific Zones
-    description: DNS management for production zones only
+  # Inherits only - assigns roles directly (no permissions specified)
+  cloudflare-dns-simple:
+    name: DNS Editor - Simple Assignment
+    description: DNS management using direct role assignment
     providers:
       - cloudflare-prod
     inherits:
-      - DNS        # Inherit all DNS permissions
-      - Analytics  # Inherit all Analytics permissions
+      - DNS        # Assign DNS role directly
+      - Analytics  # Assign Analytics role directly
     resources:
       allow:
         - zone:example.com
         - zone:api.example.com
     enabled: true
 
-  # All zones with specific permissions
-  cloudflare-firewall-all:
-    name: Firewall Manager - All Zones
-    description: Firewall management across all zones
+  # Inherits + Permissions - granular control over inherited permissions
+  cloudflare-dns-granular:
+    name: DNS Editor - Granular Control
+    description: Limited DNS permissions from DNS role
     providers:
       - cloudflare-prod
     inherits:
-      - Firewall  # Inherit all Firewall permissions
+      - DNS        # Provides available DNS permissions
+      - Analytics  # Provides available Analytics permissions
     permissions:
       allow:
-        - analytics:read  # Add analytics read access
-        - logs:read       # Add log read access
+        - dns_records:read   # Only allow reading DNS records
+        - dns_records:edit   # And editing DNS records
+        - analytics:read     # And reading analytics
+      # Other DNS role permissions (like zone settings) are not granted
+    resources:
+      allow:
+        - zone:example.com
+    enabled: true
+
+  # All zones with both inherited roles and additional permissions
+  cloudflare-firewall-all:
+    name: Firewall Manager - All Zones
+    description: Firewall management with analytics across all zones
+    providers:
+      - cloudflare-prod
+    inherits:
+      - Firewall  # Provides all Firewall-related permissions
+    permissions:
+      allow:
+        - firewall_services:read
+        - firewall_services:edit
+        - waf:read
+        - waf:edit
+        - analytics:read  # From Firewall role (if available)
+        - logs:read       # From Firewall role (if available)
     resources:
       allow:
         - zone:*  # Wildcard for all zones
@@ -107,28 +146,41 @@ roles:
   # Account-level access with permissions
   cloudflare-workers:
     name: Workers Developer
-    description: Workers and KV storage management
+    description: Workers management only (no KV or durable objects)
     providers:
       - cloudflare-prod
     inherits:
-      - Workers Platform Admin  # Inherit Workers permissions
+      - Workers Platform Admin  # Provides all Workers-related permissions
+    permissions:
+      allow:
+        - workers_scripts:read
+        - workers_scripts:edit
+      # Deny KV and Durable Objects even though they're in Workers Platform Admin
+      deny:
+        - workers_kv_storage:read
+        - workers_kv_storage:edit
+        - workers_durable_objects:read
+        - workers_durable_objects:edit
     resources:
       allow:
         - account:*  # Account-level (Workers are account resources)
     enabled: true
 
-  # Using deny permissions to restrict
+  # Using deny permissions to restrict inherited role permissions
   cloudflare-restricted-admin:
     name: Restricted Administrator
-    description: Admin access without billing
+    description: Admin access without billing or organization changes
     providers:
       - cloudflare-prod
     inherits:
-      - Administrator  # Inherit all admin permissions
+      - Administrator  # Provides all admin permissions
     permissions:
+      # Only specify what to deny - everything else from Administrator is allowed
       deny:
-        - billing:read  # Explicitly deny billing read
-        - billing:edit  # Explicitly deny billing edit
+        - billing:read
+        - billing:edit
+        - organization:read
+        - organization:edit
     resources:
       allow:
         - zone:*
@@ -136,27 +188,87 @@ roles:
 ```
 
 ### How It Works
-1. **Inherits Processing**: Extracts permission groups from inherited Cloudflare roles (e.g., DNS, Firewall, Workers Platform Admin)
-2. **Permission Addition**: Maps additional permission names (analytics, logs, etc.) to Cloudflare permission IDs
-3. Creates Resource Groups for each specified resource
-4. Builds Cloudflare Policies combining Permission Groups + Resource Groups
-5. For inherited + allow permissions: creates policies with `access: "allow"`
-6. For deny permissions: creates separate policies with `access: "deny"`
-7. Creates account member with policies (not traditional roles)
+
+**Inherits Only Mode:**
+1. Extracts role IDs from inherited Cloudflare roles
+2. Assigns those role IDs directly to the account member
+3. User gets all permissions associated with those roles
+4. Access scoped to specified resources
+
+**Inherits + Permissions Mode:**
+1. **Build Permission Map**: Loops through all inherited roles and collects all available permissions
+2. **Validate Permissions**: Each permission in allow/deny lists is checked against available permissions
+3. **Create Permission Groups**: Valid permissions are converted to Cloudflare permission groups
+4. **Build Resource Groups**: Creates resource groups for each specified resource (zone or account)
+5. **Generate Policies**: Combines permission groups with resource groups to create policies
+   - Allow permissions → policies with `access: "allow"`
+   - Deny permissions → policies with `access: "deny"`
+6. **Apply**: Creates account member with the generated policies
 
 ---
 
 ## Side-by-Side Comparison
 
-| Feature | Account-Wide Roles | Resource-Scoped Policies |
-|---------|-------------------|-------------------------|
-| **Permissions** | All permissions for the role | Only specified permissions |
-| **Scope** | Entire account | Specific zones/resources |
-| **Configuration** | Role name only | Permissions + Resources |
-| **Flexibility** | Low (predefined roles) | High (custom combinations) |
-| **Security** | Less restrictive | More restrictive (least privilege) |
-| **Use Case** | Admins, full access | Teams, specific zones |
-| **Setup Complexity** | Simple | Moderate |
+| Feature | Account-Wide Roles | Inherits Only | Inherits + Permissions |
+|---------|-------------------|---------------|----------------------|
+| **Configuration** | Role name only | Inherits + Resources | Inherits + Permissions + Resources |
+| **Permissions** | All permissions for the role | All permissions from inherited roles | Only specified permissions (validated against inherited roles) |
+| **Scope** | Entire account | Specific zones/resources | Specific zones/resources |
+| **Flexibility** | Low (predefined roles) | Medium (role combinations) | High (granular control) |
+| **Security** | Less restrictive | Moderately restrictive | Most restrictive (least privilege) |
+| **Validation** | N/A | N/A | Validates permissions exist in inherited roles |
+| **Use Case** | Admins, full access | Teams with standard role needs | Fine-grained, compliance scenarios |
+| **Setup Complexity** | Simple | Moderate | More complex |
+
+---
+
+## Understanding Permission Validation
+
+When using `inherits` + `permissions` together, the system validates that requested permissions actually exist in the inherited roles:
+
+### Example: Valid Permissions
+
+```yaml
+cloudflare-limited-dns:
+  name: Limited DNS Editor
+  providers:
+    - cloudflare-prod
+  inherits:
+    - DNS  # Provides permissions like: dns_records:read, dns_records:edit, zone:read, etc.
+  permissions:
+    allow:
+      - dns_records:read   # ✅ Valid - exists in DNS role
+      - dns_records:edit   # ✅ Valid - exists in DNS role
+      - analytics:read     # ⚠️  Warning logged - NOT in DNS role, skipped
+  resources:
+    allow:
+      - zone:example.com
+```
+
+**Result**: User gets only `dns_records:read` and `dns_records:edit`. The `analytics:read` permission is logged as a warning and skipped because it's not available in the DNS role.
+
+### Example: Using Multiple Inherits for Permission Pool
+
+```yaml
+cloudflare-multi-role:
+  name: Multi-Role Access
+  providers:
+    - cloudflare-prod
+  inherits:
+    - DNS        # Provides: dns_records:*, zone:read, etc.
+    - Firewall   # Provides: firewall_services:*, waf:*, etc.
+    - Analytics  # Provides: analytics:*, logs:read, etc.
+  permissions:
+    allow:
+      - dns_records:edit      # ✅ From DNS role
+      - firewall_services:edit # ✅ From Firewall role
+      - analytics:read        # ✅ From Analytics role
+  resources:
+    allow:
+      - zone:example.com
+```
+
+**Result**: All three permissions are valid because they exist in their respective inherited roles. The system builds a permission pool from all inherited roles.
 
 ---
 
@@ -189,15 +301,15 @@ roles:
 
 ```yaml
 roles:
-  # Marketing team - only their zones
+  # Marketing team - only their zones, simple role assignment
   marketing-zones:
     name: Marketing DNS Manager
-    description: DNS for marketing domains
+    description: DNS and Analytics for marketing domains
     providers:
       - cloudflare-prod
     inherits:
-      - DNS        # Inherit DNS permissions
-      - Analytics  # Inherit Analytics permissions
+      - DNS        # Provides all DNS permissions
+      - Analytics  # Provides all Analytics permissions
     resources:
       allow:
         - zone:marketing.example.com
@@ -207,19 +319,25 @@ roles:
         - oidc:marketing-team
     enabled: true
 
-  # API team - only their zones
+  # API team - granular permission control
   api-zones:
     name: API Zone Manager
-    description: Full management of API zones
+    description: Specific DNS and firewall permissions for API zones
     providers:
       - cloudflare-prod
     inherits:
-      - DNS           # DNS permissions
-      - Firewall      # Firewall permissions
-      - Load Balancer # Load balancer permissions
+      - DNS           # Provides DNS permissions to choose from
+      - Firewall      # Provides Firewall permissions to choose from
+      - Load Balancer # Provides Load Balancer permissions
     permissions:
       allow:
-        - analytics:read  # Add analytics read access
+        - dns_records:read
+        - dns_records:edit
+        - firewall_services:read
+        - firewall_services:edit
+        - load_balancers:read
+        - load_balancers:edit
+        - analytics:read
     resources:
       allow:
         - zone:api.example.com
@@ -229,19 +347,25 @@ roles:
         - oidc:api-team
     enabled: true
 
-  # Security team - all zones, security features only
+  # Security team - all zones, security features only with deny rules
   security-all-zones:
     name: Security Team Access
-    description: Firewall and WAF across all zones
+    description: Firewall and monitoring across all zones (no configuration changes)
     providers:
       - cloudflare-prod
     inherits:
-      - Firewall              # Firewall permissions
-      - Cloudflare Zero Trust # Zero Trust permissions
+      - Firewall              # Provides Firewall permissions
+      - Cloudflare Zero Trust # Provides Zero Trust permissions
+      - Analytics             # Provides Analytics permissions
     permissions:
       allow:
-        - analytics:read  # Add analytics read access
-        - logs:read       # Add log read access
+        - firewall_services:read
+        - waf:read
+        - analytics:read
+        - logs:read
+      deny:
+        - firewall_services:edit  # Can view but not modify
+        - waf:edit                # Can view but not modify
     resources:
       allow:
         - zone:*  # All zones for security monitoring
@@ -251,7 +375,7 @@ roles:
     enabled: true
 ```
 
-**Why**: Isolation between teams, least privilege, audit-friendly
+**Why**: Isolation between teams, granular least privilege, audit-friendly
 
 ---
 
