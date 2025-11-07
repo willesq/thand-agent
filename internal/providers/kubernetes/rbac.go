@@ -335,7 +335,7 @@ func (p *kubernetesProvider) parsePermission(permission string) *rbacv1.PolicyRu
 	verbs := strings.Split(parts[2], ",")
 
 	// Validate verbs are not empty
-	if len(verbs) == 0 || (len(verbs) == 1 && verbs[0] == "") {
+	if len(verbs) == 0 || (len(verbs) == 1 && len(verbs[0]) == 0) {
 		logrus.WithField("permission", permission).Warn("Invalid permission: no verbs specified")
 		return nil
 	}
@@ -349,7 +349,7 @@ func (p *kubernetesProvider) parsePermission(permission string) *rbacv1.PolicyRu
 
 	for _, verb := range verbs {
 		verb = strings.TrimSpace(verb)
-		if verb == "" {
+		if len(verb) == 0 {
 			continue
 		}
 		if !allowedVerbs[verb] {
@@ -380,7 +380,7 @@ func (p *kubernetesProvider) parsePermission(permission string) *rbacv1.PolicyRu
 	}
 
 	// Validate resource name (basic validation)
-	if resource == "" {
+	if len(resource) == 0 {
 		logrus.WithField("permission", permission).Warn("Empty resource name in permission")
 		return nil
 	}

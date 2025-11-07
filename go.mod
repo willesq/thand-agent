@@ -32,6 +32,7 @@ require (
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/cloudevents/sdk-go/v2 v2.16.2
+	github.com/cloudflare/cloudflare-go v0.116.0
 	github.com/crewjam/saml v0.5.1
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/getkin/kin-openapi v0.133.0

@@ -1,0 +1,285 @@
+version: "1.0"
+roles:
+  # ============================================================================
+  # ACCOUNT-WIDE ROLES (Traditional RBAC)
+  # Use when you need broad access across the entire Cloudflare account
+  # ============================================================================
+
+  cloudflare_admin:
+    name: Cloudflare Administrator
+    description: Full administrative access to Cloudflare account
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - Administrator  # Assigns Cloudflare's built-in Administrator role
+    # No resources specified = account-wide role assignment
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:admins
+        - oidc:devops-leads
+      users:
+        - cto@example.com
+    enabled: true
+
+  cloudflare_readonly:
+    name: Cloudflare Read-Only
+    description: Read-only access to all Cloudflare account resources
+    authenticators:
+      - google_oauth2
+    workflows:
+      - self_service  # Instant access for read-only
+    inherits:
+      - Administrator Read Only  # Assigns Cloudflare's read-only role
+    providers:
+      - cloudflare-prod
+      - cloudflare-dev
+    scopes:
+      groups:
+        - oidc:engineering
+        - oidc:support
+    enabled: true
+
+  # ============================================================================
+  # RESOURCE-SCOPED POLICIES (Granular RBAC)
+  # Use inherits to inherit permissions from Cloudflare roles
+  # Use permissions.allow to add additional specific permissions
+  # Use permissions.deny to explicitly block certain permissions
+  # Use resources to specify which zones/accounts to scope the permissions to
+  # ============================================================================
+
+  cloudflare_dns_specific_zones:
+    name: DNS Editor - Specific Zones
+    description: DNS management for specific production zones only
+    authenticators:
+      - google_oauth2
+      - github_oauth
+    workflows:
+      - peer_approval
+    inherits:
+      - DNS       # Inherit all DNS role permissions
+      - Analytics # Inherit all Analytics role permissions
+    resources:
+      allow:
+        - zone:example.com          # Specific zone
+        - zone:api.example.com      # Another specific zone
+        - zone:www.example.com      # Yet another zone
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:platform-team
+        - oidc:devops
+    enabled: true
+
+  cloudflare_dns_all_zones:
+    name: DNS Manager - All Zones
+    description: DNS and cache management across all zones in the account
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - DNS          # Inherit all DNS permissions
+      - Cache Purge  # Inherit cache purge permissions
+    resources:
+      allow:
+        - zone:*  # Wildcard - all zones
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:senior-engineers
+        - oidc:devops-leads
+    enabled: true
+
+  cloudflare_firewall_all_zones:
+    name: Firewall Administrator
+    description: Manage firewall rules and WAF across all zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - security_team_approval
+    inherits:
+      - Firewall  # Inherit all Firewall role permissions (includes WAF)
+    permissions:
+      allow:
+        - logs      # Add log access for security monitoring
+        - analytics # Add analytics for traffic analysis
+    resources:
+      allow:
+        - zone:*  # All zones for security management
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security
+        - oidc:platform-security
+      users:
+        - security-lead@example.com
+    enabled: true
+
+  cloudflare_workers_developer:
+    name: Workers Developer
+    description: Deploy and manage Cloudflare Workers and KV storage
+    authenticators:
+      - github_oauth
+      - google_oauth2
+    workflows:
+      - self_service  # Instant access for developers
+    inherits:
+      - Workers Platform Admin  # Inherit all Workers Platform permissions
+    resources:
+      allow:
+        - account:*  # Account-level Workers access
+    providers:
+      - cloudflare-prod
+      - cloudflare-dev
+    scopes:
+      groups:
+        - oidc:developers
+        - oidc:frontend-team
+        - oidc:backend-team
+    enabled: true
+
+  cloudflare_zerotrust_admin:
+    name: Zero Trust Administrator
+    description: Manage Cloudflare Zero Trust and Access policies
+    authenticators:
+      - google_oauth2
+    workflows:
+      - security_lead_approval
+    inherits:
+      - Cloudflare Zero Trust  # Inherit all Zero Trust permissions
+      - Cloudflare Access      # Inherit Access permissions
+    resources:
+      allow:
+        - account:*  # Account-level Zero Trust access
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security
+        - oidc:identity-team
+      users:
+        - security-architect@example.com
+    enabled: true
+
+  cloudflare_ssl_specific_zones:
+    name: SSL/TLS Manager
+    description: Manage SSL certificates and TLS settings for specific zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - senior_engineer_approval
+    inherits:
+      - SSL/TLS, Caching, Performance, Page Rules, and Customization  # SSL and related permissions
+    permissions:
+      allow:
+        - analytics  # Add analytics for certificate monitoring
+    resources:
+      allow:
+        - zone:example.com
+        - zone:api.example.com
+        - zone:secure.example.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:platform-team
+        - oidc:security
+    enabled: true
+
+  # ============================================================================
+  # EMERGENCY ACCESS ROLES
+  # For on-call engineers and incident response
+  # ============================================================================
+
+  cloudflare_oncall_engineer:
+    name: On-Call Engineer Access
+    description: Emergency read access for on-call engineers across all zones
+    authenticators:
+      - google_oauth2
+      - pagerduty  # Could integrate with PagerDuty
+    workflows:
+      - oncall_verification  # Auto-approve if on-call schedule
+    inherits:
+      - Administrator Read Only  # Cloudflare read-only admin role
+    resources:
+      allow:
+        - zone:*  # All zones for incident monitoring
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:oncall
+        - oidc:sre
+    enabled: true
+
+  # ============================================================================
+  # CUSTOMER/TENANT-SPECIFIC ROLES
+  # For multi-tenant or managed service scenarios
+  # ============================================================================
+
+  cloudflare_customer_a_dns:
+    name: DNS Editor - Customer A
+    description: DNS management for Customer A's zones only
+    authenticators:
+      - google_oauth2
+    workflows:
+      - customer_approval
+    inherits:
+      - DNS  # Inherit DNS role permissions
+    permissions:
+      deny:
+        - billing  # Explicitly deny billing access for customer isolation
+    resources:
+      allow:
+        - zone:customer-a.com
+        - zone:www.customer-a.com
+        - zone:api.customer-a.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      users:
+        - customer-a-admin@example.com
+        - customer-a-lead@example.com
+    enabled: true
+
+  # ============================================================================
+  # DEVELOPMENT/TESTING ROLES
+  # For development and staging environments
+  # ============================================================================
+
+  cloudflare_dev_fullaccess:
+    name: Development Full Access
+    description: Combined permissions for full development environment access
+    authenticators:
+      - google_oauth2
+      - github_oauth
+    workflows:
+      - self_service  # Instant access in dev
+    inherits:
+      - DNS                                                           # DNS management
+      - Firewall                                                      # Firewall and WAF
+      - Workers Platform Admin                                        # Workers deployment
+      - SSL/TLS, Caching, Performance, Page Rules, and Customization # SSL/TLS and caching
+      - Cache Purge                                                   # Cache management
+      - Analytics                                                     # Analytics viewing
+    permissions:
+      allow:
+        - logs  # Add log access for debugging
+    resources:
+      allow:
+        - zone:*  # All zones in dev account
+    providers:
+      - cloudflare-dev
+      - cloudflare-staging
+    scopes:
+      groups:
+        - oidc:developers
+        - oidc:qa-team
+    enabled: true

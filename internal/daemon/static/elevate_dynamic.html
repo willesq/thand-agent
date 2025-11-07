@@ -351,21 +351,29 @@
                         Object.keys(identitiesData.identities).forEach(key => {
                             const identity = identitiesData.identities[key];
                             
-                            const label = identity.name ? 
-                                `${identity.name} (${identity.email || identity.id})` : 
-                                (identity.email || identity.id);
-                            
+                            const label = identity.label ? 
+                                `${identity.label} (${identity.id})` : 
+                                (identity.label || identity.id);
+
+                            let type = 'unknown';
+
+                            if (identity.user) {
+                                type = 'user';
+                            } else if (identity.group) {
+                                type = 'group';
+                            }
+
                             identities.push({
                                 id: identity.id,
-                                value: identity.email,
+                                value: identity.id,
                                 label: `${label}`,
-                                customProperties: { type: 'user' },
+                                customProperties: { type },
                             });
                         });
                     }
                     
                     identityChoices.setChoices(identities, 'value', 'label', true);
-                    
+
                     // Pre-select current user if available
                     if (currentUserEmail) {
                         identityChoices.setChoiceByValue(currentUserEmail);

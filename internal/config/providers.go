@@ -10,6 +10,7 @@ import (
 
 	// Load modules
 	_ "github.com/thand-io/agent/internal/providers/aws"
+	_ "github.com/thand-io/agent/internal/providers/cloudflare"
 	_ "github.com/thand-io/agent/internal/providers/email"
 	_ "github.com/thand-io/agent/internal/providers/gcp"
 	_ "github.com/thand-io/agent/internal/providers/github"

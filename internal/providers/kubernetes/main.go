@@ -75,7 +75,7 @@ func (p *kubernetesProvider) getKubernetesConfig() (*rest.Config, error) {
 
 	// Fallback to kubeconfig file
 	kubeconfigPath := os.Getenv("KUBECONFIG")
-	if kubeconfigPath == "" {
+	if len(kubeconfigPath) == 0 {
 		if home, err := os.UserHomeDir(); err == nil {
 			kubeconfigPath = filepath.Join(home, ".kube", "config")
 		}

@@ -131,7 +131,7 @@ func TestAWSProviderFunctional(t *testing.T) {
 
 		// Extract username from user - use username field first, then email prefix
 		username := user.Username
-		if username == "" && user.Email != "" {
+		if len(username) == 0 && len(user.Email) > 0 {
 			username = strings.Split(user.Email, "@")[0]
 		}
 
@@ -152,7 +152,7 @@ func TestAWSProviderFunctional(t *testing.T) {
 
 		// Extract username from user - use username field first, then email prefix
 		username := user.Username
-		if username == "" && user.Email != "" {
+		if len(username) == 0 && len(user.Email) > 0 {
 			username = strings.Split(user.Email, "@")[0]
 		}
 

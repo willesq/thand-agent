@@ -178,7 +178,7 @@ func (m tuiModel) renderStatusSection() string {
 
 	// Current task status
 	currentTask := m.execution.Task
-	if currentTask == "" {
+	if len(currentTask) == 0 {
 		currentTask = "Initializing"
 	}
 
