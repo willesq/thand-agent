@@ -1,3 +1,12 @@
+# Cloudflare Provider Configuration Examples
+#
+# NOTE: The Cloudflare provider only supports role-based access control.
+# Unlike some other providers, Cloudflare does not support granular permission-level 
+# assignments. All access is managed through Cloudflare's predefined roles, which can 
+# be assigned either account-wide or scoped to specific resources (zones).
+#
+# For role examples, see: examples/roles/cloudflare.example.yml
+
 version: "1.0"
 providers:
   # Cloudflare Production - API Token (Recommended)
@@ -13,8 +22,7 @@ providers:
       # API Token (Recommended - more secure, scoped permissions)
       # Create at: https://dash.cloudflare.com/profile/api-tokens
       # Required permissions:
-      #   - Account → Account Settings → Read & Edit
-      #   - Account → Account Memberships → Read & Edit
+      #   - Account → Account Settings → Edit
       api_token: "your-api-token-here"
 
   # Cloudflare Development - API Token

@@ -1,23 +1,25 @@
 ---
 layout: default
 title: Cloudflare Provider
-description: Cloudflare provider with account-wide roles and resource-scoped policies
+description: Cloudflare provider with role-based access control
 parent: Providers
 grand_parent: Configuration
 ---
 
 # Cloudflare Provider
 
-The Cloudflare provider enables integration with Cloudflare accounts, providing both traditional account-wide role-based access control (RBAC) and granular resource-scoped policy-based access control.
+> **Note**: The Cloudflare provider only supports role-based access control. Unlike some other providers, Cloudflare does not support granular permission-level assignments. All access is managed through Cloudflare's predefined roles, which can be assigned either account-wide or scoped to specific resources (zones).
+
+The Cloudflare provider enables integration with Cloudflare accounts, providing role-based access control (RBAC) that can be applied either account-wide or scoped to specific resources.
 
 ## Capabilities
 
-- **Role-Based Access Control (RBAC)**: Supports Cloudflare account-wide roles
-- **Policy-Based Access Control**: Granular resource-scoped permissions for zones and accounts
-- **Account Member Management**: Invite, assign roles/policies, and remove account members
-- **Permission Discovery**: Access to 40+ Cloudflare permissions across all services
+- **Role-Based Access Control (RBAC)**: Supports Cloudflare's predefined account roles
+- **Resource-Scoped Roles**: Assign roles to specific zones or account-level resources
+- **Account Member Management**: Invite, assign roles, and remove account members
+- **Role Discovery**: Access to 60+ predefined Cloudflare roles
 - **Identity Management**: List and manage Cloudflare account members
-- **Full-text Search**: Search for permissions and roles
+- **Full-text Search**: Search for roles
 
 ## Prerequisites
 
@@ -103,7 +105,7 @@ providers:
 
 ## Access Control Models
 
-The Cloudflare provider supports two distinct access control models that can be used based on your security requirements:
+The Cloudflare provider supports two distinct access control models using Cloudflare's predefined roles:
 
 ### 1. Account-Wide Roles (Traditional RBAC)
 
@@ -123,9 +125,15 @@ roles:
     description: Full administrative access to Cloudflare account
     providers:
       - cloudflare-prod
-    # No resources specified = account-wide role assignment
+    inherits:
+      - Administrator  # Assigns Cloudflare's built-in Administrator role
+    resources:
+      allow:
+        - account:*  # Account-wide access (required)
     enabled: true
 ```
+
+**Note:** The `resources.allow` field is required. Use `account:*` or `*` for account-wide access.
 
 **Available Account-Wide Roles:**
 - Administrator
@@ -207,19 +215,17 @@ roles:
 - Zone Versioning (Account-Wide)
 - Zone Versioning Read (Account-Wide)
 
-### 2. Resource-Scoped Policies (Granular RBAC)
+### 2. Resource-Scoped Roles (Granular RBAC)
 
-Creates Cloudflare Policies that combine specific permissions with specific resources (zones, accounts). This provides fine-grained access control following the principle of least privilege.
+Assigns Cloudflare roles scoped to specific resources (zones or account-level resources). This provides fine-grained access control following the principle of least privilege.
 
 **When to use:**
 - Limiting access to specific zones/domains
-- Granting only necessary permissions
 - Implementing least-privilege security model
 - Managing multi-tenant or multi-zone environments
+- Different teams manage different zones
 
-**Important:** Cloudflare supports EITHER `inherits` (to use predefined role permissions) OR `permissions` (to specify explicit permissions), but NOT both. Choose the approach that best fits your needs.
-
-**Approach 1: Using inherits (recommended for standard access patterns)**
+**Example configuration:**
 
 ```yaml
 roles:
@@ -229,8 +235,8 @@ roles:
     providers:
       - cloudflare-prod
     inherits:
-      - DNS              # Inherit all DNS role permissions
-      - Analytics        # Inherit all Analytics role permissions
+      - DNS              # Cloudflare DNS role
+      - Analytics        # Cloudflare Analytics role
     resources:
       allow:
         - zone:example.com      # Specific zone
@@ -238,106 +244,44 @@ roles:
     enabled: true
 ```
 
-**Approach 2: Using explicit permissions (for custom permission combinations)**
+## Resource Specification Format
+
+**Important:** The `resources.allow` field is always required for Cloudflare roles.
+
+When using resource-scoped roles, you can specify resources in the following formats:
+
+| Format | Description | Example |
+|--------|-------------|---------|
+| `account:*` | Entire account (all resources) | `account:*` |
+| `*` | Entire account (same as account:*) | `*` |
+| `zone:domain.com` | Specific zone by domain name | `zone:example.com` |
+| `zone:*` | All zones in the account | `zone:*` |
+| Custom key | Cloudflare resource key | `com.cloudflare.api.account.zone.abc123` |
+
+## Role Assignment
+
+### Using the `inherits` Field
+
+The `inherits` field specifies which Cloudflare predefined roles to assign. You can inherit multiple roles:
 
 ```yaml
 roles:
-  cloudflare-custom-access:
-    name: Custom Access
-    description: Specific permission combination
+  cloudflare-multi-role:
+    name: DNS and Firewall Manager
+    description: Manage DNS and firewall for specific zones
     providers:
       - cloudflare-prod
-    permissions:
-      allow:
-        - dns_records:edit  # Edit DNS records
-        - analytics:read    # View analytics
-      deny:
-        - billing:read      # Explicitly deny billing read
-        - billing:edit      # Explicitly deny billing edit
+    inherits:
+      - DNS              # Cloudflare DNS role
+      - Firewall         # Cloudflare Firewall role
+      - Cache Purge      # Cloudflare Cache Purge role
     resources:
       allow:
         - zone:example.com
     enabled: true
 ```
 
-> **Note:** Do not use both `inherits` and `permissions` in the same role. Cloudflare's API requires you to choose one approach or the other.
-
-## Resource Specification Format
-
-When using resource-scoped policies, you can specify resources in the following formats:
-
-| Format | Description | Example |
-|--------|-------------|---------|
-| `zone:domain.com` | Specific zone by domain name | `zone:example.com` |
-| `zone:*` | All zones in the account | `zone:*` |
-| `account:*` | Entire account (all resources) | `account:*` |
-| `*` | Entire account (same as account:*) | `*` |
-| Custom key | Cloudflare resource key | `com.cloudflare.api.account.zone.abc123` |
-
-## Supported Permissions
-
-Cloudflare provides two ways to specify permissions for resource-scoped policies. **You must choose ONE approach - do not mix them.**
-
-### 1. Using Inherits (Recommended for Standard Roles)
-
-Inherit permissions from predefined Cloudflare roles. This is the easiest way to grant a standard set of permissions:
-
-```yaml
-inherits:
-  - DNS              # All DNS-related permissions
-  - Analytics        # All analytics permissions
-  - Firewall         # All firewall permissions
-# Do NOT add a permissions: section when using inherits
-```
-
-### 2. Using Explicit Permissions (For Custom Combinations)
-
-Specify individual permission keys for fine-grained control. Permission keys use the format `permission:action` where action is either `read` or `edit`.
-
-```yaml
-permissions:
-  allow:
-    - dns_records:edit  # Edit DNS records
-    - analytics:read    # View analytics
-  deny:
-    - billing:read      # Deny billing access
-# Do NOT add an inherits: section when using permissions
-```
-
-**Available permission keys:**
-
-- `analytics:read` - View analytics and reports
-- `billing:read` - View billing information
-- `billing:edit` - Manage billing and subscriptions
-- `cache_purge:edit` - Purge cache
-- `dns_records:read` - View DNS records
-- `dns_records:edit` - Manage DNS records
-- `lb:read` - View load balancers
-- `lb:edit` - Manage load balancers
-- `logs:read` - View logs
-- `logs:edit` - Manage log configuration
-- `organization:read` - View organization settings
-- `organization:edit` - Manage organization settings
-- `ssl:read` - View SSL/TLS certificates
-- `ssl:edit` - Manage SSL/TLS certificates
-- `waf:read` - View Web Application Firewall rules
-- `waf:edit` - Manage Web Application Firewall rules
-- `zone_settings:read` - View zone settings
-- `zone_settings:edit` - Manage zone settings
-- `zone:read` - View zones
-- `zone:edit` - Manage zones
-- `access:read` - View Access applications and policies
-- `access:edit` - Manage Access applications and policies
-- `firewall_services:read` - View firewall services
-- `firewall_services:edit` - Manage firewall services
-- `workers:read` - View Workers scripts
-- `workers:edit` - Manage Workers scripts
-- `workers_kv_storage:read` - View Workers KV storage
-- `workers_kv_storage:edit` - Manage Workers KV storage
-- `workers_r2:read` - View R2 storage
-- `workers_r2:edit` - Manage R2 storage
-
-Use `agent providers permissions list --provider cloudflare-prod` to see all available permissions with their exact key names.
+Use `agent providers roles list --provider cloudflare-prod` to see all available role names.
 
 ## Example Role Configurations
 
@@ -354,6 +298,11 @@ roles:
       - slack_approval
     providers:
       - cloudflare-prod
+    inherits:
+      - Administrator Read Only  # Cloudflare's read-only admin role
+    resources:
+      allow:
+        - account:*  # Account-wide access
     scopes:
       groups:
         - oidc:engineering
@@ -372,8 +321,8 @@ roles:
     workflows:
       - manager_approval
     inherits:
-      - DNS          # Inherit all DNS permissions
-      - Analytics    # Inherit all Analytics permissions
+      - DNS          # Cloudflare DNS role
+      - Analytics    # Cloudflare Analytics role
     resources:
       allow:
         - zone:example.com
@@ -426,7 +375,7 @@ roles:
     workflows:
       - self_service  # Instant access for developers
     inherits:
-      - Workers Platform Admin  # All Workers permissions
+      - Workers Platform Admin  # Cloudflare Workers Platform Admin role
     resources:
       allow:
         - account:*  # Account-level Workers access
@@ -440,28 +389,19 @@ roles:
 
 ### Example 5: Security Team Access
 
-Using explicit permissions for custom access pattern:
-
 ```yaml
 roles:
   cloudflare-security:
     name: Security Team Access
-    description: Firewall, WAF, and security settings management
+    description: Firewall and security monitoring across all zones
     authenticators:
       - google_oauth2
     workflows:
       - security_lead_approval
-    permissions:
-      allow:
-        - firewall_services:read
-        - firewall_services:edit
-        - waf:read
-        - waf:edit
-        - logs:read
-        - analytics:read
-      deny:
-        - billing:read
-        - billing:edit
+    inherits:
+      - Firewall                  # Cloudflare Firewall role
+      - Cloudflare Zero Trust     # Cloudflare Zero Trust role
+      - Analytics                 # Cloudflare Analytics role
     resources:
       allow:
         - zone:*  # All zones for security monitoring
@@ -484,16 +424,6 @@ roles:
 agent providers roles list --provider cloudflare-prod
 ```
 
-### List Available Permissions
-
-```bash
-# List all Cloudflare permissions
-agent providers permissions list --provider cloudflare-prod
-
-# Search for specific permissions
-agent providers permissions list --provider cloudflare-prod --filter "DNS"
-```
-
 ### Authorize a User (Account-Wide Role)
 
 ```bash
@@ -503,7 +433,7 @@ agent providers authorize \
   --role cloudflare-readonly
 ```
 
-### Authorize a User (Resource-Scoped Policy)
+### Authorize a User (Resource-Scoped Role)
 
 ```bash
 # First, ensure the role is defined in your roles configuration
@@ -523,7 +453,7 @@ agent providers revoke \
   --role cloudflare-dns-prod
 ```
 
-**Note:** Revoking removes the member entirely from the account, removing all their access (both roles and policies).
+**Note:** Revoking removes the member entirely from the account, removing all their access.
 
 ### List Account Members
 
@@ -537,40 +467,31 @@ agent providers identities list --provider cloudflare-prod --filter "user@exampl
 
 ## Implementation Details
 
-### How Policy-Based Access Works
+### How Role-Based Access Works
 
-When you define a role with `inherits` OR `permissions` and `resources`:
+When you define a role with `inherits` and `resources`:
 
-**Using inherits:**
-1. **Role Inheritance Processing**: Fetches permission groups from the inherited Cloudflare roles (e.g., "DNS", "Firewall")
-2. **Resource Group Creation**: Creates Resource Groups for each specified resource
-3. **Policy Construction**: Combines inherited Permission Groups with Resource Groups into Cloudflare Policies
-4. **Member Creation**: Invites the user as an account member with the generated policies
+1. **Role Lookup**: Fetches the role IDs from Cloudflare's predefined roles (e.g., "DNS", "Firewall")
+2. **Resource Processing**: Creates Resource Groups for each specified resource
+   - `account:*` or `*`: Full account access
+   - `zone:*`: All zones
+   - `zone:example.com`: Specific zone
+3. **Policy Construction**: Combines role permissions with Resource Groups into Cloudflare Policies
+4. **Member Creation**: Invites the user as an account member with the assigned policies
 
-**Using permissions:**
-1. **Permission Groups Creation**: Creates permission group objects for each specified permission key
-2. **Resource Group Creation**: Creates Resource Groups for each specified resource
-3. **Policy Construction**: 
-   - For `permissions.allow`: Creates policies with `access: "allow"`
-   - For `permissions.deny`: Creates policies with `access: "deny"`
-4. **Member Creation**: Invites the user as an account member with the generated policies
+**Important:** The `resources.allow` field is always required. There is no default - you must explicitly specify which resources the role applies to.
 
-### Permission Specification Rules
+### Role Specification
 
-- **Use EITHER `inherits` OR `permissions`** - Cloudflare does not support combining both approaches
-- **`inherits`**: Best for standard access patterns that match Cloudflare's predefined roles
-- **`permissions`**: Best for custom permission combinations or when you need explicit allow/deny control
-- When using `permissions`, you can specify both `allow` and `deny` lists
-
-### Recommended Approaches
-
-1. **Use `inherits` for standard access patterns**: When you need a well-defined set of permissions that match a Cloudflare role (e.g., DNS, Firewall, Workers Platform Admin)
-2. **Use `permissions` for custom combinations**: When you need a specific mix of permissions that doesn't match any single role, or when you need to explicitly deny certain permissions
+- Use the `inherits` field to specify which Cloudflare roles to assign
+- Role names must match Cloudflare's predefined role names exactly
+- Multiple roles can be inherited for combined permissions
+- Use `agent providers roles list` to see all available role names
 
 ### Caching and Performance
 
 - **Identity Caching**: Account members are cached to reduce API calls
-- **Background Indexing**: Permissions and roles are indexed in the background using Bleve for fast searching
+- **Role Indexing**: Roles are indexed in the background using Bleve for fast searching
 - **API Rate Limiting**: The provider respects Cloudflare API rate limits
 
 ### Security Considerations
@@ -581,8 +502,8 @@ When you define a role with `inherits` OR `permissions` and `resources`:
    - Rotate tokens regularly
 
 2. **Principle of Least Privilege**:
-   - Use resource-scoped policies instead of account-wide roles when possible
-   - Grant only necessary permissions
+   - Use resource-scoped roles instead of account-wide roles when possible
+   - Grant only necessary roles
    - Limit resource access to specific zones when appropriate
 
 3. **Audit Logging**:
@@ -596,10 +517,10 @@ When you define a role with `inherits` OR `permissions` and `resources`:
 
 ## Limitations
 
-- **Revocation**: Currently removes the member entirely from the account (doesn't support partial policy removal)
-- **Custom Roles**: Predefined Cloudflare role IDs are hardcoded (may need updates if Cloudflare changes them)
+- **Role-Based Only**: Cloudflare only supports role-based access control; granular permission-level assignments are not available
+- **Revocation**: Currently removes the member entirely from the account (doesn't support partial role removal)
+- **Predefined Roles**: Only Cloudflare's predefined roles can be assigned; custom role creation is not supported
 - **Zone Lookups**: Wildcard zone access (`zone:*`) may be slow for accounts with many zones
-- **Permission Matching**: Permission group matching is name/key-based and may need refinement
 
 ## Troubleshooting
 
@@ -609,7 +530,7 @@ When you define a role with `inherits` OR `permissions` and `resources`:
 
 **Solutions**:
 - Verify your API token or API key is correct
-- Check that the token has required permissions (Account Settings, Account Memberships)
+- Check that the token has required permissions (Account Settings)
 - Ensure the account ID is correct
 - For API key authentication, verify the email is correct
 
@@ -622,14 +543,14 @@ When you define a role with `inherits` OR `permissions` and `resources`:
 - Check if the user email is correct
 - Verify the user has a Cloudflare account
 
-### Permission Mapping Errors
+### Role Not Found
 
-**Problem**: `no matching permission groups found for permissions`
+**Problem**: `role not found` or `no matching role`
 
 **Solutions**:
-- Check permission names match Cloudflare's permission names
-- Use `agent providers permissions list` to see available permissions
-- Verify your API token has permission to list Permission Groups
+- Check role names match Cloudflare's role names exactly
+- Use `agent providers roles list` to see available roles
+- Verify your API token has permission to list roles
 
 ### Zone Not Found
 

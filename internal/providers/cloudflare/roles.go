@@ -22,44 +22,33 @@ func (p *cloudflareProvider) LoadRoles(ctx context.Context) error {
 	}()
 
 	accountRC := cloudflare.AccountIdentifier(p.accountID)
-	roles, err := p.client.ListAccountRoles(ctx, accountRC, cloudflare.ListAccountRolesParams{})
+	//roles, err := p.client.ListAccountRoles(ctx, accountRC, cloudflare.ListAccountRolesParams{})
+	roles, err := p.client.ListPermissionGroups(ctx, accountRC, cloudflare.ListPermissionGroupParams{})
 	if err != nil {
 		return fmt.Errorf("failed to list account roles: %w", err)
 	}
 
 	var rolesData []models.ProviderRole
 	rolesMap := make(map[string]*models.ProviderRole, len(roles))
-	cfRolesMap := make(map[string]cloudflare.AccountRole, len(roles))
 
 	// Convert to slice and create fast lookup map
 	for _, role := range roles {
 		newRole := models.ProviderRole{
-			Id:          role.ID,
-			Name:        role.Name,
-			Description: role.Description,
-			Role:        role, // Store the full Cloudflare role object for later use
+			Id:   role.ID,
+			Name: role.Name,
+			Role: role, // Store the full Cloudflare role object for later use
 		}
 		rolesData = append(rolesData, newRole)
 		rolesMap[strings.ToLower(role.Name)] = &rolesData[len(rolesData)-1]
 
-		// Cache the full Cloudflare role with permissions
-		cfRolesMap[strings.ToLower(role.Name)] = role
-
-		// Log the permissions for debugging
-		permKeys := make([]string, 0, len(role.Permissions))
-		for permKey := range role.Permissions {
-			permKeys = append(permKeys, permKey)
-		}
 		logrus.WithFields(logrus.Fields{
-			"role":        role.Name,
-			"role_id":     role.ID,
-			"permissions": permKeys,
-		}).Debug("Loaded role with permissions")
+			"role":    role.Name,
+			"role_id": role.ID,
+		}).Debug("Loaded role")
 	}
 
 	p.roles = rolesData
 	p.rolesMap = rolesMap
-	p.cfRolesMap = cfRolesMap
 
 	logrus.WithFields(logrus.Fields{
 		"roles": len(rolesData),

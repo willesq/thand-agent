@@ -211,15 +211,14 @@ func (p *cloudflareProvider) GetAuthorizedAccessUrl(
 }
 
 // buildMembershipFromRole creates Cloudflare policies from role definition
-// If only inherits are provided, assigns those roles directly
-// If permissions are provided, builds granular policies based on inherited role permissions
+// Uses the inherited Cloudflare roles to build resource-scoped policies
 func (p *cloudflareProvider) buildMembershipFromRole(
 	ctx context.Context,
 	params *cloudflare.CreateAccountMemberParams,
 	role *models.Role,
 ) error {
 
-	// If only inherits provided (no permissions), just assign the roles directly
+	// Inherits field is required - must specify at least one Cloudflare role
 	if len(role.Inherits) == 0 {
 		return fmt.Errorf("role must specify at least one inherited Cloudflare role in 'inherits' to authorize Cloudflare role")
 	}
@@ -256,7 +255,7 @@ func (p *cloudflareProvider) buildMembershipFromRole(
 	}
 
 	if len(policies) == 0 {
-		return fmt.Errorf("no policies could be built from the provided permissions and resources")
+		return fmt.Errorf("no policies could be built from the provided roles and resources")
 	}
 
 	params.Policies = policies
@@ -264,7 +263,7 @@ func (p *cloudflareProvider) buildMembershipFromRole(
 	logrus.WithFields(logrus.Fields{
 		"role":         role.Name,
 		"policy_count": len(policies),
-	}).Debug("Built granular policies from permissions")
+	}).Debug("Built resource-scoped policies from inherited roles")
 
 	return nil
 
@@ -283,15 +282,15 @@ func (p *cloudflareProvider) getRoleIDsFromInherits(inherits []string) ([]string
 	// Get role ID from each inherited role
 	for _, roleName := range inherits {
 		// Look up the cached Cloudflare role
-		cfRole, ok := p.cfRolesMap[strings.ToLower(roleName)]
+		cfRole, ok := p.rolesMap[strings.ToLower(roleName)]
 		if !ok {
 			return nil, fmt.Errorf("role '%s' is not a recognized Cloudflare role - when using resource-scoped policies, the role name must match a Cloudflare role (e.g., 'DNS', 'Firewall', 'Workers Admin')", roleName)
 		}
 
 		// Add unique role IDs
-		if !seenIDs[cfRole.ID] {
-			roleIDs = append(roleIDs, cfRole.ID)
-			seenIDs[cfRole.ID] = true
+		if !seenIDs[cfRole.Id] {
+			roleIDs = append(roleIDs, cfRole.Id)
+			seenIDs[cfRole.Id] = true
 		}
 	}
 
@@ -308,86 +307,16 @@ func (p *cloudflareProvider) getRoleIDsFromInherits(inherits []string) ([]string
 }
 
 // buildResourceGroups creates Cloudflare resource groups from resource specifications
+// Supported formats: "*", "account:*", "account:<id>", "zone:*", "zone:<name>", or custom keys
 func (p *cloudflareProvider) buildResourceGroups(ctx context.Context, resources []string) ([]cloudflare.ResourceGroup, error) {
 	var resourceGroups []cloudflare.ResourceGroup
 
-	accountID := p.GetAccountID()
-
 	for _, resource := range resources {
-		var rg cloudflare.ResourceGroup
-
-		// Parse resource specification
-		// Format: "zone:example.com" or "account:*" or "zone:*"
-		if resource == "*" || resource == fmt.Sprintf("%s:*", resourceTypeAccount) {
-			// Full account access - use cached account
-			var account cloudflare.Account
-			found := false
-
-			// Find the account in cached resources
-			for _, res := range p.resources {
-				if res.Type == resourceTypeAccount && res.Id == accountID {
-					if acc, ok := res.Resource.(cloudflare.Account); ok {
-						account = acc
-						found = true
-						break
-					}
-				}
-			}
-
-			if !found {
-				// Fallback to API call if not found in cache
-				var err error
-				account, _, err = p.client.Account(ctx, accountID)
-				if err != nil {
-					return nil, fmt.Errorf("failed to get account: %w", err)
-				}
-			}
-
-			rg = cloudflare.NewResourceGroupForAccount(account)
-		} else if len(resource) > 5 && resource[:5] == fmt.Sprintf("%s:", resourceTypeZone) {
-			// Zone-specific access
-			zoneName := resource[5:]
-			if zoneName == "*" {
-				// All zones - use cached resources
-				for _, res := range p.resources {
-					if res.Type == resourceTypeZone {
-						// Use cached zone from Resource field (no API calls needed)
-						if zone, ok := res.Resource.(cloudflare.Zone); ok {
-							resourceGroups = append(resourceGroups, cloudflare.NewResourceGroupForZone(zone))
-						} else {
-							logrus.WithFields(logrus.Fields{
-								resourceTypeZone: res.Name,
-								"zoneID":         res.Id,
-							}).Warn("Zone resource does not contain zone details, skipping")
-							continue
-						}
-					}
-				}
-				continue
-			} else {
-				// Specific zone - look up from cache first
-				cachedResource, err := p.GetResource(ctx, resource)
-				if err != nil {
-					return nil, fmt.Errorf("zone not found in cache: %s", zoneName)
-				}
-
-				if cachedResource.Type == resourceTypeZone {
-					// Use cached zone from Resource field (no API calls needed)
-					if zone, ok := cachedResource.Resource.(cloudflare.Zone); ok {
-						rg = cloudflare.NewResourceGroupForZone(zone)
-					} else {
-						return nil, fmt.Errorf("zone resource does not contain zone details: %s", zoneName)
-					}
-				} else {
-					return nil, fmt.Errorf("cached resource is not a zone: %s", zoneName)
-				}
-			}
-		} else {
-			// Custom resource group key
-			rg = cloudflare.NewResourceGroup(resource)
+		groups, err := p.parseResourceSpec(ctx, resource)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse resource spec '%s': %w", resource, err)
 		}
-
-		resourceGroups = append(resourceGroups, rg)
+		resourceGroups = append(resourceGroups, groups...)
 	}
 
 	if len(resourceGroups) == 0 {
@@ -395,4 +324,126 @@ func (p *cloudflareProvider) buildResourceGroups(ctx context.Context, resources 
 	}
 
 	return resourceGroups, nil
+}
+
+// parseResourceSpec parses a single resource specification into resource groups
+func (p *cloudflareProvider) parseResourceSpec(ctx context.Context, resource string) ([]cloudflare.ResourceGroup, error) {
+	// Handle wildcard for full account access
+	if resource == "*" || resource == "account:*" {
+		account, err := p.getAccountByID(ctx, p.GetAccountID())
+		if err != nil {
+			return nil, err
+		}
+		return []cloudflare.ResourceGroup{cloudflare.NewResourceGroupForAccount(account)}, nil
+	}
+
+	// Parse resource type and identifier
+	parts := strings.SplitN(resource, ":", 2)
+	if len(parts) != 2 {
+		// No colon found, treat as custom resource group key
+		return []cloudflare.ResourceGroup{cloudflare.NewResourceGroup(resource)}, nil
+	}
+
+	resourceType := parts[0]
+	identifier := parts[1]
+
+	switch resourceType {
+	case resourceTypeAccount:
+		return p.buildAccountResourceGroups(ctx, identifier)
+	case resourceTypeZone:
+		return p.buildZoneResourceGroups(ctx, identifier)
+	default:
+		// Unknown type, treat as custom resource group key
+		return []cloudflare.ResourceGroup{cloudflare.NewResourceGroup(resource)}, nil
+	}
+}
+
+// buildAccountResourceGroups creates resource groups for account specifications
+func (p *cloudflareProvider) buildAccountResourceGroups(ctx context.Context, identifier string) ([]cloudflare.ResourceGroup, error) {
+	if identifier == "*" {
+		// Already handled in parseResourceSpec, but include for safety
+		account, err := p.getAccountByID(ctx, p.GetAccountID())
+		if err != nil {
+			return nil, err
+		}
+		return []cloudflare.ResourceGroup{cloudflare.NewResourceGroupForAccount(account)}, nil
+	}
+
+	// Specific account ID
+	account, err := p.getAccountByID(ctx, identifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account %s: %w", identifier, err)
+	}
+	return []cloudflare.ResourceGroup{cloudflare.NewResourceGroupForAccount(account)}, nil
+}
+
+// buildZoneResourceGroups creates resource groups for zone specifications
+func (p *cloudflareProvider) buildZoneResourceGroups(ctx context.Context, identifier string) ([]cloudflare.ResourceGroup, error) {
+	if identifier == "*" {
+		// All zones - use cached resources
+		var groups []cloudflare.ResourceGroup
+		for _, res := range p.resources {
+			if res.Type == resourceTypeZone {
+				zone, ok := res.Resource.(cloudflare.Zone)
+				if !ok {
+					logrus.WithFields(logrus.Fields{
+						"zone_name": res.Name,
+						"zone_id":   res.Id,
+					}).Warn("Zone resource does not contain zone details, skipping")
+					continue
+				}
+				groups = append(groups, cloudflare.NewResourceGroupForZone(zone))
+			}
+		}
+		if len(groups) == 0 {
+			return nil, fmt.Errorf("no zones found in cache")
+		}
+		return groups, nil
+	}
+
+	// Specific zone - look up from cache
+	zone, err := p.getZoneByName(ctx, identifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get zone %s: %w", identifier, err)
+	}
+	return []cloudflare.ResourceGroup{cloudflare.NewResourceGroupForZone(zone)}, nil
+}
+
+// getAccountByID retrieves an account by ID from cache or API
+func (p *cloudflareProvider) getAccountByID(ctx context.Context, accountID string) (cloudflare.Account, error) {
+	// Check cache first
+	for _, res := range p.resources {
+		if res.Type == resourceTypeAccount && res.Id == accountID {
+			if account, ok := res.Resource.(cloudflare.Account); ok {
+				return account, nil
+			}
+		}
+	}
+
+	// Fallback to API call
+	account, _, err := p.client.Account(ctx, accountID)
+	if err != nil {
+		return cloudflare.Account{}, fmt.Errorf("failed to get account from API: %w", err)
+	}
+	return account, nil
+}
+
+// getZoneByName retrieves a zone by name from cache
+func (p *cloudflareProvider) getZoneByName(ctx context.Context, zoneName string) (cloudflare.Zone, error) {
+	resourceKey := fmt.Sprintf("%s:%s", resourceTypeZone, zoneName)
+	cachedResource, err := p.GetResource(ctx, resourceKey)
+	if err != nil {
+		return cloudflare.Zone{}, fmt.Errorf("zone not found in cache: %s", zoneName)
+	}
+
+	if cachedResource.Type != resourceTypeZone {
+		return cloudflare.Zone{}, fmt.Errorf("cached resource is not a zone: %s", zoneName)
+	}
+
+	zone, ok := cachedResource.Resource.(cloudflare.Zone)
+	if !ok {
+		return cloudflare.Zone{}, fmt.Errorf("zone resource does not contain zone details: %s", zoneName)
+	}
+
+	return zone, nil
 }

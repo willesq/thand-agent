@@ -29,9 +29,6 @@ type cloudflareProvider struct {
 	rolesMap   map[string]*models.ProviderRole
 	rolesIndex bleve.Index
 
-	// Cache for Cloudflare account roles with permissions
-	cfRolesMap map[string]cloudflare.AccountRole
-
 	resources    []models.ProviderResource
 	resourcesMap map[string]*models.ProviderResource
 

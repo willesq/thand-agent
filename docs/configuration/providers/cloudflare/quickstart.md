@@ -8,6 +8,8 @@ grand_parent: Providers
 
 # Cloudflare Provider - Quick Start
 
+> **Note**: The Cloudflare provider only supports role-based access control. All access is managed through Cloudflare's predefined roles.
+
 Get up and running with the Cloudflare provider in 5 minutes.
 
 ## Prerequisites
@@ -109,25 +111,20 @@ roles:
 
 ## Step 5: Test the Configuration
 
-### List Available Permissions
-
-```bash
-agent providers permissions list --provider cloudflare-prod
-```
-
-Expected output:
-```
-DNS Read
-DNS Edit
-Firewall Services Read
-Firewall Services Edit
-...
-```
-
 ### List Available Roles
 
 ```bash
 agent providers roles list --provider cloudflare-prod
+```
+
+Expected output:
+```
+Administrator
+Administrator Read Only
+DNS
+Firewall
+Analytics
+...
 ```
 
 ### List Account Members
@@ -144,10 +141,10 @@ agent providers identities list --provider cloudflare-prod
 agent providers authorize \
   --provider cloudflare-prod \
   --user engineer@example.com \
-  --role "Administrator Read Only"
+  --role cloudflare-viewer
 ```
 
-### Using Resource-Scoped Policy
+### Using Resource-Scoped Role
 
 ```bash
 agent providers authorize \
@@ -171,6 +168,11 @@ roles:
       - self_service  # Instant access
     providers:
       - cloudflare-prod
+    inherits:
+      - Administrator Read Only  # Cloudflare's read-only admin role
+    resources:
+      allow:
+        - account:*  # Account-wide access
     scopes:
       groups:
         - oidc:all-engineers
@@ -189,9 +191,9 @@ roles:
     workflows:
       - oncall_auto_approve
     inherits:
-      - DNS          # All DNS permissions
-      - Cache Purge  # Cache purge permissions
-      - Analytics    # Analytics access
+      - DNS          # Cloudflare DNS role
+      - Cache Purge  # Cloudflare Cache Purge role
+      - Analytics    # Cloudflare Analytics role
     resources:
       allow:
         - zone:*  # All zones
@@ -215,11 +217,9 @@ roles:
     workflows:
       - manager_approval
     inherits:
-      - DNS       # DNS permissions
-      - Firewall  # Firewall permissions
-    permissions:
-      allow:
-        - analytics:read  # Add analytics read access
+      - DNS       # Cloudflare DNS role
+      - Firewall  # Cloudflare Firewall role
+      - Analytics # Cloudflare Analytics role
     resources:
       allow:
         - zone:app.example.com
@@ -245,13 +245,13 @@ curl -X GET "https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID" \
   -H "Authorization: Bearer YOUR_API_TOKEN"
 ```
 
-### "No matching permission groups found"
+### "Role not found"
 
-**Cause**: Permission names don't match Cloudflare's names
+**Cause**: Role name doesn't match Cloudflare's role names
 
-**Solution**: List available permissions first:
+**Solution**: List available roles first:
 ```bash
-agent providers permissions list --provider cloudflare-prod
+agent providers roles list --provider cloudflare-prod
 ```
 
 ### "Failed to get zone ID"
