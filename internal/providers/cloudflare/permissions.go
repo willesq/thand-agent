@@ -1,3 +1,9 @@
+//go:build exclude
+
+// Cloudflare only supports roles when assigning accounts for access
+// I am leaving this here for the future in case cloudflare adds support
+// for more granular permissions in the future - aside from roles
+
 package cloudflare
 
 import (
@@ -7,17 +13,13 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/cloudflare/cloudflare-go"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
 // LoadPermissions loads Cloudflare permission reference data
-// NOTE: Cloudflare doesn't have a "permissions" API concept like AWS IAM.
-// These are reference mappings for documentation and role validation purposes only.
-// Actual access control in Cloudflare is done through:
-// 1. Account Roles (predefined by Cloudflare with associated permission groups)
-// 2. Policies (custom combinations of Permission Groups + Resource Groups)
 func (p *cloudflareProvider) LoadPermissions() error {
 	startTime := time.Now()
 	defer func() {
@@ -25,118 +27,45 @@ func (p *cloudflareProvider) LoadPermissions() error {
 		logrus.Debugf("Parsed Cloudflare permission references in %s", elapsed)
 	}()
 
-	// Define Cloudflare permission groups for reference
-	// These correspond to Cloudflare's Permission Groups that can be used in Policies
-	// https://developers.cloudflare.com/fundamentals/api/reference/permissions/
-	permissionsData := map[string]string{
-		// Account-level permission groups
-		"account:read":           "Read account settings",
-		"account:edit":           "Edit account settings",
-		"account_analytics:read": "Read account analytics",
-		"account_settings:read":  "Read account settings",
-		"account_settings:edit":  "Edit account settings",
-		"account_rulesets:read":  "Read account rulesets",
-		"account_rulesets:edit":  "Edit account rulesets",
-
-		// Access permission groups
-		"access:read": "Read Access applications and policies",
-		"access:edit": "Edit Access applications and policies",
-
-		// API Gateway permission groups
-		"api_gateway:read": "Read API Gateway settings",
-		"api_gateway:edit": "Edit API Gateway settings",
-
-		// Analytics permission groups
-		"analytics:read": "Read analytics data",
-
-		// Billing permission groups
-		"billing:read": "Read billing information",
-		"billing:edit": "Edit billing information",
-
-		// Cache permissions
-		"cache_purge:edit": "Purge cache",
-
-		// DNS permissions
-		"dns_records:read": "Read DNS records",
-		"dns_records:edit": "Edit DNS records",
-
-		// Firewall permissions
-		"waf:read":               "Read WAF rules",
-		"waf:edit":               "Edit WAF rules",
-		"firewall_services:read": "Read firewall services",
-		"firewall_services:edit": "Edit firewall services",
-
-		// Load Balancing permissions
-		"lb:read": "Read load balancers",
-		"lb:edit": "Edit load balancers",
-
-		// Logs permissions
-		"logs:read": "Read logs",
-		"logs:edit": "Edit logs configuration",
-
-		// Member permissions
-		"member:read": "Read account members",
-		"member:edit": "Edit account members",
-
-		// Organization permissions
-		"organization:read": "Read organization settings",
-		"organization:edit": "Edit organization settings",
-
-		// Page Rules permissions
-		"page_rules:read": "Read page rules",
-		"page_rules:edit": "Edit page rules",
-
-		// SSL/TLS permissions
-		"ssl:read": "Read SSL/TLS settings",
-		"ssl:edit": "Edit SSL/TLS settings",
-
-		// Stream permissions
-		"stream:read": "Read Cloudflare Stream",
-		"stream:edit": "Edit Cloudflare Stream",
-
-		// Workers permissions
-		"workers:read":            "Read Workers scripts",
-		"workers:edit":            "Edit Workers scripts",
-		"workers_kv_storage:read": "Read Workers KV storage",
-		"workers_kv_storage:edit": "Edit Workers KV storage",
-		"workers_r2:read":         "Read R2 storage",
-		"workers_r2:edit":         "Edit R2 storage",
-
-		// Zone permissions
-		"zone:read":          "Read zone settings",
-		"zone:edit":          "Edit zone settings",
-		"zone_settings:read": "Read zone settings",
-		"zone_settings:edit": "Edit zone settings",
-
-		// Images permissions
-		"images:read": "Read Cloudflare Images",
-		"images:edit": "Edit Cloudflare Images",
-
-		// Magic Transit permissions
-		"magic_transit:read": "Read Magic Transit settings",
-		"magic_transit:edit": "Edit Magic Transit settings",
-
-		// Zero Trust permissions
-		"zero_trust:read": "Read Zero Trust settings",
-		"zero_trust:edit": "Edit Zero Trust settings",
-
-		// DDoS permissions
-		"ddos:read": "Read DDoS settings",
-		"ddos:edit": "Edit DDoS settings",
+	if len(p.roles) == 0 {
+		return fmt.Errorf("roles must be loaded before permissions")
 	}
 
 	var permissions []models.ProviderPermission
-	permissionsMap := make(map[string]*models.ProviderPermission, len(permissionsData))
+	permissionsMap := make(map[string]*models.ProviderPermission)
 
 	// Convert to slice and create fast lookup map
-	for name, description := range permissionsData {
-		perm := models.ProviderPermission{
-			Name:        name,
-			Description: description,
+	for _, providerRole := range p.roles {
+
+		role, ok := providerRole.Role.(cloudflare.AccountRole) // Safe type assertion
+		if !ok {
+			return fmt.Errorf("providerRole.Role is not of type cloudflare.AccountRole")
 		}
-		permissions = append(permissions, perm)
-		// Ensure all lookups use the new format (without '#' prefix)
-		permissionsMap[strings.ToLower(name)] = &permissions[len(permissions)-1]
+
+		rolePermissions := role.Permissions
+
+		for name := range rolePermissions {
+			// Check if permission already exists
+			lowerName := strings.ToLower(name)
+
+			readName := fmt.Sprintf("%s:read", lowerName)
+			readPerm := models.ProviderPermission{
+				Name:        readName,
+				Title:       fmt.Sprintf("%s Read", name),
+				Description: fmt.Sprintf("Read access for %s", name),
+			}
+			permissions = append(permissions, readPerm)
+			permissionsMap[readName] = &permissions[len(permissions)-1]
+
+			editName := fmt.Sprintf("%s:edit", lowerName)
+			editPerm := models.ProviderPermission{
+				Name:        editName,
+				Title:       fmt.Sprintf("%s Edit", name),
+				Description: fmt.Sprintf("Edit access for %s", name),
+			}
+			permissions = append(permissions, editPerm)
+			permissionsMap[editName] = &permissions[len(permissions)-1]
+		}
 	}
 
 	p.permissions = permissions
@@ -192,4 +121,136 @@ func (p *cloudflareProvider) ListPermissions(ctx context.Context, filters ...str
 	}
 
 	return filtered, nil
+}
+
+// buildMembershipFromRole creates Cloudflare policies from role definition
+// If only inherits are provided, assigns those roles directly
+// If permissions are provided, builds granular policies based on inherited role permissions
+func (p *cloudflareProvider) buildMembershipFromRole(
+	ctx context.Context,
+	params *cloudflare.CreateAccountMemberParams,
+	role *models.Role,
+) error {
+
+	// Check if we have any permissions specified
+	hasPermissions := len(role.Permissions.Allow) > 0 || len(role.Permissions.Deny) > 0
+
+	// If only inherits provided (no permissions), just assign the roles directly
+	if len(role.Inherits) > 0 && !hasPermissions {
+		roleIDs, err := p.getRoleIDsFromInherits(role.Inherits)
+		if err != nil {
+			return fmt.Errorf("failed to get role IDs from inherits: %w", err)
+		}
+		params.Roles = roleIDs
+
+		logrus.WithFields(logrus.Fields{
+			"role":       role.Name,
+			"role_ids":   roleIDs,
+			"role_count": len(roleIDs),
+		}).Debug("Assigned roles directly from inherits")
+
+		return nil
+	}
+
+	// If permissions are provided, build granular policies
+	if hasPermissions {
+		// Build a map of all available permissions from inherited roles
+		availablePermissions := make(map[string]bool)
+
+		if len(role.Inherits) > 0 {
+			for _, roleName := range role.Inherits {
+				cfRole, ok := p.cfRolesMap[strings.ToLower(roleName)]
+				if !ok {
+					logrus.WithFields(logrus.Fields{
+						"role":           role.Name,
+						"inherited_role": roleName,
+					}).Warn("Inherited role not found in cache, skipping")
+					continue
+				}
+
+				// Add all permissions from this role to available permissions
+				for permKey, permValue := range cfRole.Permissions {
+
+					editName := fmt.Sprintf("%s:edit", permKey)
+					readName := fmt.Sprintf("%s:read", permKey)
+
+					availablePermissions[editName] = permValue.Edit
+					availablePermissions[readName] = permValue.Read
+				}
+			}
+
+			logrus.WithFields(logrus.Fields{
+				"role":                  role.Name,
+				"available_permissions": len(availablePermissions),
+			}).Debug("Built permission map from inherited roles")
+		}
+
+		// Process allow permissions
+		for _, permName := range role.Permissions.Allow {
+			availablePermissions[strings.ToLower(permName)] = true
+		}
+
+		// Process deny permissions
+		for _, permName := range role.Permissions.Deny {
+			availablePermissions[strings.ToLower(permName)] = false
+		}
+
+		var allowPermissionGroups []cloudflare.Permission
+		var denyPermissionGroups []cloudflare.Permission
+
+		// Only include permissions explicitly specified in Allow and Deny
+		for permName, permVal := range availablePermissions {
+			if permVal {
+				allowPermissionGroups = append(allowPermissionGroups, cloudflare.Permission{
+					ID: fmt.Sprintf("#%s", permName),
+				})
+			} else {
+				denyPermissionGroups = append(denyPermissionGroups, cloudflare.Permission{
+					ID: fmt.Sprintf("#%s", permName),
+				})
+			}
+		}
+
+		resourceGroups, err := p.buildResourceGroups(ctx, role.Resources.Allow)
+		if err != nil {
+			return fmt.Errorf("failed to build resource groups: %w", err)
+		}
+
+		// Create policies for each resource group
+		var policies []cloudflare.Policy
+		for _, resourceGroup := range resourceGroups {
+			if len(allowPermissionGroups) > 0 {
+				policy := cloudflare.Policy{
+					PermissionGroups: []cloudflare.PermissionGroup{{
+						ID:          common.ConvertToSnakeCase(role.Name),
+						Name:        role.Name,
+						Permissions: allowPermissionGroups,
+					}},
+					ResourceGroups: []cloudflare.ResourceGroup{
+						resourceGroup,
+					},
+					Access: CloudflareAllow,
+				}
+
+				policies = append(policies, policy)
+			}
+		}
+
+		if len(policies) == 0 {
+			return fmt.Errorf("no policies could be built from the provided permissions and resources")
+		}
+
+		params.Policies = policies
+
+		logrus.WithFields(logrus.Fields{
+			"role":         role.Name,
+			"policy_count": len(policies),
+			"allow_perms":  len(allowPermissionGroups),
+			"deny_perms":   len(denyPermissionGroups),
+		}).Debug("Built granular policies from permissions")
+
+		return nil
+	}
+
+	return fmt.Errorf("role must specify either inherits or permissions")
 }

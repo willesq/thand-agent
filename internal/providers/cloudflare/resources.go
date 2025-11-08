@@ -75,7 +75,7 @@ func (p *cloudflareProvider) loadZoneResources(ctx context.Context) ([]models.Pr
 			Type:        resourceTypeZone,
 			Name:        zone.Name,
 			Description: fmt.Sprintf("Zone: %s (Status: %s)", zone.Name, zone.Status),
-			Resource:    zone, // Store the full zone object to avoid ZoneDetails API calls later
+			Resource:    zone, // In-memory only: stores the full zone object to avoid ZoneDetails API calls later; not persisted due to json:"-" tag
 		}
 		resources = append(resources, resource)
 	}

@@ -16,12 +16,12 @@ func (p *cloudflareProvider) buildSearchIndex() {
 	}()
 
 	// Create in-memory Bleve indices
-	permissionsMapping := bleve.NewIndexMapping()
-	permissionsIndex, err := bleve.NewMemOnly(permissionsMapping)
-	if err != nil {
-		logrus.Errorf("Failed to create permissions search index: %v", err)
-		return
-	}
+	// permissionsMapping := bleve.NewIndexMapping()
+	// permissionsIndex, err := bleve.NewMemOnly(permissionsMapping)
+	// if err != nil {
+	// 	logrus.Errorf("Failed to create permissions search index: %v", err)
+	// 	return
+	// }
 
 	rolesMapping := bleve.NewIndexMapping()
 	rolesIndex, err := bleve.NewMemOnly(rolesMapping)
@@ -31,12 +31,12 @@ func (p *cloudflareProvider) buildSearchIndex() {
 	}
 
 	// Index permissions
-	for _, perm := range p.permissions {
-		if err := permissionsIndex.Index(perm.Name, perm); err != nil {
-			logrus.Errorf("Failed to index permission %s: %v", perm.Name, err)
-			return
-		}
-	}
+	// for _, perm := range p.permissions {
+	//	if err := permissionsIndex.Index(perm.Name, perm); err != nil {
+	//		logrus.Errorf("Failed to index permission %s: %v", perm.Name, err)
+	//		return
+	//	}
+	//}
 
 	// Index roles
 	for _, role := range p.roles {
@@ -48,12 +48,12 @@ func (p *cloudflareProvider) buildSearchIndex() {
 
 	// Safely update the indices
 	p.indexMu.Lock()
-	p.permissionsIndex = permissionsIndex
+	// p.permissionsIndex = permissionsIndex
 	p.rolesIndex = rolesIndex
 	p.indexMu.Unlock()
 
 	logrus.WithFields(logrus.Fields{
-		"permissions": len(p.permissions),
-		"roles":       len(p.roles),
+		// "permissions": len(p.permissions),
+		"roles": len(p.roles),
 	}).Debug("Cloudflare search indices ready")
 }

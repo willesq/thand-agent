@@ -27,6 +27,10 @@ func (p *cloudflareProvider) AuthorizeRole(
 	user := req.GetUser()
 	role := req.GetRole()
 
+	if len(role.Resources.Allow) == 0 {
+		return nil, fmt.Errorf("role must specify at least one resource in 'resources.allow' to authorize Cloudflare role")
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"user": user.Email,
 		"role": role.Name,
@@ -63,16 +67,10 @@ func (p *cloudflareProvider) AuthorizeRole(
 			"member_id": existingMember.ID,
 		}).Info("Member already exists, updating instead")
 
-		// Update the member with new roles/policies
-		// Convert role IDs to AccountRole objects
-		var accountRoles []cloudflare.AccountRole
-		for _, roleID := range params.Roles {
-			accountRoles = append(accountRoles, cloudflare.AccountRole{ID: roleID})
-		}
-		existingMember.Roles = accountRoles
-		existingMember.Policies = params.Policies
+		existingMember.Roles = nil // Clear policies when assigning roles
 
 		updatedMember, err := p.client.UpdateAccountMember(ctx, accountID, existingMember.ID, *existingMember)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to update account member: %w", err)
 		}
@@ -91,6 +89,8 @@ func (p *cloudflareProvider) AuthorizeRole(
 			},
 		}, nil
 	}
+
+	params.Roles = nil // Clear roles when assigning policies
 
 	// Member doesn't exist, create new
 	member, err := p.client.CreateAccountMember(ctx, accountRC, params)
@@ -219,135 +219,55 @@ func (p *cloudflareProvider) buildMembershipFromRole(
 	role *models.Role,
 ) error {
 
-	// Check if we have any permissions specified
-	hasPermissions := len(role.Permissions.Allow) > 0 || len(role.Permissions.Deny) > 0
-
 	// If only inherits provided (no permissions), just assign the roles directly
-	if len(role.Inherits) > 0 && !hasPermissions {
-		roleIDs, err := p.getRoleIDsFromInherits(role.Inherits)
-		if err != nil {
-			return fmt.Errorf("failed to get role IDs from inherits: %w", err)
-		}
-		params.Roles = roleIDs
-
-		logrus.WithFields(logrus.Fields{
-			"role":       role.Name,
-			"role_ids":   roleIDs,
-			"role_count": len(roleIDs),
-		}).Debug("Assigned roles directly from inherits")
-
-		return nil
+	if len(role.Inherits) == 0 {
+		return fmt.Errorf("role must specify at least one inherited Cloudflare role in 'inherits' to authorize Cloudflare role")
 	}
 
-	// If permissions are provided, build granular policies
-	if hasPermissions {
-		// Build a map of all available permissions from inherited roles
-		availablePermissions := make(map[string]bool)
-
-		if len(role.Inherits) > 0 {
-			for _, roleName := range role.Inherits {
-				cfRole, ok := p.cfRolesMap[strings.ToLower(roleName)]
-				if !ok {
-					logrus.WithFields(logrus.Fields{
-						"role":           role.Name,
-						"inherited_role": roleName,
-					}).Warn("Inherited role not found in cache, skipping")
-					continue
-				}
-
-				// Add all permissions from this role to available permissions
-				for permKey := range cfRole.Permissions {
-					availablePermissions[permKey] = true
-				}
-			}
-
-			logrus.WithFields(logrus.Fields{
-				"role":                  role.Name,
-				"available_permissions": len(availablePermissions),
-			}).Debug("Built permission map from inherited roles")
-		}
-
-		// Build permission groups for allow and deny
-		var allowPermissionGroups []cloudflare.PermissionGroup
-		var denyPermissionGroups []cloudflare.PermissionGroup
-
-		// Process allow permissions
-		for _, permName := range role.Permissions.Allow {
-			// If we have inherited roles, verify the permission is available
-			if len(role.Inherits) > 0 && !availablePermissions[permName] {
-				logrus.WithFields(logrus.Fields{
-					"role":       role.Name,
-					"permission": permName,
-				}).Warn("Allow permission not available in inherited roles, skipping")
-				continue
-			}
-
-			allowPermissionGroups = append(allowPermissionGroups, cloudflare.PermissionGroup{
-				ID: permName,
-			})
-		}
-
-		// Process deny permissions
-		for _, permName := range role.Permissions.Deny {
-			// If we have inherited roles, verify the permission is available
-			if len(role.Inherits) > 0 && !availablePermissions[permName] {
-				logrus.WithFields(logrus.Fields{
-					"role":       role.Name,
-					"permission": permName,
-				}).Warn("Deny permission not available in inherited roles, skipping")
-				continue
-			}
-
-			denyPermissionGroups = append(denyPermissionGroups, cloudflare.PermissionGroup{
-				ID: permName,
-			})
-		}
-
-		// Build resource groups from the role's resource specifications
-		resourceGroups, err := p.buildResourceGroups(ctx, role.Resources.Allow)
-		if err != nil {
-			return fmt.Errorf("failed to build resource groups: %w", err)
-		}
-
-		// Create policies for each resource group
-		var policies []cloudflare.Policy
-		for _, resourceGroup := range resourceGroups {
-			if len(allowPermissionGroups) > 0 {
-				policy := cloudflare.Policy{
-					PermissionGroups: allowPermissionGroups,
-					ResourceGroups: []cloudflare.ResourceGroup{
-						resourceGroup,
-					},
-					Access: CloudflareAllow,
-				}
-				policies = append(policies, policy)
-			}
-
-			if len(denyPermissionGroups) > 0 {
-				policy := cloudflare.Policy{
-					PermissionGroups: denyPermissionGroups,
-					ResourceGroups: []cloudflare.ResourceGroup{
-						resourceGroup,
-					},
-					Access: CloudflareDeny,
-				}
-				policies = append(policies, policy)
-			}
-		}
-
-		params.Policies = policies
-
-		logrus.WithFields(logrus.Fields{
-			"role":         role.Name,
-			"policy_count": len(policies),
-			"allow_perms":  len(allowPermissionGroups),
-			"deny_perms":   len(denyPermissionGroups),
-		}).Debug("Built granular policies from permissions")
-
-		return nil
+	roleIDs, err := p.getRoleIDsFromInherits(role.Inherits)
+	if err != nil {
+		return fmt.Errorf("failed to get role IDs from inherits: %w", err)
 	}
 
-	return fmt.Errorf("role must specify either inherits or permissions")
+	var permissionGroups []cloudflare.PermissionGroup
+	for _, roleID := range roleIDs {
+		permissionGroups = append(permissionGroups, cloudflare.PermissionGroup{
+			ID: roleID,
+		})
+	}
+
+	resourceGroups, err := p.buildResourceGroups(ctx, role.Resources.Allow)
+	if err != nil {
+		return fmt.Errorf("failed to build resource groups: %w", err)
+	}
+
+	// Create policies for each resource group
+	var policies []cloudflare.Policy
+	for _, resourceGroup := range resourceGroups {
+		policy := cloudflare.Policy{
+			PermissionGroups: permissionGroups,
+			ResourceGroups: []cloudflare.ResourceGroup{
+				resourceGroup,
+			},
+			Access: CloudflareAllow,
+		}
+
+		policies = append(policies, policy)
+	}
+
+	if len(policies) == 0 {
+		return fmt.Errorf("no policies could be built from the provided permissions and resources")
+	}
+
+	params.Policies = policies
+
+	logrus.WithFields(logrus.Fields{
+		"role":         role.Name,
+		"policy_count": len(policies),
+	}).Debug("Built granular policies from permissions")
+
+	return nil
+
 }
 
 // getRoleIDsFromInherits gets role IDs from multiple Cloudflare roles

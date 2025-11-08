@@ -21,9 +21,9 @@ type cloudflareProvider struct {
 	client    *cloudflare.API
 	accountID string
 
-	permissions      []models.ProviderPermission
-	permissionsMap   map[string]*models.ProviderPermission
-	permissionsIndex bleve.Index
+	// permissions      []models.ProviderPermission
+	// permissionsMap   map[string]*models.ProviderPermission
+	// permissionsIndex bleve.Index
 
 	roles      []models.ProviderRole
 	rolesMap   map[string]*models.ProviderRole
@@ -59,17 +59,17 @@ func (p *cloudflareProvider) Initialize(provider models.Provider) error {
 	p.client = client
 	p.accountID = accountID
 
-	// Load Cloudflare Permissions
-	err = p.LoadPermissions()
-	if err != nil {
-		return fmt.Errorf("failed to load permissions: %w", err)
-	}
-
 	// Load Cloudflare Roles
 	err = p.LoadRoles(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to load roles: %w", err)
 	}
+
+	// Once the roles are loaded use the roles to create the permissions reference
+	// err = p.LoadPermissions()
+	// if err != nil {
+	// 	return fmt.Errorf("failed to load permissions: %w", err)
+	// }
 
 	// Load Cloudflare Resources (zones, etc.)
 	err = p.LoadResources(context.Background())
