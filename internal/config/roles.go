@@ -501,7 +501,7 @@ func condenseActions(permissions []string) []string {
 
 	result := make([]string, 0, len(resourceActions))
 	for resource, actions := range resourceActions {
-		if len(actions) == 1 && actions[0] == "" {
+		if len(actions) == 1 && len(actions[0]) == 0 {
 			// This was a permission without actions
 			result = append(result, resource)
 		} else if len(actions) == 1 {

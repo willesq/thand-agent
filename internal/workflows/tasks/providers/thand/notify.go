@@ -13,6 +13,7 @@ import (
 	"github.com/thand-io/agent/internal/models"
 	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -196,6 +197,11 @@ func (t *thandTask) executeNotifyTemporalParallel(
 	ao := workflow.ActivityOptions{
 		TaskQueue:           serviceClient.GetTemporal().GetTaskQueue(),
 		StartToCloseTimeout: time.Minute * 5,
+		RetryPolicy: &temporal.RetryPolicy{
+			InitialInterval:    time.Second * 2,
+			BackoffCoefficient: 2.0,
+			MaximumAttempts:    3,
+		},
 	}
 	aoctx := workflow.WithActivityOptions(temporalContext, ao)
 
@@ -237,6 +243,7 @@ func (t *thandTask) executeNotifyTemporalParallel(
 		}
 	}
 
+	// Don't return errors they're just notifications.
 	return results, nil
 }
 

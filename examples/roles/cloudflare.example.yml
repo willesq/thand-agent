@@ -1,0 +1,701 @@
+# ============================================================================
+# Cloudflare Role Configuration Examples
+# ============================================================================
+#
+# IMPORTANT: The Cloudflare provider only supports role-based access control.
+# 
+# Unlike some other providers, Cloudflare does NOT support granular permission-level
+# assignments. All access is managed through Cloudflare's predefined roles.
+#
+# You can assign roles in two ways:
+# 1. Account-Wide: Use resources.allow: ["account:*"] for full account access
+# 2. Resource-Scoped: Use resources.allow: ["zone:example.com"] for specific zones
+#
+# IMPORTANT: The resources.allow field is ALWAYS REQUIRED. There is no default.
+#
+# To see all available Cloudflare roles, run:
+#   agent providers roles list --provider cloudflare-prod
+#
+# ============================================================================
+
+version: "1.0"
+roles:
+  # ============================================================================
+  # ACCOUNT-WIDE ROLES (Traditional RBAC)
+  # Use when you need broad access across the entire Cloudflare account
+  # ============================================================================
+
+  cloudflare_admin:
+    name: Cloudflare Administrator
+    description: Full administrative access to Cloudflare account
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - Administrator  # Cloudflare's built-in Administrator role
+    resources:
+      allow:
+        - account:*  # Account-wide access (required)
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:admins
+        - oidc:devops-leads
+      users:
+        - cto@example.com
+    enabled: true
+
+  cloudflare_readonly:
+    name: Cloudflare Read-Only
+    description: Read-only access to all Cloudflare account resources
+    authenticators:
+      - google_oauth2
+    workflows:
+      - self_service  # Instant access for read-only
+    inherits:
+      - Administrator Read Only  # Cloudflare's read-only role
+    resources:
+      allow:
+        - account:*  # Account-wide access (required)
+    providers:
+      - cloudflare-prod
+      - cloudflare-dev
+    scopes:
+      groups:
+        - oidc:engineering
+        - oidc:support
+    enabled: true
+
+  # ============================================================================
+  # RESOURCE-SCOPED ROLES (Granular RBAC)
+  # 
+  # Assigns Cloudflare roles scoped to specific resources (zones or account).
+  # The inherited roles define WHAT permissions the user has.
+  # The resources field limits WHERE those permissions can be applied.
+  # ============================================================================
+
+  cloudflare_dns_specific_zones:
+    name: DNS Editor - Specific Zones
+    description: DNS management for specific production zones
+    authenticators:
+      - google_oauth2
+      - github_oauth
+    workflows:
+      - peer_approval
+    inherits:
+      - DNS       # Cloudflare DNS role - provides all DNS permissions
+      - Analytics # Cloudflare Analytics role - provides analytics access
+    resources:
+      allow:
+        - zone:example.com          # Specific zone
+        - zone:api.example.com      # Another specific zone
+        - zone:www.example.com      # Yet another zone
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:platform-team
+        - oidc:devops
+    enabled: true
+
+  cloudflare_dns_all_zones:
+    name: DNS Manager - All Zones
+    description: DNS and cache management across all zones in the account
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - DNS          # Cloudflare DNS role
+      - Cache Purge  # Cloudflare Cache Purge role
+      - Analytics    # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:*  # Wildcard - all zones
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:senior-engineers
+        - oidc:devops-leads
+    enabled: true
+
+  cloudflare_firewall_all_zones:
+    name: Firewall Administrator
+    description: Manage firewall rules and WAF across all zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - security_team_approval
+    inherits:
+      - Firewall   # Cloudflare Firewall role
+      - Analytics  # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:*  # All zones for security management
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security
+        - oidc:platform-security
+      users:
+        - security-lead@example.com
+    enabled: true
+
+  cloudflare_workers_developer:
+    name: Workers Developer
+    description: Deploy and manage Cloudflare Workers and KV storage
+    authenticators:
+      - github_oauth
+      - google_oauth2
+    workflows:
+      - self_service  # Instant access for developers
+    inherits:
+      - Workers Platform Admin  # Cloudflare Workers Platform Admin role
+    resources:
+      allow:
+        - account:*  # Account-level Workers access
+    providers:
+      - cloudflare-prod
+      - cloudflare-dev
+    scopes:
+      groups:
+        - oidc:developers
+        - oidc:frontend-team
+        - oidc:backend-team
+    enabled: true
+
+  cloudflare_zerotrust_admin:
+    name: Zero Trust Administrator
+    description: Manage Cloudflare Zero Trust and Access policies
+    authenticators:
+      - google_oauth2
+    workflows:
+      - security_lead_approval
+    inherits:
+      - Cloudflare Zero Trust  # Cloudflare Zero Trust role
+      - Cloudflare Access      # Cloudflare Access role
+    resources:
+      allow:
+        - account:*  # Account-level Zero Trust access
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security
+        - oidc:identity-team
+      users:
+        - security-architect@example.com
+    enabled: true
+
+  cloudflare_ssl_specific_zones:
+    name: SSL/TLS Manager
+    description: Manage SSL certificates and TLS settings for specific zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - senior_engineer_approval
+    inherits:
+      - SSL/TLS, Caching, Performance, Page Rules, and Customization  # Cloudflare SSL/TLS role
+      - Analytics  # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:example.com
+        - zone:api.example.com
+        - zone:secure.example.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:platform-team
+        - oidc:security
+    enabled: true
+
+  cloudflare_load_balancer:
+    name: Load Balancer Manager
+    description: Manage load balancers for specific zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - Load Balancer  # Cloudflare Load Balancer role
+      - Analytics      # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:api.example.com
+        - zone:app.example.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:platform-team
+        - oidc:sre
+    enabled: true
+
+  # ============================================================================
+  # EMERGENCY ACCESS ROLES
+  # For on-call engineers and incident response
+  # ============================================================================
+
+  cloudflare_oncall_engineer:
+    name: On-Call Engineer Access
+    description: Emergency access for on-call engineers across all zones
+    authenticators:
+      - google_oauth2
+      - pagerduty  # Could integrate with PagerDuty
+    workflows:
+      - oncall_verification  # Auto-approve if on-call schedule
+    inherits:
+      - DNS                       # Cloudflare DNS role
+      - Cache Purge               # Cloudflare Cache Purge role
+      - Analytics                 # Cloudflare Analytics role
+      - Administrator Read Only   # Cloudflare read-only for monitoring
+    resources:
+      allow:
+        - zone:*  # All zones for incident monitoring
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:oncall
+        - oidc:sre
+    enabled: true
+
+  cloudflare_incident_response:
+    name: Incident Response Team
+    description: Full access for critical incident response
+    authenticators:
+      - google_oauth2
+    workflows:
+      - incident_commander_approval
+    inherits:
+      - Administrator  # Cloudflare Administrator role for emergencies
+    resources:
+      allow:
+        - zone:*  # All zones
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:incident-response
+      users:
+        - oncall-lead@example.com
+    enabled: false  # Enable only during active incidents
+
+  # ============================================================================
+  # CUSTOMER/TENANT-SPECIFIC ROLES
+  # For multi-tenant or managed service scenarios
+  # ============================================================================
+
+  cloudflare_customer_a_dns:
+    name: DNS Editor - Customer A
+    description: DNS management for Customer A's zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - customer_approval
+    inherits:
+      - DNS        # Cloudflare DNS role
+      - Analytics  # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:customer-a.com
+        - zone:www.customer-a.com
+        - zone:api.customer-a.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      users:
+        - customer-a-admin@example.com
+        - customer-a-lead@example.com
+    enabled: true
+
+  cloudflare_customer_b_zones:
+    name: Zone Manager - Customer B
+    description: Full zone management for Customer B
+    authenticators:
+      - google_oauth2
+    workflows:
+      - customer_approval
+    inherits:
+      - DNS                                                           # Cloudflare DNS role
+      - Firewall                                                      # Cloudflare Firewall role
+      - SSL/TLS, Caching, Performance, Page Rules, and Customization # Cloudflare SSL/TLS role
+      - Analytics                                                     # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:customer-b.com
+        - zone:*.customer-b.com  # All subdomains
+    providers:
+      - cloudflare-prod
+    scopes:
+      users:
+        - customer-b-admin@example.com
+    enabled: true
+
+  # ============================================================================
+  # DEVELOPMENT/TESTING ROLES
+  # For development and staging environments
+  # ============================================================================
+
+  cloudflare_dev_fullaccess:
+    name: Development Full Access
+    description: Combined role access for full development environment access
+    authenticators:
+      - google_oauth2
+      - github_oauth
+    workflows:
+      - self_service  # Instant access in dev
+    inherits:
+      - DNS                                                           # Cloudflare DNS role
+      - Firewall                                                      # Cloudflare Firewall role
+      - Workers Platform Admin                                        # Cloudflare Workers Platform Admin role
+      - SSL/TLS, Caching, Performance, Page Rules, and Customization # Cloudflare SSL/TLS role
+      - Cache Purge                                                   # Cloudflare Cache Purge role
+      - Analytics                                                     # Cloudflare Analytics role
+      - Load Balancer                                                 # Cloudflare Load Balancer role
+    resources:
+      allow:
+        - zone:*  # All zones in dev account
+    providers:
+      - cloudflare-dev
+      - cloudflare-staging
+    scopes:
+      groups:
+        - oidc:developers
+        - oidc:qa-team
+    enabled: true
+
+  cloudflare_staging_dns:
+    name: Staging DNS Editor
+    description: DNS-only access for staging zones
+    authenticators:
+      - google_oauth2
+      - github_oauth
+    workflows:
+      - self_service
+    inherits:
+      - DNS        # Cloudflare DNS role
+      - Analytics  # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:staging.example.com
+        - zone:dev.example.com
+    providers:
+      - cloudflare-staging
+    scopes:
+      groups:
+        - oidc:junior-developers
+        - oidc:qa-team
+    enabled: true
+
+  # ============================================================================
+  # TEAM-SPECIFIC ROLES
+  # For different teams managing different services
+  # ============================================================================
+
+  cloudflare_marketing_team:
+    name: Marketing Team - DNS
+    description: DNS and analytics for marketing domains
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - DNS        # Cloudflare DNS role
+      - Analytics  # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:marketing.example.com
+        - zone:blog.example.com
+        - zone:campaigns.example.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:marketing-team
+    enabled: true
+
+  cloudflare_api_team:
+    name: API Team - Full Control
+    description: Full control over API zones
+    authenticators:
+      - google_oauth2
+      - github_oauth
+    workflows:
+      - team_lead_approval
+    inherits:
+      - DNS                                                           # Cloudflare DNS role
+      - Firewall                                                      # Cloudflare Firewall role
+      - Load Balancer                                                 # Cloudflare Load Balancer role
+      - SSL/TLS, Caching, Performance, Page Rules, and Customization # Cloudflare SSL/TLS role
+      - Cache Purge                                                   # Cloudflare Cache Purge role
+      - Analytics                                                     # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:api.example.com
+        - zone:api-v2.example.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:api-team
+        - oidc:backend-team
+    enabled: true
+
+  cloudflare_security_team:
+    name: Security Team - Monitoring
+    description: Security monitoring and firewall management across all zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - security_lead_approval
+    inherits:
+      - Firewall                  # Cloudflare Firewall role
+      - Cloudflare Zero Trust     # Cloudflare Zero Trust role
+      - Analytics                 # Cloudflare Analytics role
+      - Audit Logs Viewer         # Cloudflare Audit Logs Viewer role
+      - Page Shield               # Cloudflare Page Shield role
+    resources:
+      allow:
+        - zone:*      # All zones for security monitoring
+        - account:*   # Account-level for Zero Trust
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security-team
+        - oidc:soc-team
+    enabled: true
+
+  cloudflare_frontend_team:
+    name: Frontend Team - Workers
+    description: Workers and caching for frontend applications
+    authenticators:
+      - github_oauth
+      - google_oauth2
+    workflows:
+      - self_service
+    inherits:
+      - Workers Platform Admin  # Cloudflare Workers Platform Admin role
+      - Cache Purge             # Cloudflare Cache Purge role
+      - Analytics               # Cloudflare Analytics role
+    resources:
+      allow:
+        - account:*  # Account-level for Workers
+        - zone:app.example.com
+        - zone:www.example.com
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:frontend-team
+        - oidc:ui-team
+    enabled: true
+
+  # ============================================================================
+  # ANALYTICS AND MONITORING ROLES
+  # For teams that need visibility without edit permissions
+  # ============================================================================
+
+  cloudflare_analytics_viewer:
+    name: Analytics Viewer
+    description: Read-only analytics access across all zones
+    authenticators:
+      - google_oauth2
+    workflows:
+      - self_service
+    inherits:
+      - Analytics                 # Cloudflare Analytics role
+      - Administrator Read Only   # Cloudflare read-only admin role
+    resources:
+      allow:
+        - zone:*  # All zones
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:data-team
+        - oidc:business-intelligence
+        - oidc:product-managers
+    enabled: true
+
+  cloudflare_logs_reader:
+    name: Logs Reader
+    description: Read-only access to logs and analytics
+    authenticators:
+      - google_oauth2
+    workflows:
+      - self_service
+    inherits:
+      - Log Share Reader  # Cloudflare Log Share Reader role
+      - Analytics         # Cloudflare Analytics role
+    resources:
+      allow:
+        - zone:*  # All zones
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security-analysts
+        - oidc:compliance-team
+    enabled: true
+
+  # ============================================================================
+  # SPECIALIZED ROLES
+  # For specific use cases and services
+  # ============================================================================
+
+  cloudflare_r2_admin:
+    name: R2 Storage Administrator
+    description: Manage R2 object storage
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - Cloudflare R2 Admin  # Cloudflare R2 Admin role
+    resources:
+      allow:
+        - account:*  # Account-level for R2
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:storage-team
+        - oidc:data-engineering
+    enabled: true
+
+  cloudflare_stream_admin:
+    name: Stream Administrator
+    description: Manage Cloudflare Stream video
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - Cloudflare Stream  # Cloudflare Stream role
+    resources:
+      allow:
+        - account:*  # Account-level for Stream
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:media-team
+        - oidc:content-team
+    enabled: true
+
+  cloudflare_email_security:
+    name: Email Security Administrator
+    description: Manage email security settings
+    authenticators:
+      - google_oauth2
+    workflows:
+      - security_team_approval
+    inherits:
+      - Email Security Policy Admin  # Cloudflare Email Security Policy Admin role
+      - Email Security Analyst       # Cloudflare Email Security Analyst role
+    resources:
+      allow:
+        - account:*  # Account-level for email security
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security-team
+      users:
+        - email-security-admin@example.com
+    enabled: true
+
+  cloudflare_turnstile_admin:
+    name: Turnstile Administrator
+    description: Manage Turnstile CAPTCHA service
+    authenticators:
+      - google_oauth2
+    workflows:
+      - manager_approval
+    inherits:
+      - Turnstile  # Cloudflare Turnstile role
+    resources:
+      allow:
+        - account:*  # Account-level for Turnstile
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:security-team
+        - oidc:frontend-team
+    enabled: true
+
+  # ============================================================================
+  # BILLING AND ADMIN ROLES
+  # For financial and administrative access
+  # ============================================================================
+
+  cloudflare_billing_admin:
+    name: Billing Administrator
+    description: Manage billing and subscriptions
+    authenticators:
+      - google_oauth2
+    workflows:
+      - finance_approval
+    inherits:
+      - Billing  # Cloudflare Billing role
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:finance-team
+      users:
+        - cfo@example.com
+        - billing-admin@example.com
+    enabled: true
+
+  cloudflare_super_admin:
+    name: Super Administrator
+    description: Super admin with all privileges
+    authenticators:
+      - google_oauth2
+    workflows:
+      - executive_approval
+    inherits:
+      - Super Administrator - All Privileges  # Cloudflare Super Administrator role
+    providers:
+      - cloudflare-prod
+    scopes:
+      users:
+        - cto@example.com
+        - ceo@example.com
+    enabled: false  # Enable only when absolutely necessary
+
+  # ============================================================================
+  # AUDIT AND COMPLIANCE ROLES
+  # For compliance, audit, and security review teams
+  # ============================================================================
+
+  cloudflare_auditor:
+    name: Compliance Auditor
+    description: Read-only access for compliance and audit purposes
+    authenticators:
+      - google_oauth2
+    workflows:
+      - compliance_approval
+    inherits:
+      - Administrator Read Only  # Cloudflare read-only admin role
+      - Audit Logs Viewer        # Cloudflare Audit Logs Viewer role
+    resources:
+      allow:
+        - zone:*      # All zones
+        - account:*   # All account resources
+    providers:
+      - cloudflare-prod
+    scopes:
+      groups:
+        - oidc:compliance-team
+        - oidc:internal-audit
+    enabled: true

@@ -1,0 +1,68 @@
+# Cloudflare Provider Configuration Examples
+#
+# NOTE: The Cloudflare provider only supports role-based access control.
+# Unlike some other providers, Cloudflare does not support granular permission-level 
+# assignments. All access is managed through Cloudflare's predefined roles, which can 
+# be assigned either account-wide or scoped to specific resources (zones).
+#
+# For role examples, see: examples/roles/cloudflare.example.yml
+
+version: "1.0"
+providers:
+  # Cloudflare Production - API Token (Recommended)
+  cloudflare-prod:
+    name: Cloudflare Production
+    description: Production Cloudflare account with API token authentication
+    provider: cloudflare
+    enabled: true
+    config:
+      # Your Cloudflare account ID (found in dashboard URL or account settings)
+      account_id: "your-account-id-here"
+      
+      # API Token (Recommended - more secure, scoped permissions)
+      # Create at: https://dash.cloudflare.com/profile/api-tokens
+      # Required permissions:
+      #   - Account → Account Settings → Edit
+      api_token: "your-api-token-here"
+
+  # Cloudflare Development - API Token
+  cloudflare-dev:
+    name: Cloudflare Development
+    description: Development Cloudflare account
+    provider: cloudflare
+    enabled: true
+    config:
+      account_id: "account_id"
+      api_token: "your-api-token-here"  # Use environment variable
+
+  # Cloudflare Staging - API Key (Legacy)
+  cloudflare-staging:
+    name: Cloudflare Staging
+    description: Staging Cloudflare account with legacy API key
+    provider: cloudflare
+    enabled: false  # Disabled by default
+    config:
+      account_id: "your-account-id-here"
+      
+      # Legacy API Key authentication (less secure, use API token instead)
+      api_key: "your-global-api-key-here"
+      email: "admin@example.com"
+
+  # Multi-tenant example - separate accounts per customer
+  cloudflare-customer-a:
+    name: Cloudflare - Customer A
+    description: Customer A's Cloudflare account
+    provider: cloudflare
+    enabled: true
+    config:
+      account_id: "your-account-id-here"
+      api_token: "your-api-token-here"
+
+  cloudflare-customer-b:
+    name: Cloudflare - Customer B
+    description: Customer B's Cloudflare account
+    provider: cloudflare
+    enabled: true
+    config:
+      account_id: "your-account-id-here"
+      api_token: "your-api-token-here"

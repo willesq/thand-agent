@@ -185,7 +185,7 @@ func (p *kubernetesProvider) extractPermissionsFromBuiltinRoles() []models.Provi
 						}
 
 						var permissionName string
-						if apiGroup == "" {
+						if len(apiGroup) == 0 {
 							// Core API group
 							permissionName = fmt.Sprintf("k8s:%s:%s", resource, verb)
 						} else {

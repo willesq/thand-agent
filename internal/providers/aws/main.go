@@ -184,7 +184,7 @@ func (p *awsProvider) GetAccountId(config *models.BasicConfig) error {
 
 	foundAccount := callerIdentity.Account
 
-	if foundAccount == nil || *foundAccount == "" {
+	if foundAccount == nil || len(*foundAccount) == 0 {
 		return fmt.Errorf("failed to retrieve valid AWS account ID via STS")
 	}
 

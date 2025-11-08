@@ -60,6 +60,7 @@ Provides user and group discovery capabilities. Providers with this capability c
 | [AWS](aws/) | RBAC | Amazon Web Services IAM and SSO integration |
 | [Azure](azure/) | RBAC | Microsoft Azure RBAC and subscription management |
 | [GCP](gcp/) | RBAC | Google Cloud Platform IAM and resource management |
+| [Cloudflare](cloudflare/) | RBAC, Identities | Cloudflare account management with role and policy-based access control |
 | [Kubernetes](kubernetes/) | Authorizor, RBAC | Kubernetes cluster authentication and RBAC |
 
 ### Development & DevOps

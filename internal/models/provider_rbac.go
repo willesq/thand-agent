@@ -159,7 +159,10 @@ func ValidateRole(
 		err = validateRole(providerCall, &identity, elevateRequest.Role)
 
 		if err != nil {
+
+			logrus.WithError(err).Warn("Role validation failed")
 			return nil, err
+
 		}
 	}
 

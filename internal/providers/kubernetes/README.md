@@ -84,8 +84,10 @@ Examples:
 To create namespace-scoped roles, include a namespace resource in the role definition:
 
 ```yaml
+version: "1.0"
 roles:
-  - name: dev-pod-reader
+  dev-pod-reader:
+    name: Dev Pod Reader
     description: Read pods in development namespace
     resources:
       allow:
@@ -100,8 +102,9 @@ roles:
 For cluster-wide access, omit namespace resources:
 
 ```yaml
+version: "1.0"
 roles:
-  - name: cluster-viewer
+  cluster-viewer:
     description: View resources across all namespaces
     permissions:
       allow:
