@@ -1,6 +1,7 @@
 package thand
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
@@ -198,7 +200,7 @@ func (t *thandTask) executeAuthorization(
 	// Process results
 	requests := make(map[string]*models.AuthorizeRoleRequest)
 	authorizations := make(map[string]*models.AuthorizeRoleResponse)
-	hasErrors := false
+	returnedErrors := []error{}
 
 	if len(authResults) == 0 {
 		return nil, fmt.Errorf("no authorization results returned")
@@ -207,8 +209,11 @@ func (t *thandTask) executeAuthorization(
 	for _, result := range authResults {
 		if result.Error != nil {
 			logrus.WithError(result.Error).WithField("identity", result.Identity).Error("Authorization failed")
-			hasErrors = true
-			continue
+
+			foundError := unwrapTemporalError(result.Error)
+
+			returnedErrors = append(returnedErrors, fmt.Errorf(
+				"authorization error, failed to authorize: %s - returned with the error: %s", result.Identity, foundError.Error()))
 		}
 		authorizations[result.Identity] = result.AuthResponse
 	}
@@ -217,8 +222,13 @@ func (t *thandTask) executeAuthorization(
 		requests[req.Identity] = &req.AuthRequest
 	}
 
-	if hasErrors && len(authorizations) == 0 {
-		return nil, fmt.Errorf("all authorization requests failed")
+	if len(returnedErrors) > 0 && len(authorizations) == 0 {
+
+		return nil, temporal.NewApplicationErrorWithCause(
+			fmt.Sprintf("One or more authorizations failed: %d errors, %d authorizations", len(returnedErrors), len(authorizations)),
+			"AuthorizationError",
+			errors.Join(returnedErrors...),
+		)
 	}
 
 	// Schedule revocation if revocation state provided

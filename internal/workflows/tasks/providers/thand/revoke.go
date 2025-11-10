@@ -12,6 +12,7 @@ import (
 	"github.com/thand-io/agent/internal/models"
 	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -158,19 +159,27 @@ func (t *thandTask) executeRevocationTask(
 
 	// Process results
 	revocations := make(map[string]any)
-	hasErrors := false
+	returnedErrors := []error{}
 
 	for _, result := range revokeResults {
 		if result.Error != nil {
 			logrus.WithError(result.Error).WithField("identity", result.Identity).Error("Revocation failed")
-			hasErrors = true
+
+			foundError := unwrapTemporalError(result.Error)
+
+			returnedErrors = append(returnedErrors, fmt.Errorf(
+				"revocation error, failed to revoke: %s - returned with the error: %s", result.Identity, foundError.Error()))
 			continue
 		}
 		revocations[result.Identity] = result.Output
 	}
 
-	if hasErrors && len(revocations) == 0 {
-		return nil, fmt.Errorf("all revocation requests failed")
+	if len(returnedErrors) > 0 && len(revocations) == 0 {
+		return nil, temporal.NewApplicationErrorWithCause(
+			fmt.Sprintf("One or more revocations failed: %d errors, %d revocations", len(returnedErrors), len(revocations)),
+			"RevocationError",
+			errors.Join(returnedErrors...),
+		)
 	}
 
 	modelOutput["revocations"] = revocations
@@ -231,7 +240,7 @@ func executeTemporalRevokeParallel(
 				aoctx,
 				thandFunction.ThandRevokeFunction,
 				workflowTask,
-				"revoke", // taskName
+				taskName,
 				call,
 				thandRevokeReq,
 			).Get(ctx, &revokeOut)

@@ -169,14 +169,45 @@ func (wr *ResumableWorkflowRunner) Run(input any) (output any, err error) {
 
 // wrapWorkflowError ensures workflow errors have a proper instance reference.
 func (wr *ResumableWorkflowRunner) wrapWorkflowError(err error) error {
+
 	taskReference := wr.workflowTask.GetTaskReference()
+
 	if len(taskReference) == 0 {
 		taskReference = "/"
 	}
+
 	if knownErr := model.AsError(err); knownErr != nil {
 		return knownErr.WithInstanceRef(wr.GetWorkflow(), taskReference)
 	}
-	return model.NewErrRuntime(fmt.Errorf("workflow '%s', task '%s': %w", wr.GetWorkflow().Document.Name, taskReference, err), taskReference)
+
+	// First unwrap ActivityError if present, then check the underlying error type
+	var activityErr *temporal.ActivityError
+	unwrappedErr := err
+	if errors.As(err, &activityErr) {
+		if innerErr := errors.Unwrap(activityErr); innerErr != nil {
+			unwrappedErr = innerErr
+		}
+	}
+
+	// Handle Temporal ApplicationError
+	if temporal.IsApplicationError(unwrappedErr) {
+		var appErr *temporal.ApplicationError
+		if errors.As(unwrappedErr, &appErr) {
+			return model.NewErrRuntime(
+				fmt.Errorf("workflow '%s', task '%s' error: %v",
+					wr.GetWorkflow().Document.Name,
+					taskReference,
+					appErr.Error(),
+				),
+				taskReference,
+			)
+		}
+	}
+
+	return model.NewErrRuntime(
+		fmt.Errorf("workflow '%s', task '%s': %w", wr.GetWorkflow().Document.Name, taskReference, err),
+		taskReference,
+	)
 }
 
 // processOutput applies output transformations.

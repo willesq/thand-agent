@@ -259,6 +259,14 @@
                                         <a href="/" class="button button-primary" style="margin-right: 0.5rem;">Back to Home</a>
                                         <a href="/elevate" class="button button-secondary">New Request</a>
                                     </div>
+                                    
+                                    <!-- Execution Context JSON -->
+                                    <details style="margin-top: 1.5rem; text-align: left;">
+                                        <summary style="cursor: pointer; font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem;">
+                                            Execution Context (JSON)
+                                        </summary>
+                                        <pre style="background-color: hsl(var(--muted)); padding: 1rem; border-radius: 0.375rem; overflow-x: auto; font-size: 0.75rem; margin-top: 0.5rem;"><code x-text="JSON.stringify(execution, null, 2)"></code></pre>
+                                    </details>
                                 </div>
                             </template>
                             
@@ -267,10 +275,85 @@
                                     <h4 style="color: hsl(var(--destructive)); margin-bottom: 0.5rem;">✗ Workflow Failed</h4>
                                     <p style="color: hsl(var(--muted-foreground)); font-size: 0.875rem;">The workflow encountered an error and could not complete.</p>
                                     
+                                    <!-- Error Details -->
+                                    <template x-if="execution && execution.output">
+                                        <div style="margin-top: 1.5rem; text-align: left;">
+                                            <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 0.5rem; padding: 1rem;">
+                                                <!-- Main Error Message -->
+                                                <template x-if="getErrorMessage()">
+                                                    <div style="margin-bottom: 1rem;">
+                                                        <h5 style="font-size: 0.875rem; font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">Error Message:</h5>
+                                                        <div style="background-color: white; border: 1px solid #fecaca; border-radius: 0.375rem; padding: 0.75rem; font-family: monospace; font-size: 0.875rem; color: #991b1b; white-space: pre-wrap; word-break: break-word;" x-text="formatErrorMessage(getErrorMessage())"></div>
+                                                    </div>
+                                                </template>
+                                                
+                                                <!-- Error Details -->
+                                                <template x-if="execution.output.details && execution.output.details.length > 0">
+                                                    <div style="margin-bottom: 1rem;">
+                                                        <h5 style="font-size: 0.875rem; font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">Details:</h5>
+                                                        <ul style="margin: 0; padding-left: 1.5rem; color: #7f1d1d; font-size: 0.875rem;">
+                                                            <template x-for="detail in execution.output.details" :key="detail">
+                                                                <li x-text="typeof detail === 'string' ? detail : JSON.stringify(detail)"></li>
+                                                            </template>
+                                                        </ul>
+                                                    </div>
+                                                </template>
+                                                
+                                                <!-- Nested Cause (if present) -->
+                                                <template x-if="execution.output.cause">
+                                                    <div style="margin-bottom: 1rem; padding-left: 1rem; border-left: 3px solid #fca5a5;">
+                                                        <h5 style="font-size: 0.875rem; font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">Caused by:</h5>
+                                                        <div style="background-color: white; border: 1px solid #fecaca; border-radius: 0.375rem; padding: 0.75rem; font-family: monospace; font-size: 0.8125rem; color: #7f1d1d; white-space: pre-wrap; word-break: break-word;" x-text="formatNestedCause(execution.output.cause)"></div>
+                                                    </div>
+                                                </template>
+                                                
+                                                <!-- Activity Information (if present) -->
+                                                <template x-if="execution.output.activityType || execution.output.activityId">
+                                                    <div style="margin-bottom: 1rem; padding: 0.75rem; background-color: white; border: 1px solid #fecaca; border-radius: 0.375rem;">
+                                                        <h5 style="font-size: 0.875rem; font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">Activity Information:</h5>
+                                                        <div style="font-size: 0.8125rem; color: #7f1d1d;">
+                                                            <template x-if="execution.output.activityType">
+                                                                <div><strong>Type:</strong> <span x-text="execution.output.activityType"></span></div>
+                                                            </template>
+                                                            <template x-if="execution.output.activityId">
+                                                                <div><strong>ID:</strong> <span x-text="execution.output.activityId"></span></div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                
+                                                <!-- Error Type and Retryable Status (at bottom) -->
+                                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #fecaca; flex-wrap: wrap;">
+                                                    <template x-if="getErrorType()">
+                                                        <span style="background-color: #fee2e2; color: #991b1b; padding: 0.25rem 0.75rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600;" x-text="getErrorType()"></span>
+                                                    </template>
+                                                    <template x-if="getErrorRetryable() !== null">
+                                                        <span :style="{ 
+                                                            'background-color': getErrorRetryable() ? '#fef3c7' : '#d1fae5', 
+                                                            'color': getErrorRetryable() ? '#92400e' : '#065f46',
+                                                            'padding': '0.25rem 0.75rem',
+                                                            'border-radius': '0.25rem',
+                                                            'font-size': '0.75rem',
+                                                            'font-weight': '600'
+                                                        }" x-text="getErrorRetryable() ? 'Non-Retryable' : 'Retryable'"></span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    
                                     <div style="margin-top: 1rem;">
                                         <a href="/" class="button button-primary" style="margin-right: 0.5rem;">Back to Home</a>
                                         <a href="/elevate" class="button button-secondary">Try Again</a>
                                     </div>
+                                    
+                                    <!-- Execution Context JSON -->
+                                    <details style="margin-top: 1.5rem; text-align: left;">
+                                        <summary style="cursor: pointer; font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem;">
+                                            Full Execution Context (JSON)
+                                        </summary>
+                                        <pre style="background-color: hsl(var(--muted)); padding: 1rem; border-radius: 0.375rem; overflow-x: auto; font-size: 0.75rem; margin-top: 0.5rem;"><code x-text="JSON.stringify(execution, null, 2)"></code></pre>
+                                    </details>
                                 </div>
                             </template>
                             
@@ -626,6 +709,86 @@
                     } else {
                         return `${diffSeconds}s`;
                     }
+                },
+                
+                // Get error message (handles both string and object formats)
+                getErrorMessage() {
+                    if (!this.execution?.output) return '';
+                    
+                    // If output is a string, return it directly
+                    if (typeof this.execution.output === 'string') {
+                        return this.execution.output;
+                    }
+                    
+                    // If output is an object with message property
+                    if (this.execution.output.message) {
+                        return this.execution.output.message;
+                    }
+                    
+                    // Fallback: stringify the output
+                    return JSON.stringify(this.execution.output);
+                },
+                
+                // Get error type
+                getErrorType() {
+                    if (!this.execution?.output) return null;
+                    if (typeof this.execution.output === 'object' && this.execution.output.type) {
+                        return this.execution.output.type;
+                    }
+                    return null;
+                },
+                
+                // Get error retryable status
+                getErrorRetryable() {
+                    if (!this.execution?.output) return null;
+                    if (typeof this.execution.output === 'object' && this.execution.output.nonRetryable !== undefined) {
+                        return this.execution.output.nonRetryable;
+                    }
+                    return null;
+                },
+                
+                // Format error message to be more readable
+                formatErrorMessage(message) {
+                    if (!message) return '';
+                    
+                    // Break long error messages into multiple lines at logical points
+                    let formatted = message
+                        .replace(/\. /g, '.\n')  // New line after sentences
+                        .replace(/ error: /g, '\nerror: ')  // New line before "error:"
+                        .replace(/ message: /g, '\nmessage: ')  // New line before "message:"
+                        .replace(/Origin: /g, '\nOrigin: ')  // New line before "Origin:"
+                        .replace(/\(type: /g, '\n(type: ');  // New line before type info
+                    
+                    return formatted;
+                },
+                
+                // Format nested cause recursively as plain text
+                formatNestedCause(cause, indent = 0) {
+                    if (!cause) return '';
+                    
+                    let lines = [];
+                    const pad = ' '.repeat(indent * 2);
+
+                    if (cause.type) {
+                        lines.push(`${pad}Type: ${cause.type}`);
+                    }
+                    if (cause.message) {
+                        lines.push(`${pad}Message: ${cause.message}`);
+                    }
+                    if (cause.activityType) {
+                        lines.push(`${pad}Activity Type: ${cause.activityType}`);
+                    }
+                    if (cause.activityId) {
+                        lines.push(`${pad}Activity ID: ${cause.activityId}`);
+                    }
+                    if (cause.timeoutType) {
+                        lines.push(`${pad}Timeout Type: ${cause.timeoutType}`);
+                    }
+                    if (cause.cause) {
+                        lines.push(`${pad}Caused by:`);
+                        lines.push(this.formatNestedCause(cause.cause, indent + 1));
+                    }
+                    return lines.join('\n');
                 },
                 
                 // Cancel workflow method
