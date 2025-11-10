@@ -31,10 +31,7 @@ func unwrapTemporalError(err error) error {
 	case temporal.IsApplicationError(unwrappedErr):
 		var appErr *temporal.ApplicationError
 		if errors.As(unwrappedErr, &appErr) {
-			foundError = fmt.Errorf("application error: %v - message: %v",
-				appErr.Error(),
-				appErr.Message(),
-			)
+			foundError = fmt.Errorf("application error: %v", appErr.Message())
 		}
 	default:
 		foundError = err

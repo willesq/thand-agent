@@ -105,6 +105,7 @@ func (p *cloudflareProvider) AuthorizeRole(
 			"CloudflareAccountMemberCreationError",
 			temporal.ApplicationErrorOptions{
 				NextRetryDelay: 3 * time.Second,
+				Cause:          err,
 			},
 		)
 	}

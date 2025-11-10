@@ -214,6 +214,7 @@ func (t *thandTask) executeAuthorization(
 
 			returnedErrors = append(returnedErrors, fmt.Errorf(
 				"authorization error, failed to authorize: %s - returned with the error: %s", result.Identity, foundError.Error()))
+			continue
 		}
 		authorizations[result.Identity] = result.AuthResponse
 	}

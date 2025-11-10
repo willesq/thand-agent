@@ -75,7 +75,7 @@ func (m *WorkflowManager) registerActivities() error {
 				return nil, handleActivityError(fn, err)
 			}
 
-			return output, err
+			return output, nil
 		}, activity.RegisterOptions{
 			Name: fn,
 		})

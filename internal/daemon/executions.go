@@ -653,6 +653,11 @@ func extractFailureMessage(failure *failurepb.Failure) *TemporalFailureInfo {
 		}
 	}
 
+	// Check for nested cause (applies to all error types)
+	if cause := failure.GetCause(); cause != nil {
+		errorInfo.Cause = extractFailureMessage(cause)
+	}
+
 	// Include stack trace if available
 	if stackTrace := failure.GetStackTrace(); len(stackTrace) > 0 {
 		errorInfo.StackTrace = stackTrace
