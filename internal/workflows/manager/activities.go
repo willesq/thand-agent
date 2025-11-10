@@ -10,6 +10,7 @@ import (
 	models "github.com/thand-io/agent/internal/models"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
 	"go.temporal.io/sdk/activity"
+	"go.temporal.io/sdk/temporal"
 )
 
 func (m *WorkflowManager) registerActivities() error {
@@ -68,11 +69,13 @@ func (m *WorkflowManager) registerActivities() error {
 			output, err := caller.Execute(
 				workflowTask, callFunction, input)
 
+			// Applications need to handle errors returned from activities
+			// by themselves, so we just return the error here
 			if err != nil {
-				logrus.WithError(err).Errorf("failed to execute activity: %s", fn)
+				return nil, handleActivityError(fn, err)
 			}
 
-			return output, err
+			return output, nil
 		}, activity.RegisterOptions{
 			Name: fn,
 		})
@@ -159,4 +162,26 @@ func (m *WorkflowManager) registerActivities() error {
 	})
 
 	return nil
+}
+
+func handleActivityError(fn string, err error) error {
+
+	logrus.WithError(err).Errorf("failed to execute activity: %s", fn)
+
+	// Check the error type and wrap if necessary
+	if temporal.IsApplicationError(err) {
+		return err
+	} else if temporal.IsCanceledError(err) {
+		return err
+	} else if temporal.IsPanicError(err) {
+		return err
+	} else if temporal.IsTerminatedError(err) {
+		return err
+	} else {
+		return temporal.NewNonRetryableApplicationError(
+			fmt.Sprintf("Activity Error: %s", fn),
+			"NonRetryableApplicationError",
+			err,
+		)
+	}
 }
