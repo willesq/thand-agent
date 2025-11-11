@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Slack Provider
+title: Slack
 description: Slack provider for team communication and notifications
 parent: Providers
 grand_parent: Configuration

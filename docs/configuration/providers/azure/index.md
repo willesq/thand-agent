@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Azure Provider
+title: Azure
 description: Microsoft Azure provider with RBAC and subscription management
 parent: Providers
 grand_parent: Configuration

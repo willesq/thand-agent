@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Cloudflare Provider
+title: Cloudflare
 description: Cloudflare provider with role-based access control
 parent: Providers
 grand_parent: Configuration

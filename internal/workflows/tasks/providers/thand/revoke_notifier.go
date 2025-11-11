@@ -2,6 +2,7 @@ package thand
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
@@ -69,8 +70,8 @@ func (r *revokeNotifier) GetPayload(toIdentity string) models.NotificationReques
 	elevationReq := r.elevationReq
 	var notificationPayload models.NotificationRequest
 
-	switch r.GetProviderName() {
-	case slackProvider.SlackProviderName:
+	if strings.Compare(r.GetProviderName(), slackProvider.SlackProviderName) == 0 {
+
 		blocks := r.createRevokeSlackBlocks()
 
 		slackReq := slackProvider.SlackNotificationRequest{
@@ -90,12 +91,13 @@ func (r *revokeNotifier) GetPayload(toIdentity string) models.NotificationReques
 			logrus.WithError(err).Error("Failed to convert slack request")
 			return models.NotificationRequest{}
 		}
-	case emailProvider.EmailProviderName:
+	} else if strings.HasPrefix(r.GetProviderName(), emailProvider.EmailProviderName) {
+
 		plainText, html := r.createRevokeEmailBody()
-		emailReq := emailProvider.EmailNotificationRequest{
+		emailReq := models.EmailNotificationRequest{
 			To:      []string{toIdentity},
 			Subject: "Access Revoked",
-			Body: emailProvider.EmailNotificationBody{
+			Body: models.EmailNotificationBody{
 				Text: plainText,
 				HTML: html,
 			},
@@ -105,7 +107,7 @@ func (r *revokeNotifier) GetPayload(toIdentity string) models.NotificationReques
 			logrus.WithError(err).Error("Failed to convert email request")
 			return models.NotificationRequest{}
 		}
-	default:
+	} else {
 		logrus.WithField("provider", r.GetProviderName()).Error("Unsupported provider type")
 		return models.NotificationRequest{}
 	}

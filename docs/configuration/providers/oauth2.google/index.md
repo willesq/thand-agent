@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Google OAuth2 Provider
+title: Google OAuth2
 description: Google OAuth2 provider for Google account authentication
 parent: Providers
 grand_parent: Configuration

@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Google Workspace (GSuite) Provider
+title: Google Workspace (GSuite)
 description: Google Workspace provider for user and group management
 parent: Providers
 grand_parent: Configuration

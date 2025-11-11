@@ -2,6 +2,7 @@ package thand
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
@@ -72,10 +73,9 @@ func (a *authorizerNotifier) GetPayload(toIdentity string) models.NotificationRe
 	elevationReq := a.elevationReq
 	var notificationPayload models.NotificationRequest
 
-	switch a.GetProviderName() {
-	case slackProvider.SlackProviderName:
-		blocks := a.createAuthorizeSlackBlocks()
+	if strings.Compare(a.GetProviderName(), slackProvider.SlackProviderName) == 0 {
 
+		blocks := a.createAuthorizeSlackBlocks()
 		slackReq := slackProvider.SlackNotificationRequest{
 			To: toIdentity,
 			Text: fmt.Sprintf("Your access request for role %s has been approved", func() string {
@@ -93,12 +93,12 @@ func (a *authorizerNotifier) GetPayload(toIdentity string) models.NotificationRe
 			logrus.WithError(err).Error("Failed to convert slack request")
 			return models.NotificationRequest{}
 		}
-	case emailProvider.EmailProviderName:
+	} else if strings.HasPrefix(a.GetProviderName(), emailProvider.EmailProviderName) {
 		plainText, html := a.createAuthorizeEmailBody()
-		emailReq := emailProvider.EmailNotificationRequest{
+		emailReq := models.EmailNotificationRequest{
 			To:      []string{toIdentity},
 			Subject: "Access Request Approved",
-			Body: emailProvider.EmailNotificationBody{
+			Body: models.EmailNotificationBody{
 				Text: plainText,
 				HTML: html,
 			},
@@ -108,7 +108,7 @@ func (a *authorizerNotifier) GetPayload(toIdentity string) models.NotificationRe
 			logrus.WithError(err).Error("Failed to convert email request")
 			return models.NotificationRequest{}
 		}
-	default:
+	} else {
 		logrus.WithField("provider", a.GetProviderName()).Error("Unsupported provider type")
 		return models.NotificationRequest{}
 	}
