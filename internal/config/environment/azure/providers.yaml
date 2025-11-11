@@ -1,0 +1,16 @@
+version: "1.0"
+providers:
+
+  # TODO(hugh) Add thand as auth provider
+
+  azure:
+    name: Azure Cloud Provider
+    description: Microsoft Azure cloud provider
+    provider: azure
+    enabled: true
+
+  email:
+    name: Azure Email
+    description: Azure SMTP for notifications
+    provider: email
+    enabled: true

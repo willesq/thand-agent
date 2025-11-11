@@ -206,3 +206,9 @@ func (p *BaseProvider) Initialize(provider Provider) error {
 	// Initialize the provider
 	return nil
 }
+
+// ProviderDefinitions represents a collection of provider configurations loaded from a file or other source.
+type ProviderDefinitions struct {
+	Version   string              `yaml:"version" json:"version"`
+	Providers map[string]Provider `yaml:"providers" json:"providers"`
+}

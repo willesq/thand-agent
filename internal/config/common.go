@@ -1,24 +1,21 @@
 package config
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
-	"gopkg.in/yaml.v3"
+	"github.com/thand-io/agent/internal/models"
 )
 
 // loadDataFromSource loads data from either a file path or URL
 func loadDataFromSource[
-	T WorkflowDefinitions | RoleDefinitions | ProviderDefinitions,
+	T models.WorkflowDefinitions | models.RoleDefinitions | models.ProviderDefinitions,
 ](path string, uriEndpoint *model.Endpoint, data string, definition T) ([]*T, error) {
 
 	// Prioritize path over URL if both are provided
@@ -26,7 +23,7 @@ func loadDataFromSource[
 
 		logrus.Debugln("Loading definitions from data")
 
-		item, err := readData([]byte(data), definition)
+		item, err := common.ReadDataToInterface([]byte(data), definition)
 
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
@@ -68,7 +65,7 @@ func loadDataFromSource[
 
 		data := resp.Body()
 
-		item, err := readData(data, definition)
+		item, err := common.ReadDataToInterface(data, definition)
 
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
@@ -108,7 +105,7 @@ func loadDataFromSource[
 }
 
 // loadFromDirectory loads and merges all YAML and JSON files from a directory
-func loadFromDirectory[T WorkflowDefinitions | RoleDefinitions | ProviderDefinitions](
+func loadFromDirectory[T models.WorkflowDefinitions | models.RoleDefinitions | models.ProviderDefinitions](
 	dirPath string, definition T,
 ) ([]*T, error) {
 
@@ -156,7 +153,7 @@ func loadFromDirectory[T WorkflowDefinitions | RoleDefinitions | ProviderDefinit
 
 }
 
-func readFile[T WorkflowDefinitions | RoleDefinitions | ProviderDefinitions](
+func readFile[T models.WorkflowDefinitions | models.RoleDefinitions | models.ProviderDefinitions](
 	path string, definition T,
 ) (*T, error) {
 
@@ -171,44 +168,5 @@ func readFile[T WorkflowDefinitions | RoleDefinitions | ProviderDefinitions](
 		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
 	}
 
-	return readData(data, definition)
-}
-
-func readData[T WorkflowDefinitions | RoleDefinitions | ProviderDefinitions](
-	data []byte, _ T) (*T, error) {
-
-	var item T
-
-	// remove all starting whitespace including newlines to figure out
-	// what the first character is
-	data = bytes.TrimLeftFunc(data, unicode.IsSpace)
-
-	if len(data) == 0 {
-		return nil, fmt.Errorf("no data provided")
-	} else if data[0] == '{' || data[1] == '[' {
-		// If JSON we can unmarshal directly
-		logrus.Debugln("Data format detected: JSON")
-	} else {
-		// If YAML we need to convert to JSON after. Have to use json
-		// as the DSL serverless workflow SDK expects JSON
-		var yamlData any
-		if err := yaml.Unmarshal(data, &yamlData); err != nil {
-			logrus.WithError(err).Errorln("Failed to unmarshal YAML")
-			return nil, err
-		}
-
-		if jsonData, err := json.Marshal(yamlData); err != nil {
-			logrus.WithError(err).Errorln("Failed to convert YAML to JSON")
-			return nil, err
-		} else {
-			data = jsonData
-		}
-	}
-
-	if err := json.Unmarshal(data, &item); err != nil {
-		logrus.WithError(err).Errorln("Failed to unmarshal JSON data")
-		return nil, fmt.Errorf("failed to unmarshal JSON file: %w", err)
-	}
-
-	return &item, nil
+	return common.ReadDataToInterface(data, definition)
 }

@@ -1,0 +1,80 @@
+version: "1.0"
+roles:
+  # Administrator Group
+  local_admin:
+    name: Local Administrator
+    description: Administrator group with full system access
+    workflows: 
+      - local_simple_elevation
+    roles:  # Use of system roles for elevated access
+      - admin
+      - administrators
+      - wheel
+    scopes:
+      groups:
+        - local:developer # Only allow roles if user is in developer group
+    resources:
+      - path:/root # Only allow access to /root directory
+    providers:
+      - local
+    enabled: true
+
+  # Power Users Group
+  local_poweruser:
+    name: Local Power User
+    description: Power users group with elevated privileges
+    workflows: 
+      - local_simple_elevation
+    roles:  # Use of system roles for elevated access
+      - poweruser
+      - developers
+    scopes:
+      groups:
+        - local:powerusers
+        - local:developers
+    resources:
+      - path:/home
+      - path:/opt
+    providers:
+      - local
+    enabled: true
+
+  # Users Group
+  local_user:
+    name: Local User
+    description: Standard users group with basic access
+    workflows: 
+      - local_simple_elevation
+    roles:  # Use of system roles for elevated access
+      - user
+      - users
+    scopes:
+      groups:
+        - local:users
+    resources:
+      - path:/tmp
+      - path:/var/tmp
+    providers:
+      - local
+    enabled: true
+
+  # Operators Group
+  local_operator:
+    name: Local Operator
+    description: System operators group with service management access
+    workflows: 
+      - local_simple_elevation
+    roles:  # Use of system roles for elevated access
+      - operator
+      - systemd-journal
+    scopes:
+      groups:
+        - local:operators
+        - sudo:operator
+    resources:
+      - path:/var/log
+      - path:/etc/systemd
+    providers:
+      - local
+    enabled: true
+

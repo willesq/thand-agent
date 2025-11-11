@@ -79,3 +79,9 @@ type Resources struct {
 	Allow []string `json:"allow,omitempty"`
 	Deny  []string `json:"deny,omitempty"`
 }
+
+// RoleDefinitions represents the structure for roles YAML/JSON
+type RoleDefinitions struct {
+	Version string          `yaml:"version" json:"version"`
+	Roles   map[string]Role `yaml:"roles" json:"roles"`
+}
