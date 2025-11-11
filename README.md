@@ -86,7 +86,9 @@ thand request "I need to debug customer data issue"
 
 Thand can be deployed quickly on your infrastructure. The server requires no persistent storage and can be run ephemerally. You can deploy via Docker, Kubernetes or even as an AWS Lambda function or GCP Cloud Function.
 
-A full guide to self-hosting can be found in the [docs](https://docs.thand.io/environments/).
+A full guide to self-hosting can be found in the [docs](https://docs.thand.io/environments/). Or you can quickly deploy Thand using the following one-click deploy options:
+
+- [![Launch Stack](https://img.shields.io/badge/Deploy%20with-AWS%20CloudFormation-FF9900?logo=amazon-aws)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=thand-agent&templateURL=https://raw.githubusercontent.com/thand-io/agent/refs/heads/main/deploy/aws/cloudformation.yaml)
 
 To get started quickly you can run the server locally via Docker. This will start your server with the default configuration defined in the examples directory. For production usage you should provide your own configuration file. See the [docs](https://docs.thand.io/configuration/) for more details.
 

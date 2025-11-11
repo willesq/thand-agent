@@ -1,6 +1,8 @@
 package thand
 
 import (
+	"strings"
+
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
@@ -51,12 +53,11 @@ func (d *defaultNotifierImpl) GetProviderName() string {
 
 func (d *defaultNotifierImpl) GetPayload(toIdentity string) models.NotificationRequest {
 
-	switch d.GetProviderName() {
-	case slackProvider.SlackProviderName:
+	if strings.Compare(d.GetProviderName(), slackProvider.SlackProviderName) == 0 {
 		return d.GetSlackPayload(toIdentity)
-	case emailProvider.EmailProviderName:
+	} else if strings.HasPrefix(d.GetProviderName(), emailProvider.EmailProviderName) {
 		return d.GetEmailPayload(toIdentity)
-	default:
+	} else {
 		return models.NotificationRequest{}
 	}
 
@@ -75,10 +76,10 @@ func (d *defaultNotifierImpl) GetEmailPayload(toIdentity string) models.Notifica
 		html = notificationReq.Message
 	}
 
-	emailReq := emailProvider.EmailNotificationRequest{
+	emailReq := models.EmailNotificationRequest{
 		To:      []string{toIdentity},
 		Subject: "Workflow Notification",
-		Body: emailProvider.EmailNotificationBody{
+		Body: models.EmailNotificationBody{
 			Text: notificationReq.Message,
 			HTML: html,
 		},

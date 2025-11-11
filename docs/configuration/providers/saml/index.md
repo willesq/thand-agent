@@ -1,6 +1,6 @@
 ---
 layout: default
-title: SAML Provider
+title: SAML
 description: SAML 2.0 provider for enterprise authentication and SSO
 parent: Providers
 grand_parent: Configuration

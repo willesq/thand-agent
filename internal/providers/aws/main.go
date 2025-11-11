@@ -132,7 +132,7 @@ func CreateAwsConfig(awsConfig *models.BasicConfig) (*AwsConfigurationProvider, 
 		awsOptions = append(awsOptions, config.WithBaseEndpoint(endpoint))
 	}
 
-	if imsdDisable, found := awsConfig.GetBool("imsd_disable"); found && imsdDisable {
+	if imdsDisable, found := awsConfig.GetBool("imds_disable"); found && imdsDisable {
 		logrus.Info("Disabling IMDSv2 for AWS credentials")
 		awsOptions = append(awsOptions, config.WithEC2IMDSClientEnableState(imds.ClientDisabled))
 	}

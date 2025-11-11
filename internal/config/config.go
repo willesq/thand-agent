@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -167,7 +168,7 @@ func bindCloudProviderEnvVars(v *viper.Viper) {
 	v.BindEnv("environment.config.access_key_id", "THAND_ENVIRONMENT_CONFIG_ACCESS_KEY_ID")
 	v.BindEnv("environment.config.secret_access_key", "THAND_ENVIRONMENT_CONFIG_SECRET_ACCESS_KEY")
 	v.BindEnv("environment.config.kms_arn", "THAND_ENVIRONMENT_CONFIG_KMS_ARN")
-	v.BindEnv("environment.config.imsd_disable", "THAND_ENVIRONMENT_CONFIG_IMSD_DISABLE")
+	v.BindEnv("environment.config.imds_disable", "THAND_ENVIRONMENT_CONFIG_IMDS_DISABLE")
 }
 
 // bindVaultEnvVars binds HashiCorp Vault and secret management environment variables
@@ -262,7 +263,7 @@ func setupLogging(config *Config, v *viper.Viper) error {
 func (c *Config) ReloadConfig() error {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	var errors []error
+	var foundErrors []error
 
 	// Load roles in parallel
 	if c.Roles.IsExternal() {
@@ -271,7 +272,7 @@ func (c *Config) ReloadConfig() error {
 			if err != nil {
 				logrus.WithError(err).Errorln("Error loading roles")
 				mu.Lock()
-				errors = append(errors, fmt.Errorf("loading roles: %w", err))
+				foundErrors = append(foundErrors, fmt.Errorf("loading roles: %w", err))
 				mu.Unlock()
 			} else if len(roles) > 0 {
 				logrus.Infoln("Loaded roles from external source:", len(roles))
@@ -291,7 +292,7 @@ func (c *Config) ReloadConfig() error {
 			if err != nil {
 				logrus.WithError(err).Errorln("Error loading workflows")
 				mu.Lock()
-				errors = append(errors, fmt.Errorf("loading workflows: %w", err))
+				foundErrors = append(foundErrors, fmt.Errorf("loading workflows: %w", err))
 				mu.Unlock()
 			} else if len(workflows) > 0 {
 				logrus.Infoln("Loaded workflows from external source:", len(workflows))
@@ -311,7 +312,7 @@ func (c *Config) ReloadConfig() error {
 			if err != nil {
 				logrus.WithError(err).Errorln("Error loading providers")
 				mu.Lock()
-				errors = append(errors, fmt.Errorf("loading providers: %w", err))
+				foundErrors = append(foundErrors, fmt.Errorf("loading providers: %w", err))
 				mu.Unlock()
 			} else if len(providers) > 0 {
 				logrus.Infoln("Loaded providers from external source:", len(providers))
@@ -328,8 +329,8 @@ func (c *Config) ReloadConfig() error {
 	wg.Wait()
 
 	// Return first error if any occurred
-	if len(errors) > 0 {
-		return errors[0]
+	if len(foundErrors) > 0 {
+		return errors.Join(foundErrors...)
 	}
 
 	return nil

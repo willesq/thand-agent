@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Salesforce Provider
+title: Salesforce
 description: Salesforce CRM provider for user and permission management
 parent: Providers
 grand_parent: Configuration
