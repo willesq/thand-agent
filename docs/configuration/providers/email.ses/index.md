@@ -34,7 +34,7 @@ The AWS SES email provider (`email.ses`) enables email notifications through Ama
 | `access_key_id` | string | No | AWS access key ID for static credentials |
 | `secret_access_key` | string | No | AWS secret access key for static credentials |
 | `endpoint` | string | No | Custom endpoint URL (e.g., for LocalStack testing) |
-| `imsd_disable` | boolean | No | Disable EC2 IMDSv2 for credential retrieval |
+| `imds_disable` | boolean | No | Disable EC2 IMDSv2 for credential retrieval |
 
 ## Authentication Methods
 

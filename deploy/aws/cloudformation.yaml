@@ -1,0 +1,311 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Deploy Thand Agent to AWS App Runner with required IAM roles, KMS, and Secrets Manager integration'
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: thand-agent
+    Description: Name of the App Runner service
+  
+  ImageUri:
+    Type: String
+    Description: ECR image URI with tag (e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com/thand-io/agent:latest)
+    AllowedPattern: '^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com\/[a-zA-Z0-9\/_-]+:[a-zA-Z0-9\._-]+$'
+    ConstraintDescription: Must be a valid ECR image URI with tag (e.g., account.dkr.ecr.region.amazonaws.com/repository:tag)
+  
+  Port:
+    Type: Number
+    Default: 8080
+    Description: Port the application listens on
+  
+  CPU:
+    Type: String
+    Default: '2 vCPU'
+    AllowedValues:
+      - '0.25 vCPU'
+      - '0.5 vCPU'
+      - '1 vCPU'
+      - '2 vCPU'
+      - '4 vCPU'
+    Description: CPU allocation (recommended 2 vCPU)
+  
+  Memory:
+    Type: String
+    Default: '4 GB'
+    AllowedValues:
+      - '0.5 GB'
+      - '1 GB'
+      - '2 GB'
+      - '3 GB'
+      - '4 GB'
+      - '6 GB'
+      - '8 GB'
+      - '10 GB'
+      - '12 GB'
+    Description: Memory allocation (recommended 4 GB minimum)
+
+Resources:
+  # KMS Key for Thand Agent encryption
+  ThandKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Encryption key for Thand Agent
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow App Runner service role to use the key
+            Effect: Allow
+            Principal:
+              Service: tasks.apprunner.amazonaws.com
+            Action:
+              - 'kms:Decrypt'
+              - 'kms:Encrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+  
+  ThandKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${ServiceName}'
+      TargetKeyId: !Ref ThandKMSKey
+  
+  # Secrets Manager secrets for Thand configuration
+  ThandProvidersSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ServiceName}-providers'
+      Description: Thand Agent providers configuration
+      SecretString: !Sub |
+        version: "1.0"
+        providers:
+          aws:
+            name: AWS Default
+            description: Default AWS provider using IAM role
+            provider: aws
+            enabled: true
+            config:
+              region: ${AWS::Region}
+  
+  ThandRolesSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ServiceName}-roles'
+      Description: Thand Agent roles configuration
+      SecretString: |
+        version: "1.0"
+        roles: {}
+  
+  ThandWorkflowsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ServiceName}-workflows'
+      Description: Thand Agent workflows configuration
+      SecretString: |
+        version: "1.0"
+        workflows: {}
+  
+  # IAM Role for App Runner to access ECR
+  AppRunnerECRAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ServiceName}-ecr-access-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: build.apprunner.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess'
+      Policies:
+        - PolicyName: ECRImagePull
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:DescribeRepositories'
+                  - 'ecr:GetRepositoryPolicy'
+                  - 'ecr:ListImages'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                Resource: '*'
+  
+  # IAM Role for App Runner instance (runtime)
+  AppRunnerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ServiceName}-instance-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: tasks.apprunner.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/SecretsManagerReadWrite'
+        - 'arn:aws:iam::aws:policy/AmazonSSMFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+        - 'arn:aws:iam::aws:policy/IAMFullAccess'
+        - 'arn:aws:iam::aws:policy/AWSSSOMasterAccountAdministrator'
+      Policies:
+        - PolicyName: KMSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'kms:Decrypt'
+                  - 'kms:Encrypt'
+                  - 'kms:ReEncrypt*'
+                  - 'kms:GenerateDataKey*'
+                  - 'kms:DescribeKey'
+                  - 'kms:CreateGrant'
+                  - 'kms:ListGrants'
+                  - 'kms:RevokeGrant'
+                Resource: !GetAtt ThandKMSKey.Arn
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+  
+  # Auto Scaling Configuration
+  AutoScalingConfig:
+    Type: AWS::AppRunner::AutoScalingConfiguration
+    Properties:
+      AutoScalingConfigurationName: !Sub '${ServiceName}-autoscaling'
+      MaxConcurrency: 100
+      MaxSize: 10
+      MinSize: 1
+  
+  # App Runner Service
+  AppRunnerService:
+    Type: AWS::AppRunner::Service
+    DependsOn:
+      - ThandProvidersSecret
+      - ThandRolesSecret
+      - ThandWorkflowsSecret
+      - ThandKMSKey
+    Properties:
+      ServiceName: !Ref ServiceName
+      SourceConfiguration:
+        AuthenticationConfiguration:
+          AccessRoleArn: !GetAtt AppRunnerECRAccessRole.Arn
+        ImageRepository:
+          ImageIdentifier: !Ref ImageUri
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: !Ref Port
+            RuntimeEnvironmentVariables:
+              - Name: PORT
+                Value: !Ref Port
+              - Name: THAND_ENVIRONMENT_CONFIG_KMS_ARN
+                Value: !GetAtt ThandKMSKey.Arn
+              - Name: THAND_ENVIRONMENT_CONFIG_REGION
+                Value: !Ref AWS::Region
+              - Name: THAND_PROVIDERS_VAULT
+                Value: !Sub '${ServiceName}-providers'
+              - Name: THAND_ROLES_VAULT
+                Value: !Sub '${ServiceName}-roles'
+              - Name: THAND_WORKFLOWS_VAULT
+                Value: !Sub '${ServiceName}-workflows'
+              - Name: THAND_ENVIRONMENT_PLATFORM
+                Value: aws
+      InstanceConfiguration:
+        Cpu: !Ref CPU
+        Memory: !Ref Memory
+        InstanceRoleArn: !GetAtt AppRunnerInstanceRole.Arn
+      HealthCheckConfiguration:
+        Protocol: HTTP
+        Path: /health
+        Interval: 10
+        Timeout: 5
+        HealthyThreshold: 1
+        UnhealthyThreshold: 5
+      AutoScalingConfigurationArn: !GetAtt AutoScalingConfig.AutoScalingConfigurationArn
+
+Outputs:
+  ServiceUrl:
+    Description: App Runner service URL (use this for THAND_LOGIN_ENDPOINT)
+    Value: !Sub 'https://${AppRunnerService.ServiceUrl}'
+    Export:
+      Name: !Sub '${AWS::StackName}-ServiceUrl'
+  
+  ServiceArn:
+    Description: App Runner service ARN
+    Value: !GetAtt AppRunnerService.ServiceArn
+    Export:
+      Name: !Sub '${AWS::StackName}-ServiceArn'
+  
+  ServiceId:
+    Description: App Runner service ID
+    Value: !GetAtt AppRunnerService.ServiceId
+    Export:
+      Name: !Sub '${AWS::StackName}-ServiceId'
+  
+  ECRAccessRoleArn:
+    Description: ECR Access Role ARN
+    Value: !GetAtt AppRunnerECRAccessRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ECRAccessRoleArn'
+  
+  InstanceRoleArn:
+    Description: Instance Role ARN (use this role for AWS provider configurations)
+    Value: !GetAtt AppRunnerInstanceRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceRoleArn'
+  
+  KMSKeyArn:
+    Description: KMS Key ARN for encryption
+    Value: !GetAtt ThandKMSKey.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-KMSKeyArn'
+  
+  KMSKeyAlias:
+    Description: KMS Key Alias
+    Value: !Ref ThandKMSKeyAlias
+    Export:
+      Name: !Sub '${AWS::StackName}-KMSKeyAlias'
+  
+  ProvidersSecretName:
+    Description: Secrets Manager secret name for providers configuration
+    Value: !Ref ThandProvidersSecret
+    Export:
+      Name: !Sub '${AWS::StackName}-ProvidersSecret'
+  
+  RolesSecretName:
+    Description: Secrets Manager secret name for roles configuration
+    Value: !Ref ThandRolesSecret
+    Export:
+      Name: !Sub '${AWS::StackName}-RolesSecret'
+  
+  WorkflowsSecretName:
+    Description: Secrets Manager secret name for workflows configuration
+    Value: !Ref ThandWorkflowsSecret
+    Export:
+      Name: !Sub '${AWS::StackName}-WorkflowsSecret'
+  
+  LoginCommand:
+    Description: CLI login command
+    Value: !Sub 'thand login --login-server https://${AppRunnerService.ServiceUrl}'
