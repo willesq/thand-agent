@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/models"
 )
 
 // TestReadData_WorkflowStructure tests readData with realistic workflow structure
@@ -17,8 +19,8 @@ workflows:
     description: "Workflow that triggers on push events"
     enabled: true`
 
-	var definition WorkflowDefinitions
-	result, err := readData([]byte(yamlInput), definition)
+	var definition models.WorkflowDefinitions
+	result, err := common.ReadDataToInterface([]byte(yamlInput), definition)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -69,8 +71,8 @@ workflows:
               body:
                 message: "Scheduled workflow executed"`
 
-	var definition WorkflowDefinitions
-	result, err := readData([]byte(yamlInput), definition)
+	var definition models.WorkflowDefinitions
+	result, err := common.ReadDataToInterface([]byte(yamlInput), definition)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -102,8 +104,8 @@ func TestReadData_JSONInput(t *testing.T) {
 		}
 	}`
 
-	var definition WorkflowDefinitions
-	result, err := readData([]byte(jsonInput), definition)
+	var definition models.WorkflowDefinitions
+	result, err := common.ReadDataToInterface([]byte(jsonInput), definition)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -120,15 +122,15 @@ func TestReadData_InvalidYAML(t *testing.T) {
   test: true
     invalid: indentation`
 
-	var definition WorkflowDefinitions
-	result, err := readData([]byte(invalidYAML), definition)
+	var definition models.WorkflowDefinitions
+	result, err := common.ReadDataToInterface([]byte(invalidYAML), definition)
 	assert.Error(t, err, "should return error for invalid YAML")
 	assert.Nil(t, result, "result should be nil for invalid YAML")
 }
 
 func TestReadData_EmptyInput(t *testing.T) {
-	var definition WorkflowDefinitions
-	result, err := readData([]byte(""), definition)
+	var definition models.WorkflowDefinitions
+	result, err := common.ReadDataToInterface([]byte(""), definition)
 	assert.Error(t, err, "should return error for empty input")
 	assert.Nil(t, result, "result should be nil for empty input")
 }
@@ -142,11 +144,11 @@ workflows:
     description: "Benchmark test"
     enabled: true`
 
-	var definition WorkflowDefinitions
+	var definition models.WorkflowDefinitions
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := readData([]byte(yamlInput), definition)
+		_, err := common.ReadDataToInterface([]byte(yamlInput), definition)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -145,3 +145,9 @@ func (w *WorkflowExecutionInfo) GetAuthorizationTime() *time.Time {
 
 	return &approvalTime
 }
+
+// WorkflowDefinitions represents the structure for workflows YAML/JSON
+type WorkflowDefinitions struct {
+	Version   string              `yaml:"version" json:"version"`
+	Workflows map[string]Workflow `yaml:"workflows" json:"workflows"`
+}

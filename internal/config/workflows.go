@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -36,11 +37,20 @@ func (c *Config) LoadWorkflows() (map[string]models.Workflow, error) {
 		c.Workflows.Path,
 		c.Workflows.URL,
 		vaultData,
-		WorkflowDefinitions{},
+		models.WorkflowDefinitions{},
 	)
 	if err != nil {
 		logrus.WithError(err).Errorln("Failed to load workflows data")
 		return nil, fmt.Errorf("failed to load workflows data: %w", err)
+	}
+
+	if len(foundWorkflows) == 0 {
+		logrus.Warningln("No workflows found from any source, loading defaults")
+		foundWorkflows, err = environment.GetDefaultWorkflows(c.Environment.Platform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load default workflows: %w", err)
+		}
+		logrus.Infoln("Loaded default workflows:", len(foundWorkflows))
 	}
 
 	defs := make(map[string]models.Workflow)

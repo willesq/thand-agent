@@ -1,0 +1,16 @@
+version: "1.0"
+providers:
+
+  # TODO(hugh) Add thand as auth provider
+
+  aws:
+    name: AWS Cloud Provider
+    description: Amazon Web Services cloud provider
+    provider: aws
+    enabled: true
+
+  email:
+    name: AWS SES Email
+    description: AWS Simple Email Service for notifications
+    provider: email
+    enabled: true

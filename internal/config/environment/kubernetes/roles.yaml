@@ -1,0 +1,267 @@
+version: "1.0"
+roles:
+  # Read-Only Access
+  k8s_readonly:
+    name: Kubernetes Read-Only
+    description: Read-only access to view pods, services, and basic resources
+    workflows:
+      - k8s_simple_elevation
+    permissions:
+      allow:
+        - k8s:pods:get,list,watch
+        - k8s:services:get,list,watch
+        - k8s:namespaces:get,list
+        - k8s:nodes:get,list
+        - k8s:events:get,list
+        - k8s:apps/deployments:get,list,watch
+        - k8s:apps/replicasets:get,list
+        - k8s:configmaps:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Developer Access
+  k8s_developer:
+    name: Kubernetes Developer
+    description: Developer access to deploy and manage applications in development namespace
+    workflows:
+      - k8s_simple_elevation
+    resources:
+      allow:
+        - namespace:development
+        - namespace:dev-*
+    permissions:
+      allow:
+        - k8s:pods:get,list,watch,create,delete
+        - k8s:services:get,list,create,update,patch,delete
+        - k8s:configmaps:get,list,create,update,delete
+        - k8s:secrets:get,list,create,update,delete
+        - k8s:apps/deployments:get,list,create,update,patch,delete,watch
+        - k8s:apps/replicasets:get,list
+        - k8s:apps/statefulsets:get,list,create,update,patch,delete
+        - k8s:batch/jobs:get,list,create,update,patch,delete
+        - k8s:batch/cronjobs:get,list,create,update,patch,delete
+        - k8s:events:get,list,create
+    scopes:
+      groups:
+        - oidc:developers
+        - oidc:engineering
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Cluster Viewer
+  k8s_cluster_viewer:
+    name: Kubernetes Cluster Viewer
+    description: Read-only access across all namespaces and cluster-level resources
+    workflows:
+      - k8s_simple_elevation
+    permissions:
+      allow:
+        - k8s:pods:get,list,watch
+        - k8s:services:get,list,watch
+        - k8s:namespaces:get,list
+        - k8s:nodes:get,list
+        - k8s:events:get,list,watch
+        - k8s:apps/deployments:get,list,watch
+        - k8s:apps/replicasets:get,list
+        - k8s:apps/statefulsets:get,list
+        - k8s:apps/daemonsets:get,list
+        - k8s:persistentvolumes:get,list
+        - k8s:persistentvolumeclaims:get,list
+        - k8s:configmaps:get,list
+        - k8s:secrets:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Deployment Manager
+  k8s_deployment_manager:
+    name: Kubernetes Deployment Manager
+    description: Manage deployments and workloads across staging namespaces
+    workflows:
+      - k8s_simple_elevation
+    resources:
+      allow:
+        - namespace:staging
+        - namespace:staging-*
+    permissions:
+      allow:
+        - k8s:apps/deployments:get,list,create,update,patch,delete,watch
+        - k8s:apps/replicasets:get,list,delete
+        - k8s:apps/statefulsets:get,list,create,update,patch,delete
+        - k8s:apps/daemonsets:get,list,create,update,patch,delete
+        - k8s:batch/jobs:get,list,create,update,patch,delete
+        - k8s:batch/cronjobs:get,list,create,update,patch,delete
+        - k8s:pods:get,list,watch,delete
+        - k8s:services:get,list
+        - k8s:events:get,list
+        - k8s:configmaps:get,list
+        - k8s:namespaces:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Secrets Manager
+  k8s_secrets_manager:
+    name: Kubernetes Secrets Manager
+    description: Manage secrets and config maps across namespaces
+    workflows:
+      - k8s_simple_elevation
+    permissions:
+      allow:
+        - k8s:secrets:get,list,create,update,delete
+        - k8s:configmaps:get,list,create,update,delete
+        - k8s:namespaces:get,list
+        - k8s:pods:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Network Administrator
+  k8s_network_admin:
+    name: Kubernetes Network Administrator
+    description: Manage networking resources including ingress and network policies
+    workflows:
+      - k8s_simple_elevation
+    permissions:
+      allow:
+        - k8s:networking.k8s.io/ingresses:get,list,create,update,patch,delete
+        - k8s:networking.k8s.io/networkpolicies:get,list,create,update,patch,delete
+        - k8s:networking.k8s.io/ingressclasses:get,list
+        - k8s:services:get,list,create,update,patch,delete
+        - k8s:endpoints:get,list
+        - k8s:namespaces:get,list
+        - k8s:pods:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Storage Administrator
+  k8s_storage_admin:
+    name: Kubernetes Storage Administrator
+    description: Manage persistent volumes and storage resources
+    workflows:
+      - k8s_simple_elevation
+    permissions:
+      allow:
+        - k8s:persistentvolumes:get,list,create,update,patch,delete
+        - k8s:persistentvolumeclaims:get,list,create,update,patch,delete
+        - k8s:storage.k8s.io/storageclasses:get,list,create,update,patch,delete
+        - k8s:storage.k8s.io/volumeattachments:get,list
+        - k8s:namespaces:get,list
+        - k8s:pods:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Namespace Administrator
+  k8s_namespace_admin:
+    name: Kubernetes Namespace Administrator
+    description: Full administrative access within specific namespaces
+    workflows:
+      - k8s_simple_elevation
+    resources:
+      allow:
+        - namespace:*
+    permissions:
+      allow:
+        - k8s:*:*
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Cluster Administrator
+  k8s_cluster_admin:
+    name: Kubernetes Cluster Administrator
+    description: Full administrative access to the entire Kubernetes cluster
+    workflows:
+      - k8s_simple_elevation
+    permissions:
+      allow:
+        - k8s:*:*
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Security Auditor
+  k8s_security_auditor:
+    name: Kubernetes Security Auditor
+    description: Read-only access to security-related resources for auditing
+    workflows:
+      - k8s_simple_elevation
+    permissions:
+      allow:
+        - k8s:pods:get,list,watch
+        - k8s:services:get,list,watch
+        - k8s:secrets:get,list
+        - k8s:configmaps:get,list
+        - k8s:serviceaccounts:get,list
+        - k8s:rbac.authorization.k8s.io/roles:get,list
+        - k8s:rbac.authorization.k8s.io/rolebindings:get,list
+        - k8s:rbac.authorization.k8s.io/clusterroles:get,list
+        - k8s:rbac.authorization.k8s.io/clusterrolebindings:get,list
+        - k8s:networking.k8s.io/networkpolicies:get,list
+        - k8s:policy/podsecuritypolicies:get,list
+        - k8s:namespaces:get,list
+        - k8s:events:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+
+  # Production Deployer
+  k8s_prod_deployer:
+    name: Kubernetes Production Deployer
+    description: Deploy and manage applications in production with strict approval
+    workflows:
+      - k8s_simple_elevation
+    resources:
+      allow:
+        - namespace:production
+        - namespace:prod-*
+    permissions:
+      allow:
+        - k8s:apps/deployments:get,list,create,update,patch,watch
+        - k8s:apps/replicasets:get,list
+        - k8s:pods:get,list,watch
+        - k8s:services:get,list
+        - k8s:configmaps:get,list
+        - k8s:events:get,list,create
+        - k8s:namespaces:get,list
+    providers:
+      - kubernetes-local
+      - kubernetes-dev
+      - kubernetes-staging
+      - kubernetes-prod
+    enabled: true
+

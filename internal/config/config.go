@@ -20,7 +20,6 @@ import (
 
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config/environment"
-	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/sessions"
 )
 
@@ -507,23 +506,6 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	logrus.Infoln("Successfully registered with login server")
 
 	return &registrationResponse, nil
-}
-
-// RoleDefinitions represents the structure for roles YAML/JSON
-type RoleDefinitions struct {
-	Version string                 `yaml:"version" json:"version"`
-	Roles   map[string]models.Role `yaml:"roles" json:"roles"`
-}
-
-// WorkflowDefinitions represents the structure for workflows YAML/JSON
-type WorkflowDefinitions struct {
-	Version   string                     `yaml:"version" json:"version"`
-	Workflows map[string]models.Workflow `yaml:"workflows" json:"workflows"`
-}
-
-type ProviderDefinitions struct {
-	Version   string                     `yaml:"version" json:"version"`
-	Providers map[string]models.Provider `yaml:"providers" json:"providers"`
 }
 
 // setDefaults sets default configuration values
