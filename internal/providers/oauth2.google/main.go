@@ -29,7 +29,7 @@ type oauth2Provider struct {
 func (p *oauth2Provider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
-		models.ProviderCapabilityAuthorizor,
+		models.ProviderCapabilityAuthorizer,
 	)
 
 	// Get client id and secret from the config

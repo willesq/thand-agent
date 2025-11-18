@@ -1,0 +1,7 @@
+version: "1.0"
+providers:
+  thand:
+    name: Thand Auth
+    provider: thand
+    description: Thand Provider
+    enabled: true

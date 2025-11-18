@@ -55,7 +55,7 @@ func (s *Server) processProviderCookies(
 	encryptionServer models.EncryptionImpl,
 	foundSessions map[string]*models.Session,
 ) {
-	allProviders := s.Config.GetProvidersByCapability(models.ProviderCapabilityAuthorizor)
+	allProviders := s.Config.GetProvidersByCapability(models.ProviderCapabilityAuthorizer)
 
 	for providerName := range allProviders {
 

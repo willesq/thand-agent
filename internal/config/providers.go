@@ -21,6 +21,7 @@ import (
 	_ "github.com/thand-io/agent/internal/providers/salesforce"
 	_ "github.com/thand-io/agent/internal/providers/slack"
 	_ "github.com/thand-io/agent/internal/providers/terraform"
+	_ "github.com/thand-io/agent/internal/providers/thand"
 )
 
 // LoadProviders loads providers from a file or URL and maps them to their implementations

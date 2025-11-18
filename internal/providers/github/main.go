@@ -42,7 +42,7 @@ func (p *githubProvider) Initialize(provider models.Provider) error {
 
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
-		models.ProviderCapabilityAuthorizor,
+		models.ProviderCapabilityAuthorizer,
 		models.ProviderCapabilityRBAC,
 	)
 
