@@ -29,7 +29,7 @@ type thandProvider struct {
 	authEndpoint string
 }
 
-// UserInfoResponse represents the user information returned from thand.dev
+// UserInfoResponse represents the user information returned from thand.io
 type UserInfoResponse struct {
 	Sub               string   `json:"sub"`            // Subject - unique user ID
 	Email             string   `json:"email"`          // User's email
