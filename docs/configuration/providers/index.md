@@ -77,6 +77,7 @@ Provides user and group discovery capabilities. Providers with this capability c
 | [SAML](saml/) | Authorizor | SAML 2.0 SSO integration for enterprise identity providers |
 | [OAuth2](oauth2/) | Authorizor | Generic OAuth2 authentication for any compliant service |
 | [Google OAuth2](oauth2.google/) | Authorizor | Google account authentication with OAuth2 |
+| [Thand](thand/) | Authorizor | Thand federated OIDC authentication service |
 
 ### Business Applications
 

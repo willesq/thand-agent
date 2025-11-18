@@ -21,7 +21,7 @@ type exampleProvider struct {
 func (p *exampleProvider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
-		models.ProviderCapabilityAuthorizor,
+		models.ProviderCapabilityAuthorizer,
         models.ProviderCapabilityRBAC,
 	)
 	// TODO: Implement Example initialization logic

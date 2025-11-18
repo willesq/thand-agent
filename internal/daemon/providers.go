@@ -133,7 +133,7 @@ func (s *Server) getProviderPermissions(c *gin.Context) {
 func (s *Server) getAuthProvidersAsProviderResponse(authenticatedUser *models.Session) map[string]models.ProviderResponse {
 	return s.getProvidersAsProviderResponse(
 		authenticatedUser,
-		models.ProviderCapabilityAuthorizor)
+		models.ProviderCapabilityAuthorizer)
 }
 
 func (s *Server) getProvidersAsProviderResponse(

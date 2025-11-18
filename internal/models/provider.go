@@ -86,7 +86,7 @@ type ProviderCapability string
 
 const (
 	ProviderCapabilityRBAC       ProviderCapability = "rbac"
-	ProviderCapabilityAuthorizor ProviderCapability = "authorizor"
+	ProviderCapabilityAuthorizer ProviderCapability = "authorizor"
 	ProviderCapabilityNotifier   ProviderCapability = "notifier"
 	ProviderCapabilityIdentities ProviderCapability = "identities" // Provider can return users, groups, etc.
 )
@@ -95,8 +95,8 @@ func GetCapabilityFromString(cap string) (ProviderCapability, error) {
 	switch strings.ToLower(cap) {
 	case string(ProviderCapabilityRBAC):
 		return ProviderCapabilityRBAC, nil
-	case string(ProviderCapabilityAuthorizor):
-		return ProviderCapabilityAuthorizor, nil
+	case string(ProviderCapabilityAuthorizer):
+		return ProviderCapabilityAuthorizer, nil
 	case string(ProviderCapabilityNotifier):
 		return ProviderCapabilityNotifier, nil
 	default:

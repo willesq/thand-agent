@@ -40,7 +40,7 @@ type exampleProvider struct {
 func (p *exampleProvider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
-		models.ProviderCapabilityAuthorizor,
+		models.ProviderCapabilityAuthorizer,
 	)
 	return nil
 }

@@ -18,7 +18,7 @@ type oauth2Provider struct {
 func (p *oauth2Provider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
-		models.ProviderCapabilityAuthorizor,
+		models.ProviderCapabilityAuthorizer,
 	)
 	// TODO: Implement OAuth2 initialization logic
 	return nil
