@@ -89,6 +89,7 @@ func (p *oktaProvider) LoadRoles() error {
 	// Reference: https://help.okta.com/en-us/content/topics/security/administrators-admin-comparison.htm
 	for _, role := range oktaPredefinedRoles {
 		roles = append(roles, role)
+		rolesMap[strings.ToLower(role.Id)] = &roles[len(roles)-1]
 		rolesMap[strings.ToLower(role.Name)] = &roles[len(roles)-1]
 	}
 

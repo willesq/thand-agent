@@ -25,6 +25,7 @@ type OktaApplication interface {
 }
 
 // LoadResources loads Okta resources (applications) from the API
+// TODO: if you're adding any new resource types, then break this into separate methods
 func (p *oktaProvider) LoadResources(ctx context.Context) error {
 	startTime := time.Now()
 	defer func() {
