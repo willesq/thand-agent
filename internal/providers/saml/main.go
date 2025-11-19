@@ -41,7 +41,7 @@ type SAMLConfig struct {
 func (p *samlProvider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
-		models.ProviderCapabilityAuthorizor,
+		models.ProviderCapabilityAuthorizer,
 	)
 
 	// Parse SAML configuration from provider config

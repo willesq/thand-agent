@@ -104,6 +104,11 @@ func (s *Server) getAuthCallback(c *gin.Context) {
 
 	state := c.Query("state")
 
+	if len(state) == 0 {
+		s.getErrorPage(c, http.StatusBadRequest, "State is required")
+		return
+	}
+
 	decoded, err := models.EncodingWrapper{}.DecodeAndDecrypt(
 		state,
 		s.Config.GetServices().GetEncryption(),
@@ -239,6 +244,11 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 		return
 	}
 
+	if session == nil {
+		s.getErrorPage(c, http.StatusInternalServerError, "Session is nil")
+		return
+	}
+
 	exportableSession := &models.ExportableSession{
 		Session:  session,
 		Provider: auth.Provider,
@@ -283,6 +293,53 @@ func (s *Server) getLogoutPage(c *gin.Context) {
 
 	cookie := sessions.DefaultMany(c, ThandCookieName)
 	cookie.Clear()
+
+	// Need to loop over all cookies and clear them
+	provider := c.Param("provider")
+
+	if len(provider) > 0 {
+
+		_, err := s.Config.GetProviderByName(provider)
+
+		if err != nil {
+			s.getErrorPage(c, http.StatusBadRequest, "Invalid provider", err)
+			return
+		}
+
+		providerCookie := sessions.DefaultMany(c, CreateCookieName(provider))
+		providerCookie.Clear()
+
+		err = providerCookie.Save()
+
+		if err != nil {
+			s.getErrorPage(c, http.StatusInternalServerError, "Failed to clear provider session", err)
+			return
+		}
+
+	} else {
+
+		allProviders := s.Config.GetProvidersByCapability(models.ProviderCapabilityAuthorizer)
+
+		for providerName := range allProviders {
+
+			cookie := sessions.DefaultMany(c, CreateCookieName(providerName))
+
+			if cookie == nil {
+				continue
+			}
+
+			cookie.Clear()
+			err := cookie.Save()
+
+			if err != nil {
+				s.getErrorPage(c, http.StatusInternalServerError, "Failed to clear provider session", err)
+				return
+			}
+
+		}
+
+	}
+
 	err := cookie.Save()
 
 	if err != nil {

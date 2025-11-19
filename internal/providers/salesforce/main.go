@@ -24,7 +24,6 @@ func (p *salesForceProvider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
 		models.ProviderCapabilityRBAC,
-		models.ProviderCapabilityAuthorizor,
 	)
 
 	salesForceConfig := p.GetConfig()

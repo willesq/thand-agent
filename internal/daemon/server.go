@@ -197,7 +197,7 @@ func (s *Server) Start() error {
 	cookieNames := []string{ThandCookieName}
 
 	foundProviders := s.Config.GetProvidersByCapability(
-		models.ProviderCapabilityAuthorizor,
+		models.ProviderCapabilityAuthorizer,
 	)
 
 	for providerName := range foundProviders {
