@@ -58,24 +58,33 @@
                     <div class="choice-help mb-1 text-sm text-muted">
                         Select specific permissions for this role. Either role inheritance above or specific permissions must be selected to proceed to scopes.
                     </div>
-                    <div class="permission-selection">
-                        <label class="form-label" for="permissionSearch">Search and Select Permissions</label>
-                        <input type="text" id="permissionSearch" placeholder="Type to search permissions..." class="permission-search-input">
-                        <div id="permissionResults" class="permission-results">
-                            <div class="search-instruction">Start typing to search permissions...</div>
+                    <div class="permissions-split-layout">
+                        <!-- Left side: Selected permissions and descriptions -->
+                        <div class="permissions-left">
+                            <div class="selected-permissions-container">
+                                <h4>Selected Permissions (<span id="selectedCount">0</span>)</h4>
+                                <div id="selectedPermissionsList" class="selected-permissions-list"></div>
+                                <!-- Hidden inputs for selected permissions -->
+                                <div id="permissionInputs"></div>
+                            </div>
+                            
+                            <!-- Permission Description Display -->
+                            <div class="permission-description-area">
+                                <div id="permissionDescription" class="permission-description">
+                                    <span class="description-placeholder">Hover over a permission to see its description</span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="selected-permissions-container">
-                            <h4>Selected Permissions (<span id="selectedCount">0</span>)</h4>
-                            <div id="selectedPermissionsList" class="selected-permissions-list"></div>
-                            <!-- Hidden inputs for selected permissions -->
-                            <div id="permissionInputs"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Permission Description Display -->
-                    <div class="permission-description-area">
-                        <div id="permissionDescription" class="permission-description">
-                            <span class="description-placeholder">Hover over a permission to see its description</span>
+                        
+                        <!-- Right side: Search and selection -->
+                        <div class="permissions-right">
+                            <div class="permission-selection">
+                                <label class="form-label" for="permissionSearch">Search and Select Permissions</label>
+                                <input type="text" id="permissionSearch" placeholder="Type to search permissions..." class="permission-search-input">
+                                <div id="permissionResults" class="permission-results">
+                                    <div class="search-instruction">Start typing to search permissions...</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
