@@ -82,7 +82,9 @@ func (p *oktaProvider) LoadRoles() error {
 	var roles []models.ProviderRole
 	rolesMap := make(map[string]*models.ProviderRole)
 
-	// Load predefined roles
+	// Load predefined standard roles
+	// These are Okta's built-in administrator roles that are consistent across all Okta orgs
+	// Reference: https://help.okta.com/en-us/content/topics/security/administrators-admin-comparison.htm
 	for _, role := range oktaPredefinedRoles {
 		roles = append(roles, role)
 		rolesMap[strings.ToLower(role.Name)] = &roles[len(roles)-1]
@@ -93,7 +95,7 @@ func (p *oktaProvider) LoadRoles() error {
 
 	logrus.WithFields(logrus.Fields{
 		"roles": len(roles),
-	}).Debug("Loaded Okta roles, building search index in background")
+	}).Debug("Loaded Okta standard roles, building search index in background")
 
 	return nil
 }

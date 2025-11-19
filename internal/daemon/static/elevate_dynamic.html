@@ -54,7 +54,7 @@
 
                 <!-- Stage 3: Permission Selection -->
                 <div class="form-section hidden" id="permissionsSection">
-                    <h3>4. Configure Permissions</h3>
+                    <h3>4. Configure Permissions (Optional)</h3>
                     <div class="choice-help mb-1 text-sm text-muted">
                         Select specific permissions for this role. Either role inheritance above or specific permissions must be selected to proceed to scopes.
                     </div>
@@ -83,6 +83,9 @@
                 <!-- Stage 4: Scopes -->
                 <div class="form-section hidden" id="scopesSection">
                     <h3>5. Define Scopes</h3>
+                    <div class="choice-help mb-1 text-sm text-muted">
+                        Search and select users and groups to scope this role. Scopes are optional.
+                    </div>
                     <div class="scopes-container">
                         <div class="scope-field">
                             <label class="form-label" for="groupsSelect">Groups</label>
@@ -154,27 +157,9 @@
             // Choices.js instances
             let providerChoices = null;
             let inheritanceChoices = null;
-            let permissionChoices = null;
+            let identityChoices = null;
             let groupsChoices = null;
             let usersChoices = null;
-            let identityChoices = null;
-
-            // Sample data for groups and users (in a real app, these would come from APIs)
-            const sampleGroups = [
-                { value: 'admin', label: 'Administrators' },
-                { value: 'developers', label: 'Developers' },
-                { value: 'qa', label: 'QA Team' },
-                { value: 'devops', label: 'DevOps Team' },
-                { value: 'security', label: 'Security Team' },
-                { value: 'management', label: 'Management' }
-            ];
-            
-            const sampleUsers = [
-                { value: 'john@example.com', label: 'John Doe (john@example.com)' },
-                { value: 'jane@example.com', label: 'Jane Smith (jane@example.com)' },
-                { value: 'mike@example.com', label: 'Mike Johnson (mike@example.com)' },
-                { value: 'sarah@example.com', label: 'Sarah Wilson (sarah@example.com)' }
-            ];
 
             // Initialize all Choices.js components
             initializeAllChoices();
@@ -216,32 +201,6 @@
                     placeholderValue: 'Search roles...',
                     noResultsText: 'No roles found',
                     shouldSort: false,
-                    searchResultLimit: 50,
-                    searchFields: ['label', 'value']
-                });
-
-                // Initialize Groups selector
-                groupsChoices = new Choices('#groupsSelect', {
-                    removeItemButton: true,
-                    searchEnabled: true,
-                    placeholder: true,
-                    placeholderValue: 'Search groups...',
-                    noResultsText: 'No groups found',
-                    shouldSort: false,
-                    choices: sampleGroups,
-                    searchResultLimit: 50,
-                    searchFields: ['label', 'value']
-                });
-
-                // Initialize Users selector
-                usersChoices = new Choices('#usersSelect', {
-                    removeItemButton: true,
-                    searchEnabled: true,
-                    placeholder: true,
-                    placeholderValue: 'Search users...',
-                    noResultsText: 'No users found',
-                    shouldSort: false,
-                    choices: sampleUsers,
                     searchResultLimit: 50,
                     searchFields: ['label', 'value']
                 });
@@ -340,7 +299,7 @@
 
             function loadIdentities() {
                 // Use template value for current user and fetch available identities
-                fetch('{{.Config.GetApiBasePath}}/identities')
+                fetch('{{.Config.GetApiBasePath}}/identities?t=all')
                 .then(response => response.json())
                 .then(identitiesData => {
                     const identities = [];
@@ -488,19 +447,43 @@
                 let searchTimeout;
                 const SEARCH_DELAY = 150; // Reduced delay for better responsiveness
 
+                // Load initial results on startup
+                loadInitialPermissions();
+
                 // Debounced search function
                 searchInput.addEventListener('input', function() {
                     const query = this.value.trim().toLowerCase();
                     
                     clearTimeout(searchTimeout);
                     searchTimeout = setTimeout(() => {
-                        performSearch(query);
+                        if (query.length === 0) {
+                            loadInitialPermissions();
+                        } else {
+                            performSearch(query);
+                        }
                     }, SEARCH_DELAY);
                 });
 
+                function loadInitialPermissions() {
+                    // Show first 30 permissions as initial results
+                    const results = [];
+                    const maxResults = 30;
+                    
+                    for (let i = 0; i < availablePermissions.length && results.length < maxResults; i++) {
+                        const perm = availablePermissions[i];
+                        
+                        // Skip if already selected
+                        if (selectedPermissions.includes(perm.value)) continue;
+                        
+                        results.push(perm);
+                    }
+
+                    renderResults(results, '');
+                }
+
                 function performSearch(query) {
                     if (query.length < 2) {
-                        resultsContainer.innerHTML = '<div class="search-instruction">Type at least 2 characters to search...</div>';
+                        loadInitialPermissions();
                         return;
                     }
 
@@ -664,6 +647,105 @@
                 });
             }
 
+            // Function to initialize scope selectors (groups and users)
+            // Function to initialize Choices.js for groups and users with API search
+            function initializeScopeChoices() {
+                // Initialize Groups selector with live search
+                groupsChoices = new Choices('#groupsSelect', {
+                    removeItemButton: true,
+                    searchEnabled: true,
+                    placeholder: true,
+                    placeholderValue: 'Search groups...',
+                    noResultsText: 'No groups found',
+                    shouldSort: false,
+                    searchResultLimit: 50,
+                    searchFields: ['label', 'value']
+                });
+
+                // Initialize Users selector with live search
+                usersChoices = new Choices('#usersSelect', {
+                    removeItemButton: true,
+                    searchEnabled: true,
+                    placeholder: true,
+                    placeholderValue: 'Search users...',
+                    noResultsText: 'No users found',
+                    shouldSort: false,
+                    searchResultLimit: 50,
+                    searchFields: ['label', 'value']
+                });
+
+                // Load initial groups
+                loadScopeData('group', groupsChoices);
+                
+                // Load initial users
+                loadScopeData('user', usersChoices);
+
+                // Set up search event listeners for live filtering
+                const groupsInput = document.querySelector('#groupsSelect + .choices .choices__input');
+                const usersInput = document.querySelector('#usersSelect + .choices .choices__input');
+
+                let groupSearchTimeout;
+                let userSearchTimeout;
+
+                if (groupsInput) {
+                    groupsInput.addEventListener('input', function(e) {
+                        clearTimeout(groupSearchTimeout);
+                        const query = e.target.value.trim();
+                        groupSearchTimeout = setTimeout(() => {
+                            loadScopeData('group', groupsChoices, query);
+                        }, 300);
+                    });
+                }
+
+                if (usersInput) {
+                    usersInput.addEventListener('input', function(e) {
+                        clearTimeout(userSearchTimeout);
+                        const query = e.target.value.trim();
+                        userSearchTimeout = setTimeout(() => {
+                            loadScopeData('user', usersChoices, query);
+                        }, 300);
+                    });
+                }
+            }
+
+            // Function to load scope data (groups or users) from API
+            function loadScopeData(type, choicesInstance, query = '') {
+                const apiUrl = query 
+                    ? `{{.Config.GetApiBasePath}}/identities?t=${type}&q=${encodeURIComponent(query)}`
+                    : `{{.Config.GetApiBasePath}}/identities?t=${type}`;
+
+                fetch(apiUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        const choices = [];
+                        
+                        if (data && data.identities) {
+                            Object.keys(data.identities).forEach(key => {
+                                const identity = data.identities[key];
+                                
+                                const label = identity.label ? 
+                                    `${identity.label} (${identity.id})` : 
+                                    identity.id;
+                                
+                                choices.push({
+                                    value: identity.id,
+                                    label: label,
+                                    customProperties: {
+                                        type: type
+                                    }
+                                });
+                            });
+                        }
+                        
+                        // Clear existing choices and set new ones
+                        choicesInstance.clearChoices();
+                        choicesInstance.setChoices(choices, 'value', 'label', true);
+                    })
+                    .catch(error => {
+                        console.error(`Error loading ${type}s:`, error);
+                    });
+            }
+
             // Form submission handler - add validation before form submit
             document.getElementById('customRoleForm').addEventListener('submit', function(e) {
                 // Remove any search_terms inputs that Choices.js might have created
@@ -750,13 +832,10 @@
             function showNextSection(sectionId) {
                 document.getElementById(sectionId).classList.remove('hidden');
                 
-                // Special handling for scopes section - show reason after scopes
+                // Special handling for scopes section - initialize Choices.js for groups and users
                 if (sectionId === 'scopesSection') {
-                    // Add event listeners to scopes if not already added
-                    if (!document.getElementById('groupsSelect').hasScopes) {
-                        document.getElementById('groupsSelect').addEventListener('change', showReasonSection);
-                        document.getElementById('usersSelect').addEventListener('change', showReasonSection);
-                        document.getElementById('groupsSelect').hasScopes = true;
+                    if (!groupsChoices) {
+                        initializeScopeChoices();
                     }
                     showReasonSection(); // Show reason section immediately when scopes section is shown
                 }

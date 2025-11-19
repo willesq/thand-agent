@@ -11,7 +11,15 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-func (c *Config) GetIdentitiesWithFilter(user *models.User, filter ...string) ([]models.Identity, error) {
+const (
+	IdentityTypeUser  IdentityType = "user"
+	IdentityTypeGroup IdentityType = "group"
+	IdentityTypeAll   IdentityType = "all"
+)
+
+type IdentityType string
+
+func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType IdentityType, filter ...string) ([]models.Identity, error) {
 
 	// Find providers with identity capabilities
 	providerMap := c.GetProvidersByCapabilityWithUser(user, models.ProviderCapabilityIdentities)
@@ -81,6 +89,14 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, filter ...string) ([
 				// Add identities to the map (thread-safe)
 				mu.Lock()
 				for _, identity := range identities {
+
+					if identityType == IdentityTypeUser && identity.User == nil {
+						continue
+					}
+					if identityType == IdentityTypeGroup && identity.Group == nil {
+						continue
+					}
+
 					// Use identity ID as key to avoid duplicates
 					// If the same identity exists from multiple providers, keep the first one
 					if _, exists := identityMap[identity.GetId()]; !exists {

@@ -28,6 +28,10 @@ type oktaProvider struct {
 	roles            []models.ProviderRole
 	rolesMap         map[string]*models.ProviderRole
 	rolesIndex       bleve.Index
+	resources        []models.ProviderResource
+	resourcesMap     map[string]*models.ProviderResource
+	identities       []models.Identity
+	identitiesMap    map[string]*models.Identity
 
 	indexMu sync.RWMutex
 }
@@ -36,6 +40,7 @@ func (p *oktaProvider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
 		models.ProviderCapabilityRBAC,
+		models.ProviderCapabilityIdentities,
 	)
 
 	// Get Okta configuration
@@ -72,6 +77,18 @@ func (p *oktaProvider) Initialize(provider models.Provider) error {
 	err = p.LoadRoles()
 	if err != nil {
 		return fmt.Errorf("failed to load roles: %w", err)
+	}
+
+	// Load Okta Resources (applications)
+	err = p.LoadResources(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to load resources: %w", err)
+	}
+
+	// Load Okta Identities (users and groups)
+	err = p.RefreshIdentities(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to load identities: %w", err)
 	}
 
 	// Start background indexing

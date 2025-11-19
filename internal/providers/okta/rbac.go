@@ -5,47 +5,9 @@ import (
 	"fmt"
 
 	"github.com/okta/okta-sdk-golang/v2/okta"
-	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
-
-// ValidateRole validates if a role can be assigned to an identity
-func (p *oktaProvider) ValidateRole(
-	ctx context.Context,
-	identity *models.Identity,
-	role *models.Role,
-) (map[string]any, error) {
-	if identity == nil || role == nil {
-		return nil, fmt.Errorf("identity and role must be provided")
-	}
-
-	// Check if the role exists in our predefined roles
-	_, err := p.GetRole(ctx, role.Name)
-	if err != nil {
-		return nil, fmt.Errorf("invalid role: %w", err)
-	}
-
-	// Get the user from the identity
-	user := identity.GetUser()
-	if user == nil {
-		return nil, fmt.Errorf("identity must have a user")
-	}
-
-	// Try to find the user in Okta
-	oktaUser, _, err := p.client.User.GetUser(ctx, user.Email)
-	if err != nil {
-		return nil, fmt.Errorf("user not found in Okta: %w", err)
-	}
-
-	metadata := map[string]any{
-		"user_id":    oktaUser.Id,
-		"user_email": user.Email,
-		"role_type":  role.Name,
-	}
-
-	return metadata, nil
-}
 
 // AuthorizeRole assigns a role to a user in Okta
 func (p *oktaProvider) AuthorizeRole(
@@ -65,30 +27,50 @@ func (p *oktaProvider) AuthorizeRole(
 		return nil, fmt.Errorf("failed to find user in Okta: %w", err)
 	}
 
-	// Prepare role assignment request
-	roleAssignment := okta.AssignRoleRequest{
-		Type: role.Name,
+	// Determine which Okta roles to assign
+	var rolesToAssign []string
+	if len(role.Inherits) > 0 {
+		// If the role inherits from other roles, assign those roles
+		rolesToAssign = role.Inherits
+	} else if len(role.Permissions.Allow) > 0 {
+		// TODO: If permissions are provided, we should ideally create a custom role
+		// or apply permissions directly. For now, we'll fall back to using the role name
+		// assuming it corresponds to a pre-created custom role in Okta.
+		logrus.Warnf("Role %s has permissions defined but custom role creation is not fully implemented. Using role name as Okta role type.", role.Name)
+		rolesToAssign = []string{role.Name}
+	} else {
+		// Default to using the role name
+		rolesToAssign = []string{role.Name}
 	}
 
-	// Assign the role to the user
-	assignedRole, _, err := p.client.User.AssignRoleToUser(ctx, oktaUser.Id, roleAssignment, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to assign role to user: %w", err)
-	}
+	var assignedRoleIds []string
 
-	logrus.WithFields(logrus.Fields{
-		"user_id":       oktaUser.Id,
-		"user_email":    user.Email,
-		"role_type":     role.Name,
-		"assignment_id": assignedRole.Id,
-	}).Info("Successfully assigned role to user in Okta")
+	for _, roleType := range rolesToAssign {
+		// Prepare role assignment request
+		roleAssignment := okta.AssignRoleRequest{
+			Type: roleType,
+		}
+
+		// Assign the role to the user
+		assignedRole, _, err := p.client.User.AssignRoleToUser(ctx, oktaUser.Id, roleAssignment, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign role %s to user: %w", roleType, err)
+		}
+
+		assignedRoleIds = append(assignedRoleIds, assignedRole.Id)
+
+		logrus.WithFields(logrus.Fields{
+			"user_id":       oktaUser.Id,
+			"user_email":    user.Email,
+			"role_type":     roleType,
+			"assignment_id": assignedRole.Id,
+		}).Info("Successfully assigned role to user in Okta")
+	}
 
 	// Return metadata for later revocation
 	metadata := map[string]any{
-		"user_id":       oktaUser.Id,
-		"role_id":       assignedRole.Id,
-		"role_type":     assignedRole.Type,
-		"assignment_id": assignedRole.Id,
+		"user_id":  oktaUser.Id,
+		"role_ids": assignedRoleIds,
 	}
 
 	return &models.AuthorizeRoleResponse{
@@ -113,45 +95,70 @@ func (p *oktaProvider) RevokeRole(
 		return nil, fmt.Errorf("failed to find user in Okta: %w", err)
 	}
 
-	// If we have the role ID from the authorization metadata, use it directly
-	var roleId string
+	// Get role IDs to revoke
+	var roleIds []string
+
+	// Try to get from metadata first
 	if req.AuthorizeRoleResponse != nil && req.AuthorizeRoleResponse.Metadata != nil {
-		if id, ok := req.AuthorizeRoleResponse.Metadata["role_id"].(string); ok {
-			roleId = id
+		if ids, ok := req.AuthorizeRoleResponse.Metadata["role_ids"].([]string); ok {
+			roleIds = ids
+		} else if ids, ok := req.AuthorizeRoleResponse.Metadata["role_ids"].([]interface{}); ok {
+			// Handle JSON unmarshaling
+			for _, id := range ids {
+				if strId, ok := id.(string); ok {
+					roleIds = append(roleIds, strId)
+				}
+			}
+		} else if id, ok := req.AuthorizeRoleResponse.Metadata["role_id"].(string); ok {
+			// Backward compatibility
+			roleIds = []string{id}
 		}
 	}
 
-	// If we don't have the role ID, we need to find it by listing the user's roles
-	if roleId == "" {
+	// If we don't have the role IDs, we need to find them by listing the user's roles
+	if len(roleIds) == 0 {
 		roles, _, err := p.client.User.ListAssignedRolesForUser(ctx, oktaUser.Id, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list user roles: %w", err)
 		}
 
-		// Find the role by type
-		for _, role := range roles {
-			if role.Type == req.GetRole().Name {
-				roleId = role.Id
-				break
+		// Determine which role types we are looking for
+		var targetRoleTypes []string
+		if len(req.GetRole().Inherits) > 0 {
+			targetRoleTypes = req.GetRole().Inherits
+		} else {
+			targetRoleTypes = []string{req.GetRole().Name}
+		}
+
+		// Find the roles by type
+		for _, targetType := range targetRoleTypes {
+			for _, role := range roles {
+				if role.Type == targetType {
+					roleIds = append(roleIds, role.Id)
+					break
+				}
 			}
 		}
 
-		if roleId == "" {
+		if len(roleIds) == 0 {
 			return nil, fmt.Errorf("role assignment not found for user")
 		}
 	}
 
-	// Remove the role from the user
-	_, err = p.client.User.RemoveRoleFromUser(ctx, oktaUser.Id, roleId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to remove role from user: %w", err)
+	// Remove the roles from the user
+	for _, roleId := range roleIds {
+		_, err = p.client.User.RemoveRoleFromUser(ctx, oktaUser.Id, roleId)
+		if err != nil {
+			logrus.WithError(err).Warnf("Failed to remove role %s from user", roleId)
+			// We continue trying to remove other roles even if one fails
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"user_id":    oktaUser.Id,
+				"user_email": user.Email,
+				"role_id":    roleId,
+			}).Info("Successfully revoked role from user in Okta")
+		}
 	}
-
-	logrus.WithFields(logrus.Fields{
-		"user_id":    oktaUser.Id,
-		"user_email": user.Email,
-		"role_id":    roleId,
-	}).Info("Successfully revoked role from user in Okta")
 
 	return &models.RevokeRoleResponse{}, nil
 }
@@ -164,33 +171,6 @@ func (p *oktaProvider) GetAuthorizedAccessUrl(
 ) string {
 	// Return the Okta organization URL where users can log in
 	return p.orgUrl
-}
-
-// GetResource returns information about an Okta resource
-func (p *oktaProvider) GetResource(ctx context.Context, resource string) (*models.ProviderResource, error) {
-	// Okta resources could be users, groups, apps, etc.
-	// For now, return a basic implementation
-	return &models.ProviderResource{
-		Name:        resource,
-		Description: fmt.Sprintf("Okta resource: %s", resource),
-	}, nil
-}
-
-// ListResources lists available resources in Okta
-func (p *oktaProvider) ListResources(ctx context.Context, filters ...string) ([]models.ProviderResource, error) {
-	var resources []models.ProviderResource
-
-	// List some common Okta resource types
-	resourceTypes := []string{"users", "groups", "applications", "policies"}
-
-	for _, rt := range resourceTypes {
-		resources = append(resources, models.ProviderResource{
-			Name:        rt,
-			Description: fmt.Sprintf("Okta %s", rt),
-		})
-	}
-
-	return resources, nil
 }
 
 // Helper function to list groups in Okta
@@ -253,99 +233,5 @@ func (p *oktaProvider) RemoveUserFromGroup(ctx context.Context, groupId string, 
 	if err != nil {
 		return fmt.Errorf("failed to remove user from group: %w", err)
 	}
-	return nil
-}
-
-// GetIdentity retrieves an identity (user) from Okta
-func (p *oktaProvider) GetIdentity(ctx context.Context, identity string) (*models.Identity, error) {
-	user, _, err := p.client.User.GetUser(ctx, identity)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user from Okta: %w", err)
-	}
-
-	email := ""
-	name := ""
-	if user.Profile != nil {
-		if emailVal, ok := (*user.Profile)["email"].(string); ok {
-			email = emailVal
-		}
-		if nameVal, ok := (*user.Profile)["firstName"].(string); ok {
-			name = nameVal
-		}
-		if lastNameVal, ok := (*user.Profile)["lastName"].(string); ok {
-			if name != "" {
-				name = name + " " + lastNameVal
-			} else {
-				name = lastNameVal
-			}
-		}
-	}
-
-	return &models.Identity{
-		ID:    user.Id,
-		Label: email,
-		User: &models.User{
-			ID:     user.Id,
-			Email:  email,
-			Name:   name,
-			Source: "okta",
-		},
-	}, nil
-}
-
-// ListIdentities lists all identities (users) from Okta
-func (p *oktaProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
-	var identities []models.Identity
-
-	// Build query parameters based on filters
-	qp := query.NewQueryParams()
-	if len(filters) > 0 {
-		// Use the first filter as a search term
-		qp = query.NewQueryParams(query.WithSearch(filters[0]))
-	}
-
-	users, _, err := p.client.User.ListUsers(ctx, qp)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list users from Okta: %w", err)
-	}
-
-	for _, user := range users {
-		email := ""
-		name := ""
-		if user.Profile != nil {
-			if emailVal, ok := (*user.Profile)["email"].(string); ok {
-				email = emailVal
-			}
-			if nameVal, ok := (*user.Profile)["firstName"].(string); ok {
-				name = nameVal
-			}
-			if lastNameVal, ok := (*user.Profile)["lastName"].(string); ok {
-				if name != "" {
-					name = name + " " + lastNameVal
-				} else {
-					name = lastNameVal
-				}
-			}
-		}
-
-		identities = append(identities, models.Identity{
-			ID:    user.Id,
-			Label: email,
-			User: &models.User{
-				ID:     user.Id,
-				Email:  email,
-				Name:   name,
-				Source: "okta",
-			},
-		})
-	}
-
-	return identities, nil
-}
-
-// RefreshIdentities refreshes the identity cache (if applicable)
-func (p *oktaProvider) RefreshIdentities(ctx context.Context) error {
-	// The Okta SDK has caching built in, so we don't need to do anything special here
-	logrus.Info("Refreshing Okta identities cache")
 	return nil
 }
