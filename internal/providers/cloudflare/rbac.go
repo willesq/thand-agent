@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloudflare/cloudflare-go"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/activity"
+	"go.temporal.io/sdk/temporal"
 )
 
 const CloudflareAllow = "allow"
@@ -19,6 +22,7 @@ func (p *cloudflareProvider) AuthorizeRole(
 	ctx context.Context,
 	req *models.AuthorizeRoleRequest,
 ) (*models.AuthorizeRoleResponse, error) {
+
 	// Check for nil inputs
 	if !req.IsValid() {
 		return nil, fmt.Errorf("user and role must be provided to authorize Cloudflare role")
@@ -95,7 +99,15 @@ func (p *cloudflareProvider) AuthorizeRole(
 	// Member doesn't exist, create new
 	member, err := p.client.CreateAccountMember(ctx, accountRC, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create account member: %w", err)
+		attempt := activity.GetInfo(ctx).Attempt
+		return nil, temporal.NewApplicationErrorWithOptions(
+			fmt.Sprintf("failed to create cloudflare account member on attempt %d", attempt),
+			"CloudflareAccountMemberCreationError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+				Cause:          err,
+			},
+		)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -119,6 +131,7 @@ func (p *cloudflareProvider) RevokeRole(
 	ctx context.Context,
 	req *models.RevokeRoleRequest,
 ) (*models.RevokeRoleResponse, error) {
+
 	// Check for nil inputs
 	if !req.IsValid() {
 		return nil, fmt.Errorf("user and role must be provided to revoke Cloudflare role")

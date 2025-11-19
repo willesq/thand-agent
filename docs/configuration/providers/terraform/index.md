@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Terraform Provider
+title: Terraform
 description: Terraform Cloud/Enterprise provider for workspace and organization management
 parent: Providers
 grand_parent: Configuration

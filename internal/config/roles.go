@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -40,12 +41,21 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 		c.Roles.Path,
 		c.Roles.URL,
 		vaultData,
-		RoleDefinitions{},
+		models.RoleDefinitions{},
 	)
 
 	if err != nil {
 		logrus.WithError(err).Errorln("Failed to load roles data")
 		return nil, fmt.Errorf("failed to load roles data: %w", err)
+	}
+
+	if len(foundRoles) == 0 {
+		logrus.Warningln("No roles found from any source, loading defaults")
+		foundRoles, err = environment.GetDefaultRoles(c.Environment.Platform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load default roles: %w", err)
+		}
+		logrus.Infoln("Loaded default roles:", len(foundRoles))
 	}
 
 	defs := make(map[string]models.Role)

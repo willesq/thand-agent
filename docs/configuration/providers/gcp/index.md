@@ -1,6 +1,6 @@
 ---
 layout: default
-title: GCP Provider
+title: GCP
 description: Google Cloud Platform provider with IAM and resource management
 parent: Providers
 grand_parent: Configuration

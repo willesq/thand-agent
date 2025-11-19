@@ -1,0 +1,208 @@
+version: "1.0"
+roles:
+  # Viewer Access
+  gcp_viewer:
+    name: GCP Viewer
+    description: Read-only access to all GCP resources
+    workflows: 
+      - gcp_simple_elevation
+    inherits:
+      - roles/viewer
+    permissions:
+      allow:
+        - compute.instances.get
+        - compute.instances.list
+        - storage.buckets.get
+        - storage.buckets.list
+        - storage.objects.get
+        - storage.objects.list
+        - cloudsql.instances.get
+        - cloudsql.instances.list
+    providers:
+      - gcp
+    enabled: true
+
+  # Administrator Access
+  gcp_admin:
+    name: GCP Administrator
+    description: Full administrative access to all GCP resources
+    workflows: 
+      - gcp_email_approval
+    inherits:
+      - roles/owner
+    permissions:
+      allow:
+        - "*"
+    scopes:
+      groups:
+        - oidc:admins
+        - oidc:devops
+    providers:
+      - gcp
+    enabled: true
+
+  # Secret Manager Access
+  gcp_secret_manager:
+    name: GCP Secret Manager Admin
+    description: Full access to Secret Manager for managing secrets
+    workflows:
+      - gcp_email_approval
+    inherits:
+      - roles/secretmanager.admin
+    permissions:
+      allow:
+        - secretmanager.secrets.*
+        - secretmanager.versions.*
+        - cloudkms.cryptoKeys.get
+        - cloudkms.cryptoKeys.list
+    scopes:
+      groups:
+        - oidc:security
+        - oidc:devops
+    providers:
+      - gcp
+    enabled: true
+
+  # Database Administrator
+  gcp_database_admin:
+    name: GCP Database Administrator
+    description: Full access to Cloud SQL, Spanner, and database services
+    workflows:
+      - gcp_email_approval
+    inherits:
+      - roles/cloudsql.admin
+      - roles/spanner.admin
+      - roles/datastore.owner
+    permissions:
+      allow:
+        - cloudsql.*
+        - spanner.*
+        - datastore.*
+        - firestore.*
+        - redis.*
+        - bigtable.*
+    providers:
+      - gcp
+    enabled: true
+
+  # Storage Administrator
+  gcp_storage_admin:
+    name: GCP Storage Administrator
+    description: Full access to Cloud Storage and storage services
+    workflows:
+      - gcp_email_approval
+    inherits:
+      - roles/storage.admin
+    permissions:
+      allow:
+        - storage.buckets.*
+        - storage.objects.*
+        - file.instances.*
+        - file.locations.*
+    providers:
+      - gcp
+    enabled: true
+
+  # Network Administrator
+  gcp_network_admin:
+    name: GCP Network Administrator
+    description: Full access to VPC, networking, and connectivity services
+    workflows:
+      - gcp_email_approval
+    inherits:
+      - roles/compute.networkAdmin
+    permissions:
+      allow:
+        - compute.networks.*
+        - compute.subnetworks.*
+        - compute.firewalls.*
+        - compute.routes.*
+        - compute.routers.*
+        - compute.addresses.*
+        - dns.*
+    providers:
+      - gcp
+    enabled: true
+
+  # Security Administrator
+  gcp_security_admin:
+    name: GCP Security Administrator
+    description: Full access to security and IAM services
+    workflows:
+      - gcp_email_approval
+    inherits:
+      - roles/iam.securityAdmin
+      - roles/securitycenter.admin
+    permissions:
+      allow:
+        - iam.serviceAccounts.*
+        - iam.roles.*
+        - securitycenter.*
+        - cloudkms.*
+    providers:
+      - gcp
+    enabled: true
+
+  # Compute Administrator
+  gcp_compute_admin:
+    name: GCP Compute Administrator
+    description: Full access to Compute Engine, GKE, and compute services
+    workflows:
+      - gcp_email_approval
+    inherits:
+      - roles/compute.admin
+      - roles/container.admin
+    permissions:
+      allow:
+        - compute.instances.*
+        - compute.disks.*
+        - compute.images.*
+        - container.clusters.*
+        - run.services.*
+        - cloudfunctions.*
+    providers:
+      - gcp
+    enabled: true
+
+  # Developer Access
+  gcp_developer:
+    name: GCP Developer
+    description: Developer access with limited permissions
+    workflows:
+      - gcp_simple_elevation
+    inherits:
+      - roles/editor
+    permissions:
+      allow:
+        - compute.instances.*
+        - storage.buckets.*
+        - storage.objects.*
+        - cloudfunctions.*
+        - run.services.*
+        - pubsub.*
+        - logging.*
+        - monitoring.*
+      deny:
+        - iam.serviceAccounts.delete
+        - iam.roles.delete
+    providers:
+      - gcp
+    enabled: true
+
+  # Monitoring Administrator
+  gcp_monitoring_admin:
+    name: GCP Monitoring Administrator
+    description: Full access to monitoring, logging, and observability
+    workflows:
+      - gcp_simple_elevation
+    inherits:
+      - roles/monitoring.admin
+      - roles/logging.admin
+    permissions:
+      allow:
+        - monitoring.*
+        - logging.*
+        - cloudtrace.*
+    providers:
+      - gcp
+    enabled: true

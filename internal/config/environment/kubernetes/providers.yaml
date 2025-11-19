@@ -1,0 +1,34 @@
+version: "1.0"
+providers:
+
+  # TODO(hugh) Add thand as auth provider
+
+  kubernetes-local:
+    name: Kubernetes Development
+    description: Development Kubernetes cluster
+    provider: kubernetes
+    enabled: true
+  
+  kubernetes-dev:
+    name: Kubernetes Development
+    description: Development Kubernetes cluster
+    provider: kubernetes
+    enabled: true
+    config:
+      context: development
+      
+  kubernetes-staging:
+    name: Kubernetes Staging
+    description: Staging Kubernetes cluster
+    provider: kubernetes
+    enabled: true
+    config:
+      context: staging
+      
+  kubernetes-prod:
+    name: Kubernetes Production
+    description: Production Kubernetes cluster
+    provider: kubernetes
+    enabled: true
+    config:
+      context: production

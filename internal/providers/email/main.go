@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"crypto/tls"
-
-	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
-
-	"gopkg.in/gomail.v2"
+	emailacs "github.com/thand-io/agent/internal/providers/email.acs"
+	ses "github.com/thand-io/agent/internal/providers/email.ses"
+	smtp "github.com/thand-io/agent/internal/providers/email.smtp"
 )
 
 const EmailProviderName = "email"
@@ -18,121 +16,50 @@ const EmailProviderName = "email"
 // emailProvider implements the ProviderImpl interface for Email
 type emailProvider struct {
 	*models.BaseProvider
-	mailer             *gomail.Dialer
-	defaultFromAddress string
+	proxy models.ProviderImpl
 }
 
 func (p *emailProvider) Initialize(provider models.Provider) error {
+
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
 		models.ProviderCapabilityNotifier,
 	)
 
+	// Depending on the provider configuration, setup the email dialer
+	// By default, we expect SMTP configuration
+
 	emailerConfig := p.GetConfig()
 
-	smtpHost, foundSmtpHost := emailerConfig.GetString("host")
-	smtpPort, foundSmtpPort := emailerConfig.GetInt("port")
-	smtpUser, foundSmtpUser := emailerConfig.GetString("user")
-	smtpPass, foundSmtpPass := emailerConfig.GetString("pass")
-	smtpFrom, foundFrom := emailerConfig.GetString("from")
+	// Get platform specific configuration
+	platformType := emailerConfig.GetStringWithDefault("platform", "smtp")
 
-	var missingFields []string
-	if !foundSmtpHost {
-		missingFields = append(missingFields, "host")
-	}
-	if !foundSmtpPort {
-		missingFields = append(missingFields, "port")
-	}
-	if !foundSmtpUser {
-		missingFields = append(missingFields, "user")
-	}
-	if !foundSmtpPass {
-		missingFields = append(missingFields, "pass")
-	}
-	if !foundFrom {
-		missingFields = append(missingFields, "from")
-	}
-	if len(missingFields) > 0 {
-		return fmt.Errorf("missing email configuration field(s): %v", missingFields)
+	switch platformType {
+	case "ses":
+		p.proxy = ses.NewEmailSesProvider()
+	case "acs":
+		p.proxy = emailacs.NewEmailAcsProvider()
+	case "smtp":
+		fallthrough
+	default:
+		p.proxy = smtp.NewEmailSmtpProvider()
 	}
 
-	tlsSkipVerify, foundTlsSkipVerify := emailerConfig.GetBool("tls_skip_verify")
-
-	d := gomail.NewDialer(smtpHost, smtpPort, smtpUser, smtpPass)
-
-	if foundTlsSkipVerify {
-		d.TLSConfig = &tls.Config{
-			ServerName:         smtpHost,
-			InsecureSkipVerify: tlsSkipVerify,
-		}
+	if p.proxy == nil {
+		return fmt.Errorf("failed to initialize email proxy for platform: %s", platformType)
 	}
 
-	p.mailer = d
-	p.defaultFromAddress = smtpFrom
-
-	// Send emails using d.
-	// TODO: Implement Email initialization logic
-	return nil
+	return p.proxy.Initialize(provider)
 }
-
-type EmailNotificationRequest struct {
-	From    string
-	To      []string
-	Subject string
-	Body    EmailNotificationBody
-	Headers map[string][]string
-}
-
-type EmailNotificationBody struct {
-	Text string
-	HTML string
-}
-
 func (p *emailProvider) SendNotification(
 	ctx context.Context, notification models.NotificationRequest,
 ) error {
 
-	// Lets convert NotificationRequest to EmailNotificationRequest
-	emailRequest := &EmailNotificationRequest{}
-	common.ConvertMapToInterface(notification, emailRequest)
-
-	m := gomail.NewMessage()
-
-	if len(emailRequest.Body.Text) > 0 {
-		m.SetBody("text/plain", emailRequest.Body.Text, gomail.SetPartEncoding(gomail.Unencoded))
-	}
-	if len(emailRequest.Body.HTML) > 0 {
-		m.SetBody("text/html", emailRequest.Body.HTML, gomail.SetPartEncoding(gomail.Unencoded))
+	if p.proxy == nil {
+		return fmt.Errorf("email provider proxy is not initialized")
 	}
 
-	if len(emailRequest.Headers) > 0 {
-		m.SetHeaders(emailRequest.Headers)
-	}
-
-	if len(emailRequest.Subject) > 0 {
-		m.SetHeader("Subject", emailRequest.Subject)
-	}
-
-	// From field is required
-	if len(emailRequest.From) > 0 {
-		m.SetAddressHeader("From", emailRequest.From, "")
-	} else {
-		m.SetAddressHeader("From", p.defaultFromAddress, "")
-	}
-
-	// Set multiple recipients
-	if len(emailRequest.To) == 0 {
-		return fmt.Errorf("at least one recipient is required")
-	}
-	m.SetHeader("To", emailRequest.To...)
-
-	err := p.mailer.DialAndSend(m)
-
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	return nil
+	return p.proxy.SendNotification(ctx, notification)
 }
 
 func init() {

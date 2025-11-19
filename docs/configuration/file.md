@@ -66,7 +66,7 @@ Platform-specific configuration settings:
 | `environment.config.access_key_id` | string | - | AWS access key ID |
 | `environment.config.secret_access_key` | string | - | AWS secret access key |
 | `environment.config.kms_arn` | string | - | AWS KMS key ARN for encryption |
-| `environment.config.imsd_disable` | boolean | - | Disable AWS instance metadata service |
+| `environment.config.imds_disable` | boolean | - | Disable AWS instance metadata service |
 
 #### GCP-Specific Config
 

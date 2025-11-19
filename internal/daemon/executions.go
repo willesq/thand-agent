@@ -15,6 +15,7 @@ import (
 	"github.com/thand-io/agent/internal/models"
 
 	"go.temporal.io/api/enums/v1"
+	failurepb "go.temporal.io/api/failure/v1"
 	"go.temporal.io/api/workflow/v1"
 	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
@@ -24,6 +25,30 @@ import (
 type ExecutionsPageData struct {
 	config.TemplateData
 	Executions []*models.WorkflowExecutionInfo `json:"executions"`
+}
+
+// TemporalFailureInfo represents a structured error from a Temporal workflow failure
+type TemporalFailureInfo struct {
+	Message      string               `json:"message"`
+	Type         string               `json:"type,omitempty"`
+	NonRetryable *bool                `json:"nonRetryable,omitempty"`
+	Details      []any                `json:"details,omitempty"`
+	StackTrace   string               `json:"stackTrace,omitempty"`
+	Cause        *TemporalFailureInfo `json:"cause,omitempty"`
+	ActivityType string               `json:"activityType,omitempty"`
+	ActivityID   string               `json:"activityId,omitempty"`
+	TimeoutType  string               `json:"timeoutType,omitempty"`
+	Metadata     map[string]any       `json:"metadata,omitempty"`
+}
+
+func (t *TemporalFailureInfo) Error() string {
+	if len(t.Type) > 0 {
+		return fmt.Sprintf("%s: %s", t.Type, t.Message)
+	}
+	if t.Cause != nil {
+		return fmt.Sprintf("%s: %s", t.Message, t.Cause.Error())
+	}
+	return t.Message
 }
 
 // listRunningWorkflows lists all running workflow executions
@@ -224,10 +249,11 @@ func (s *Server) getWorkflowExecutionState(c *gin.Context, workflowID string) (*
 		defer cancel()
 
 		queryResponse, err := temporalClient.QueryWorkflowWithOptions(timeoutCtx, &client.QueryWorkflowWithOptionsRequest{
-			WorkflowID: workflowID,
-			RunID:      models.TemporalEmptyRunId,
-			QueryType:  models.TemporalGetWorkflowTaskQueryName,
-			Args:       nil,
+			WorkflowID:           workflowID,
+			RunID:                models.TemporalEmptyRunId,
+			QueryType:            models.TemporalGetWorkflowTaskQueryName,
+			QueryRejectCondition: enums.QUERY_REJECT_CONDITION_NONE,
+			Args:                 nil,
 		})
 
 		if err == nil {
@@ -277,7 +303,45 @@ func (s *Server) getWorkflowExecutionState(c *gin.Context, workflowID string) (*
 
 		}
 
-	} else if wklwInfo.GetStatus() != enums.WORKFLOW_EXECUTION_STATUS_TERMINATED {
+	} else if wklwInfo.GetStatus() == enums.WORKFLOW_EXECUTION_STATUS_FAILED {
+
+		// Get history for failed workflows to extract detailed failure information
+
+		iter := temporalClient.GetWorkflowHistory(
+			ctx, workflowID, models.TemporalEmptyRunId,
+			false, enums.HISTORY_EVENT_FILTER_TYPE_CLOSE_EVENT)
+
+		// Iterate through history events to find the failure
+		for iter.HasNext() {
+			event, err := iter.Next()
+			if err != nil {
+				logrus.WithError(err).Warnln("Failed to iterate workflow history")
+				workflowExecInfo.Output = err.Error()
+				break
+			}
+
+			// Look for the WorkflowExecutionFailed event
+			if event.GetEventType() == enums.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED {
+				failedAttrs := event.GetWorkflowExecutionFailedEventAttributes()
+				if failedAttrs != nil {
+					// Extract the failure information properly
+					if failure := failedAttrs.GetFailure(); failure != nil {
+						workflowExecInfo.Output = extractFailureMessage(failure)
+					} else {
+						workflowExecInfo.Output = failedAttrs
+					}
+				}
+				break
+			} else if event.GetEventType() == enums.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED {
+				terminatedAttrs := event.GetWorkflowExecutionTerminatedEventAttributes()
+				if terminatedAttrs != nil {
+					workflowExecInfo.Output = terminatedAttrs
+				}
+				break
+			}
+		}
+
+	} else if wklwInfo.GetStatus() == enums.WORKFLOW_EXECUTION_STATUS_COMPLETED {
 
 		// Otherwise if the workflow has completed then get the last output
 
@@ -510,4 +574,94 @@ func (s *Server) signalRunningWorkflow(c *gin.Context) {
 		c.JSON(http.StatusOK, data)
 	}
 
+}
+
+// extractFailureMessage extracts a human-readable error message from a Temporal Failure
+func extractFailureMessage(failure *failurepb.Failure) *TemporalFailureInfo {
+	if failure == nil {
+		return &TemporalFailureInfo{
+			Message: "Unknown error",
+		}
+	}
+
+	errorInfo := &TemporalFailureInfo{
+		Message: failure.GetMessage(),
+	}
+
+	// Handle different failure types
+	if appErrInfo := failure.GetApplicationFailureInfo(); appErrInfo != nil {
+		errorInfo.Type = appErrInfo.GetType()
+		nonRetryable := appErrInfo.GetNonRetryable()
+		errorInfo.NonRetryable = &nonRetryable
+
+		// Try to decode details if available
+		if len(appErrInfo.GetDetails().GetPayloads()) > 0 {
+			dataConverter := converter.GetDefaultDataConverter()
+			var details []any
+			for _, payload := range appErrInfo.GetDetails().GetPayloads() {
+				var detail any
+				if err := dataConverter.FromPayload(payload, &detail); err == nil {
+					details = append(details, detail)
+				}
+			}
+			if len(details) > 0 {
+				errorInfo.Details = details
+			}
+		}
+	} else if activityErr := failure.GetActivityFailureInfo(); activityErr != nil {
+		errorInfo.Type = "ActivityError"
+		if activityType := activityErr.GetActivityType(); activityType != nil {
+			errorInfo.ActivityType = activityType.GetName()
+		}
+		errorInfo.ActivityID = activityErr.GetActivityId()
+
+		// Recursively extract the cause
+		if cause := failure.GetCause(); cause != nil {
+			errorInfo.Cause = extractFailureMessage(cause)
+		}
+	} else if timeoutInfo := failure.GetTimeoutFailureInfo(); timeoutInfo != nil {
+		errorInfo.Type = "TimeoutError"
+		errorInfo.TimeoutType = timeoutInfo.GetTimeoutType().String()
+
+		// Add timeout-specific metadata
+		errorInfo.Metadata = map[string]any{
+			"timeoutType": timeoutInfo.GetTimeoutType().String(),
+		}
+	} else if cancelInfo := failure.GetCanceledFailureInfo(); cancelInfo != nil {
+		errorInfo.Type = "CanceledError"
+
+		// Try to decode cancellation details
+		if len(cancelInfo.GetDetails().GetPayloads()) > 0 {
+			dataConverter := converter.GetDefaultDataConverter()
+			var details []any
+			for _, payload := range cancelInfo.GetDetails().GetPayloads() {
+				var detail any
+				if err := dataConverter.FromPayload(payload, &detail); err == nil {
+					details = append(details, detail)
+				}
+			}
+			if len(details) > 0 {
+				errorInfo.Details = details
+			}
+		}
+	} else if terminatedInfo := failure.GetTerminatedFailureInfo(); terminatedInfo != nil {
+		errorInfo.Type = "TerminatedError"
+	} else if serverInfo := failure.GetServerFailureInfo(); serverInfo != nil {
+		errorInfo.Type = "ServerError"
+		errorInfo.Metadata = map[string]any{
+			"nonRetryable": serverInfo.GetNonRetryable(),
+		}
+	}
+
+	// Check for nested cause (applies to all error types)
+	if cause := failure.GetCause(); cause != nil {
+		errorInfo.Cause = extractFailureMessage(cause)
+	}
+
+	// Include stack trace if available
+	if stackTrace := failure.GetStackTrace(); len(stackTrace) > 0 {
+		errorInfo.StackTrace = stackTrace
+	}
+
+	return errorInfo
 }

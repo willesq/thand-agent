@@ -1,6 +1,6 @@
 ---
 layout: default
-title: GitHub Provider
+title: GitHub
 description: GitHub provider for repository management and authentication
 parent: Providers
 grand_parent: Configuration

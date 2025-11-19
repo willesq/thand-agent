@@ -1,6 +1,6 @@
 ---
 layout: default
-title: AWS Provider
+title: AWS
 description: Amazon Web Services provider with IAM and SSO integration
 parent: Providers
 grand_parent: Configuration

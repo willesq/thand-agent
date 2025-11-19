@@ -1,0 +1,241 @@
+version: "1.0"
+roles:
+  # Reader Access
+  azure_reader:
+    name: Azure Reader
+    description: Read-only access to all Azure resources
+    workflows: 
+      - azure_simple_elevation
+    inherits:
+      - Reader
+    permissions:
+      allow:
+        - "*/read"
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Contributor Access
+  azure_contributor:
+    name: Azure Contributor
+    description: Full access to manage Azure resources (excluding access management)
+    workflows: 
+      - azure_email_approval
+    inherits:
+      - Contributor
+    permissions:
+      allow:
+        - "*"
+      deny:
+        - "Microsoft.Authorization/*/Delete"
+        - "Microsoft.Authorization/*/Write"
+        - "Microsoft.Authorization/elevateAccess/Action"
+    scopes:
+      groups:
+        - oidc:admins
+        - oidc:devops
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Owner Access
+  azure_owner:
+    name: Azure Owner
+    description: Full administrative access to all Azure resources
+    workflows:
+      - azure_email_approval
+    inherits:
+      - Owner
+    permissions:
+      allow:
+        - "*"
+    scopes:
+      groups:
+        - oidc:admins
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Key Vault Secrets Officer
+  azure_secrets_admin:
+    name: Azure Key Vault Secrets Officer
+    description: Full access to Azure Key Vault secrets
+    workflows:
+      - azure_email_approval
+    inherits:
+      - "Key Vault Secrets Officer"
+      - "Key Vault Administrator"
+    permissions:
+      allow:
+        - "Microsoft.KeyVault/vaults/secrets/*"
+        - "Microsoft.KeyVault/vaults/keys/read"
+        - "Microsoft.KeyVault/vaults/*/read"
+    scopes:
+      groups:
+        - oidc:security
+        - oidc:devops
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Database Administrator
+  azure_database_admin:
+    name: Azure Database Administrator
+    description: Full access to Azure SQL, Cosmos DB, and database services
+    workflows:
+      - azure_email_approval
+    inherits:
+      - "SQL DB Contributor"
+      - "Cosmos DB Account Contributor"
+      - "DocumentDB Account Contributor"
+    permissions:
+      allow:
+        - "Microsoft.Sql/*"
+        - "Microsoft.DocumentDB/*"
+        - "Microsoft.Cache/*"
+        - "Microsoft.DBforMySQL/*"
+        - "Microsoft.DBforPostgreSQL/*"
+    scopes:
+      groups:
+        - oidc:database-admins
+        - oidc:devops
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Storage Administrator
+  azure_storage_admin:
+    name: Azure Storage Administrator
+    description: Full access to Azure Storage accounts and services
+    workflows:
+      - azure_email_approval
+    inherits:
+      - "Storage Account Contributor"
+      - "Storage Blob Data Owner"
+    permissions:
+      allow:
+        - "Microsoft.Storage/*"
+        - "Microsoft.StorageCache/*"
+    scopes:
+      groups:
+        - oidc:storage-admins
+        - oidc:devops
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Network Administrator
+  azure_network_admin:
+    name: Azure Network Administrator
+    description: Full access to Azure networking services
+    workflows:
+      - azure_email_approval
+    inherits:
+      - "Network Contributor"
+    permissions:
+      allow:
+        - "Microsoft.Network/*"
+        - "Microsoft.ClassicNetwork/*"
+        - "Microsoft.Cdn/*"
+    scopes:
+      groups:
+        - oidc:network-admins
+        - oidc:devops
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Security Administrator
+  azure_security_admin:
+    name: Azure Security Administrator
+    description: Full access to security and compliance services
+    workflows:
+      - azure_email_approval
+    inherits:
+      - "Security Admin"
+    permissions:
+      allow:
+        - "Microsoft.Security/*"
+        - "Microsoft.Authorization/*/read"
+        - "Microsoft.Authorization/policyAssignments/*"
+        - "Microsoft.Authorization/policyDefinitions/*"
+        - "Microsoft.Authorization/policySetDefinitions/*"
+    scopes:
+      groups:
+        - oidc:security
+        - oidc:compliance
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Compute Administrator
+  azure_compute_admin:
+    name: Azure Compute Administrator
+    description: Full access to virtual machines, containers, and compute services
+    workflows:
+      - azure_email_approval
+    inherits:
+      - "Virtual Machine Contributor"
+      - "Azure Kubernetes Service Contributor"
+    permissions:
+      allow:
+        - "Microsoft.Compute/*"
+        - "Microsoft.ContainerInstance/*"
+        - "Microsoft.ContainerRegistry/*"
+        - "Microsoft.ContainerService/*"
+    scopes:
+      groups:
+        - oidc:compute-admins
+        - oidc:devops
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Developer Access
+  azure_developer:
+    name: Azure Developer
+    description: Developer access with limited permissions
+    workflows:
+      - azure_simple_elevation
+    inherits:
+      - Contributor
+    permissions:
+      allow:
+        - "Microsoft.Compute/*/read"
+        - "Microsoft.Storage/*/read"
+        - "Microsoft.Storage/storageAccounts/listKeys/action"
+        - "Microsoft.Web/*"
+        - "Microsoft.Sql/servers/databases/read"
+        - "Microsoft.Resources/deployments/*"
+      deny:
+        - "Microsoft.Authorization/*"
+        - "Microsoft.Compute/virtualMachines/delete"
+        - "Microsoft.Sql/servers/delete"
+    scopes:
+      groups:
+        - oidc:developers
+        - oidc:eng
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true
+
+  # Monitoring Administrator
+  azure_monitoring_admin:
+    name: Azure Monitoring Administrator
+    description: Full access to monitoring and diagnostics
+    workflows:
+      - azure_simple_elevation
+    inherits:
+      - "Monitoring Contributor"
+    permissions:
+      allow:
+        - "Microsoft.Insights/*"
+        - "Microsoft.OperationalInsights/*"
+        - "Microsoft.Monitor/*"
+    scopes:
+      groups:
+        - oidc:sre
+        - oidc:devops
+    providers:
+      - ${AZURE_PROVIDER}
+    enabled: true

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
 
@@ -36,11 +37,20 @@ func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 		c.Providers.Path,
 		c.Providers.URL,
 		vaultData,
-		ProviderDefinitions{},
+		models.ProviderDefinitions{},
 	)
 	if err != nil {
 		logrus.WithError(err).Errorln("Failed to load providers data")
 		return nil, fmt.Errorf("failed to load providers data: %w", err)
+	}
+
+	if len(foundProviders) == 0 {
+		logrus.Warningln("No providers found from any source, loading defaults")
+		foundProviders, err = environment.GetDefaultProviders(c.Environment.Platform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load default providers: %w", err)
+		}
+		logrus.Infoln("Loaded default providers:", len(foundProviders))
 	}
 
 	defs := c.processProviderDefinitions(foundProviders)
@@ -70,7 +80,7 @@ func (c *Config) loadVaultData() (string, error) {
 }
 
 // processProviderDefinitions processes raw provider data and returns enabled providers
-func (c *Config) processProviderDefinitions(foundProviders []*ProviderDefinitions) map[string]models.Provider {
+func (c *Config) processProviderDefinitions(foundProviders []*models.ProviderDefinitions) map[string]models.Provider {
 	defs := make(map[string]models.Provider)
 	logrus.Debugln("Processing loaded providers: ", len(foundProviders))
 
@@ -160,7 +170,9 @@ func (c *Config) initializeSingleProvider(providerKey string, p *models.Provider
 
 	p.SetClient(impl)
 	return nil
-} // getProviderImplementation returns the appropriate provider implementation based on config mode
+}
+
+// getProviderImplementation returns the appropriate provider implementation based on config mode
 func (c *Config) getProviderImplementation(providerKey string, providerName string) (models.ProviderImpl, error) {
 	if c.IsServer() || c.IsAgent() {
 		return providers.CreateInstance(strings.ToLower(providerName))

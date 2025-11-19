@@ -1,0 +1,7 @@
+version: "1.0"
+providers:
+  local-elevation:
+    name: Local Elevation
+    description: Local privilege elevation (like sudo or UAC)
+    provider: local
+    enabled: true
