@@ -9,6 +9,41 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// CustomAdminRoleResponse represents the response from creating a custom admin role in Okta
+type CustomAdminRoleResponse struct {
+	ID          string               `json:"id"`
+	Label       string               `json:"label"`
+	Description string               `json:"description"`
+	Created     string               `json:"created"`
+	LastUpdated string               `json:"lastUpdated"`
+	Links       CustomAdminRoleLinks `json:"_links"`
+}
+
+// CustomAdminRoleLinks represents the links in the custom admin role response
+type CustomAdminRoleLinks struct {
+	Permissions CustomAdminRoleLink `json:"permissions"`
+	Self        CustomAdminRoleLink `json:"self"`
+}
+
+// CustomAdminRoleLink represents a single link in the custom admin role response
+type CustomAdminRoleLink struct {
+	Href string `json:"href"`
+}
+
+// ResourceSetAssignment represents a principal assignment to a resource set
+type ResourceSetAssignment struct {
+	PrincipalID     string `json:"principalId"`
+	PrincipalType   string `json:"principalType"`
+	PermissionSetID string `json:"permissionSetId"`
+	ResourceSetID   string `json:"resourceSetId"`
+}
+
+// ResourceSetAssignmentRequest represents the request body for resource set assignments
+type ResourceSetAssignmentRequest struct {
+	Add    []ResourceSetAssignment `json:"add,omitempty"`
+	Remove []ResourceSetAssignment `json:"remove,omitempty"`
+}
+
 // AuthorizeRole assigns a role to a user in Okta
 func (p *oktaProvider) AuthorizeRole(
 	ctx context.Context,
@@ -29,48 +64,73 @@ func (p *oktaProvider) AuthorizeRole(
 
 	// Determine which Okta roles to assign
 	var rolesToAssign []string
+
 	if len(role.Inherits) > 0 {
 		// If the role inherits from other roles, assign those roles
-		rolesToAssign = role.Inherits
+
+		for _, roleType := range role.Inherits {
+			// Prepare role assignment request
+			roleAssignment := okta.AssignRoleRequest{
+				Type: roleType,
+			}
+
+			// Assign the role to the user
+			assignedRole, _, err := p.client.User.AssignRoleToUser(ctx, oktaUser.Id, roleAssignment, nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to assign role %s to user: %w", roleType, err)
+			}
+
+			rolesToAssign = append(rolesToAssign, assignedRole.Id)
+
+			logrus.WithFields(logrus.Fields{
+				"user_id":       oktaUser.Id,
+				"user_email":    user.Email,
+				"role_type":     roleType,
+				"assignment_id": assignedRole.Id,
+			}).Info("Successfully assigned role to user in Okta")
+		}
+
 	} else if len(role.Permissions.Allow) > 0 {
-		// TODO: If permissions are provided, we should ideally create a custom role
-		// or apply permissions directly. For now, we'll fall back to using the role name
-		// assuming it corresponds to a pre-created custom role in Okta.
-		logrus.Warnf("Role %s has permissions defined but custom role creation is not fully implemented. Using role name as Okta role type.", role.Name)
-		rolesToAssign = []string{role.Name}
-	} else {
-		// Default to using the role name
-		rolesToAssign = []string{role.Name}
-	}
 
-	var assignedRoleIds []string
-
-	for _, roleType := range rolesToAssign {
-		// Prepare role assignment request
-		roleAssignment := okta.AssignRoleRequest{
-			Type: roleType,
-		}
-
-		// Assign the role to the user
-		assignedRole, _, err := p.client.User.AssignRoleToUser(ctx, oktaUser.Id, roleAssignment, nil)
+		// Create a custom admin role with the specified permissions
+		customRoleType, err := p.createCustomAdminRole(ctx, role)
 		if err != nil {
-			return nil, fmt.Errorf("failed to assign role %s to user: %w", roleType, err)
+			return nil, fmt.Errorf("failed to create custom admin role: %w", err)
 		}
-
-		assignedRoleIds = append(assignedRoleIds, assignedRole.Id)
 
 		logrus.WithFields(logrus.Fields{
-			"user_id":       oktaUser.Id,
-			"user_email":    user.Email,
-			"role_type":     roleType,
-			"assignment_id": assignedRole.Id,
-		}).Info("Successfully assigned role to user in Okta")
+			"role_name":        role.Name,
+			"custom_role_type": customRoleType,
+			"permissions":      role.Permissions.Allow,
+		}).Info("Created custom admin role in Okta")
+
+		// Assign the role to the user
+		err = p.assignCustomRoleToUser(ctx, ResourceSetAssignmentRequest{
+			Add: []ResourceSetAssignment{
+				{
+					PrincipalID:     oktaUser.Id,
+					PrincipalType:   "USER",
+					PermissionSetID: customRoleType.ID,
+					ResourceSetID:   "", // Assuming empty for now; adjust as needed
+				},
+			},
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign custom role to user: %w", err)
+		}
+
+		rolesToAssign = append(rolesToAssign, customRoleType.ID)
+
+	} else {
+
+		return nil, fmt.Errorf("role %s has no inherits or permissions defined", role.Name)
 	}
 
 	// Return metadata for later revocation
 	metadata := map[string]any{
-		"user_id":  oktaUser.Id,
-		"role_ids": assignedRoleIds,
+		"user_id":     oktaUser.Id,
+		"assignments": rolesToAssign,
 	}
 
 	return &models.AuthorizeRoleResponse{
@@ -102,7 +162,7 @@ func (p *oktaProvider) RevokeRole(
 	if req.AuthorizeRoleResponse != nil && req.AuthorizeRoleResponse.Metadata != nil {
 		if ids, ok := req.AuthorizeRoleResponse.Metadata["role_ids"].([]string); ok {
 			roleIds = ids
-		} else if ids, ok := req.AuthorizeRoleResponse.Metadata["role_ids"].([]interface{}); ok {
+		} else if ids, ok := req.AuthorizeRoleResponse.Metadata["role_ids"].([]any); ok {
 			// Handle JSON unmarshaling
 			for _, id := range ids {
 				if strId, ok := id.(string); ok {
@@ -157,6 +217,32 @@ func (p *oktaProvider) RevokeRole(
 				"user_email": user.Email,
 				"role_id":    roleId,
 			}).Info("Successfully revoked role from user in Okta")
+		}
+	}
+
+	// Clean up custom roles that were created during authorization
+	var createdCustomRoles []string
+	if req.AuthorizeRoleResponse != nil && req.AuthorizeRoleResponse.Metadata != nil {
+		if roles, ok := req.AuthorizeRoleResponse.Metadata["created_custom_roles"].([]string); ok {
+			createdCustomRoles = roles
+		} else if roles, ok := req.AuthorizeRoleResponse.Metadata["created_custom_roles"].([]any); ok {
+			// Handle JSON unmarshaling
+			for _, roleId := range roles {
+				if strRoleId, ok := roleId.(string); ok {
+					createdCustomRoles = append(createdCustomRoles, strRoleId)
+				}
+			}
+		}
+	}
+
+	// Delete the custom roles
+	for _, customRoleId := range createdCustomRoles {
+		err := p.deleteCustomAdminRole(ctx, customRoleId)
+		if err != nil {
+			logrus.WithError(err).Warnf("Failed to delete custom admin role %s", customRoleId)
+			// Continue even if deletion fails - role is already unassigned from user
+		} else {
+			logrus.WithField("role_id", customRoleId).Info("Successfully deleted custom admin role")
 		}
 	}
 

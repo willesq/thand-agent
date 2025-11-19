@@ -12,8 +12,11 @@ import (
 
 const resourceTypeApplication = "application"
 
+// Okta has custom admin resources that can span multuiple resources
+
 // OktaApplication is an interface that represents the common methods
 // available on all Okta application types returned by the SDK
+// applications can be assigned to non-administrator users
 type OktaApplication interface {
 	GetId() string
 	GetLabel() string

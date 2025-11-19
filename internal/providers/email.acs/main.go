@@ -100,9 +100,9 @@ func (p *emailAcsProvider) SendNotification(
 		content["plainText"] = emailRequest.Body.Text
 	}
 
-	emailMessage := map[string]interface{}{
+	emailMessage := map[string]any{
 		"senderAddress": fromAddress,
-		"recipients": map[string]interface{}{
+		"recipients": map[string]any{
 			"to": recipients,
 		},
 		"content": content,

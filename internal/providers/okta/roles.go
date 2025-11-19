@@ -16,61 +16,63 @@ import (
 // Reference: https://help.okta.com/en-us/content/topics/security/administrators-admin-comparison.htm
 var oktaPredefinedRoles = map[string]models.ProviderRole{
 	"SUPER_ADMIN": {
-		Name:        "SUPER_ADMIN",
-		Title:       "Super Administrator",
+		Id:          "SUPER_ADMIN",
+		Name:        "Super Administrator",
 		Description: "Full administrative access to the Okta organization. Can perform all administrative tasks including managing other administrators.",
 	},
 	"ORG_ADMIN": {
-		Name:        "ORG_ADMIN",
-		Title:       "Organization Administrator",
+		Id:          "ORG_ADMIN",
+		Name:        "Organization Administrator",
 		Description: "Full administrative access except for managing super administrators. Can manage users, groups, apps, and most org settings.",
 	},
 	"APP_ADMIN": {
-		Name:        "APP_ADMIN",
-		Title:       "Application Administrator",
+		Id:          "APP_ADMIN",
+		Name:        "Application Administrator",
 		Description: "Can create and manage applications and their assignments. Cannot manage users or groups unless they are assigned to apps.",
 	},
 	"USER_ADMIN": {
-		Name:        "USER_ADMIN",
-		Title:       "User Administrator",
+		Id:          "USER_ADMIN",
+		Name:        "User Administrator",
 		Description: "Can create and manage users and groups. Cannot manage applications or advanced settings.",
 	},
 	"GROUP_MEMBERSHIP_ADMIN": {
-		Name:        "GROUP_MEMBERSHIP_ADMIN",
-		Title:       "Group Membership Administrator",
+		Id:          "GROUP_MEMBERSHIP_ADMIN",
+		Name:        "Group Membership Administrator",
 		Description: "Can manage group membership but cannot create or delete groups.",
 	},
 	"HELP_DESK_ADMIN": {
-		Name:        "HELP_DESK_ADMIN",
-		Title:       "Help Desk Administrator",
+		Id:          "HELP_DESK_ADMIN",
+		Name:        "Help Desk Administrator",
 		Description: "Can reset passwords and MFA factors for users. Limited administrative capabilities for support purposes.",
 	},
 	"READ_ONLY_ADMIN": {
-		Name:        "READ_ONLY_ADMIN",
-		Title:       "Read-Only Administrator",
+		Id:          "READ_ONLY_ADMIN",
+		Name:        "Read-Only Administrator",
 		Description: "Can view all aspects of the Okta organization but cannot make changes.",
 	},
 	"MOBILE_ADMIN": {
-		Name:        "MOBILE_ADMIN",
-		Title:       "Mobile Administrator",
+		Id:          "MOBILE_ADMIN",
+		Name:        "Mobile Administrator",
 		Description: "Can manage mobile device management settings and policies.",
 	},
 	"API_ACCESS_MANAGEMENT_ADMIN": {
-		Name:        "API_ACCESS_MANAGEMENT_ADMIN",
-		Title:       "API Access Management Administrator",
+		Id:          "API_ACCESS_MANAGEMENT_ADMIN",
+		Name:        "API Access Management Administrator",
 		Description: "Can manage authorization servers, scopes, and claims for API access management.",
 	},
 	"REPORT_ADMIN": {
-		Name:        "REPORT_ADMIN",
-		Title:       "Report Administrator",
+		Id:          "REPORT_ADMIN",
+		Name:        "Report Administrator",
 		Description: "Can create and view reports about the Okta organization.",
 	},
 	"GROUP_ADMIN": {
-		Name:        "GROUP_ADMIN",
-		Title:       "Group Administrator",
+		Id:          "GROUP_ADMIN",
+		Name:        "Group Administrator",
 		Description: "Can create, manage, and delete groups. Can manage group membership.",
 	},
 }
+
+// Also load in user groups as these can have roles assigned too
 
 func (p *oktaProvider) LoadRoles() error {
 	startTime := time.Now()

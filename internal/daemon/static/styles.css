@@ -50,6 +50,7 @@ body {
 
 .container {
     max-width: 1200px;
+    min-width: 800px;
     margin: 0 auto;
     padding: 0 1rem;
 }
@@ -770,7 +771,6 @@ footer p {
 
 /* Elevate Methods */
 .elevate-methods {
-    max-width: 800px;
     margin: 0 auto 2rem;
     display: flex;
     justify-content: center;
@@ -800,6 +800,35 @@ footer p {
 
 .method-button:hover {
     background-color: hsl(var(--secondary));
+}
+
+/* Description Container */
+.description-container {
+    margin: 0 auto 2rem;
+    text-align: center;
+}
+
+.hover-description {
+    padding: 1rem;
+    min-height: 3rem;
+    color: hsl(var(--muted-foreground));
+}
+
+/* Elevation Actions */
+.elevation-actions,
+.alternative-actions {
+    margin: 2rem auto;
+    padding: 2rem;
+    text-align: center;
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+}
+
+.elevation-actions p,
+.alternative-actions p {
+    margin-bottom: 1rem;
+    color: hsl(var(--foreground));
 }
 
 /* Permission Search Interface */

@@ -12,129 +12,129 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-// Okta permissions map - based on Okta's OAuth 2.0 scopes and admin permissions
-// Reference: https://developer.okta.com/docs/reference/api/oidc/#scopes
+// Okta permissions map - complete catalog from Okta Management API
+// Reference: https://developer.okta.com/docs/api/openapi/okta-management/guides/permissions/#permissions-catalog
+// Note: The Okta SDK v2 does not have built-in support for custom admin role permissions.
+// These permissions are primarily used for reference and custom role creation via API.
 var oktaPermissions = map[string]string{
-	// User permissions
-	"okta.users.read":                       "Read information about users",
-	"okta.users.manage":                     "Create, update, and delete users",
-	"okta.users.read.self":                  "Read information about the current user",
-	"okta.users.manage.self":                "Update the current user's profile",
-	"okta.users.appLinks.read":              "Read user's app links",
-	"okta.users.credentials.manage":         "Manage user credentials including passwords and factors",
-	"okta.users.credentials.resetFactors":   "Reset user authentication factors",
-	"okta.users.credentials.resetPassword":  "Reset user passwords",
-	"okta.users.credentials.expirePassword": "Expire user passwords",
-
-	// Group permissions
-	"okta.groups.read":   "Read information about groups",
-	"okta.groups.manage": "Create, update, and delete groups",
+	// Agent permissions
+	"okta.agents.manage":   "Allows the admin to manage agent communication and agent updates",
+	"okta.agents.read":     "Allows the admin to download agents and view agent statuses",
+	"okta.agents.register": "Allows the admin to register agents and domains",
 
 	// App permissions
-	"okta.apps.read":   "Read information about applications",
-	"okta.apps.manage": "Create, update, and delete applications",
+	"okta.apps.assignment.manage":      "Allows the admin to manage assignment operations of an app in your Okta org and view the following provisioning errors: app assignment, group push mapping, and Error Profile push updates",
+	"okta.apps.clientCredentials.read": "Allows the admin to view information about client credentials for the app",
+	"okta.apps.manage":                 "Allows the admin to fully manage apps and their members in your Okta org",
+	"okta.apps.manageFirstPartyApps":   "Allows the admin to manage first-party apps",
+	"okta.apps.read":                   "Allows the admin to only read information about apps and their members in your Okta org",
+	"okta.apps.universalLogout.manage": "Allows the admin to manage universal logout settings for apps",
+	"okta.apps.universalLogout.read":   "Allows the admin to view universal logout settings for apps",
 
 	// Authorization Server permissions
-	"okta.authorizationServers.read":   "Read authorization server information",
-	"okta.authorizationServers.manage": "Manage authorization servers",
+	"okta.authzServers.manage": "Allows the admin to manage authorization servers",
+	"okta.authzServers.read":   "Allows the admin to read authorization servers",
 
-	// Client permissions
-	"okta.clients.read":     "Read OAuth client information",
-	"okta.clients.manage":   "Manage OAuth clients",
-	"okta.clients.register": "Register new OAuth clients",
-
-	// Event permissions
-	"okta.eventHooks.read":   "Read event hook configurations",
-	"okta.eventHooks.manage": "Manage event hooks",
-	"okta.events.read":       "Read system log events",
-
-	// Factor permissions
-	"okta.factors.read":   "Read information about factors",
-	"okta.factors.manage": "Manage factor configurations",
-
-	// Identity Provider permissions
-	"okta.idps.read":   "Read identity provider information",
-	"okta.idps.manage": "Manage identity providers",
-
-	// Inline Hook permissions
-	"okta.inlineHooks.read":   "Read inline hook configurations",
-	"okta.inlineHooks.manage": "Manage inline hooks",
-
-	// Linked Object permissions
-	"okta.linkedObjects.read":   "Read linked object definitions",
-	"okta.linkedObjects.manage": "Manage linked objects",
-
-	// Log Stream permissions
-	"okta.logStreams.read":   "Read log stream configurations",
-	"okta.logStreams.manage": "Manage log streams",
-
-	// Policy permissions
-	"okta.policies.read":   "Read policy configurations",
-	"okta.policies.manage": "Manage policies",
-
-	// Profile Mapping permissions
-	"okta.profileMappings.read":   "Read profile mapping configurations",
-	"okta.profileMappings.manage": "Manage profile mappings",
-
-	// Role permissions
-	"okta.roles.read":   "Read role assignments",
-	"okta.roles.manage": "Manage role assignments",
-
-	// Schema permissions
-	"okta.schemas.read":   "Read schema definitions",
-	"okta.schemas.manage": "Manage schemas",
-
-	// Session permissions
-	"okta.sessions.read":   "Read session information",
-	"okta.sessions.manage": "Manage user sessions",
-
-	// Trusted Origin permissions
-	"okta.trustedOrigins.read":   "Read trusted origin configurations",
-	"okta.trustedOrigins.manage": "Manage trusted origins",
-
-	// Template permissions
-	"okta.templates.read":   "Read email and SMS templates",
-	"okta.templates.manage": "Manage email and SMS templates",
+	// Customization permissions
+	"okta.customizations.manage": "Allows the admin to manage customizations",
+	"okta.customizations.read":   "Allows the admin to read customizations",
 
 	// Device permissions
-	"okta.devices.read":   "Read device information",
-	"okta.devices.manage": "Manage devices",
+	"okta.devices.lifecycle.activate":   "Allows the admin to activate devices",
+	"okta.devices.lifecycle.deactivate": "Allows the admin to deactivate devices. When you deactivate a device, it loses all device user links",
+	"okta.devices.lifecycle.delete":     "Allows the admin to permanently delete devices",
+	"okta.devices.lifecycle.manage":     "Allows the admin to perform any device lifecycle operations",
+	"okta.devices.lifecycle.suspend":    "Allows the admin to suspend device access to Okta",
+	"okta.devices.lifecycle.unsuspend":  "Allows the admin to unsuspend and restore device access to Okta",
+	"okta.devices.manage":               "Allows the admin to manage devices and perform all device lifecycle operations",
+	"okta.devices.read":                 "Allows the admin to read device details",
 
-	// Domain permissions
-	"okta.domains.read":   "Read domain configurations",
-	"okta.domains.manage": "Manage domains",
+	// Directory permissions
+	"okta.directories.manage": "Allows the admin to manage all directory integration settings of an app instance",
+	"okta.directories.read":   "Allows the admin to view the directory integration settings of an app instance",
 
-	// Network Zone permissions
-	"okta.networkZones.read":   "Read network zone configurations",
-	"okta.networkZones.manage": "Manage network zones",
+	// Governance permissions
+	"okta.governance.accessCertifications.manage": "Allows the admin to view and manage access certification campaigns",
+	"okta.governance.accessRequests.manage":       "Allows the admin to view and manage access requests",
 
-	// Org permissions
-	"okta.orgs.read":   "Read organization information",
-	"okta.orgs.manage": "Manage organization settings",
+	// Group permissions
+	"okta.groups.appAssignment.manage": "Allows the admin to manage a group's app assignment (also need okta.apps.assignment.manage to assign to a specific app)",
+	"okta.groups.create":               "Allows the admin to create groups",
+	"okta.groups.manage":               "Allows the admin to fully manage groups in your Okta org",
+	"okta.groups.members.manage":       "Allows the admin to only manage member operations in a group in your Okta org",
+	"okta.groups.read":                 "Allows the admin to only read information about groups and their members in your Okta org",
 
-	// Rate Limit permissions
-	"okta.rateLimitSettings.read":   "Read rate limit settings",
-	"okta.rateLimitSettings.manage": "Manage rate limit settings",
+	// IAM permissions
+	"okta.iam.read": "Allows the admin to view roles, resources, and admin assignments",
 
-	// Subscription permissions
-	"okta.subscriptions.read":   "Read subscription information",
-	"okta.subscriptions.manage": "Manage subscriptions",
+	// Identity Provider permissions
+	"okta.identityProviders.manage": "Allows the admin to manage Identity Providers",
+	"okta.identityProviders.read":   "Allows the admin to read Identity Providers",
 
-	// Threat Insight permissions
-	"okta.threatInsights.read":   "Read threat insight data",
-	"okta.threatInsights.manage": "Manage threat insight settings",
+	// Policy permissions
+	"okta.policies.manage": "Allows the admin to manage policies",
+	"okta.policies.read":   "Allows the admin to view any policy",
 
-	// API Token permissions
-	"okta.apiTokens.read":   "Read API token information",
-	"okta.apiTokens.manage": "Manage API tokens",
+	// Profile Source permissions
+	"okta.profilesources.import.run": "Allows the admin to run imports for apps with a profile source, such as HRaaS and AD/LDAP apps. Admins with this permission can create users through the import",
 
-	// Standard OAuth/OIDC scopes
-	"openid":         "OpenID Connect authentication",
-	"profile":        "Access to user's profile information",
-	"email":          "Access to user's email address",
-	"address":        "Access to user's address information",
-	"phone":          "Access to user's phone number",
-	"offline_access": "Request refresh tokens for offline access",
+	// Realm permissions
+	"okta.realms.manage": "Allows the admin to view, create, and manage realms",
+	"okta.realms.read":   "Allows the admin to view realms",
+
+	// Shared Signals Framework permissions
+	"okta.ssf.securityEventsProviders.manage": "Allows the admin to manage shared signals framework receivers",
+	"okta.ssf.securityEventsProviders.read":   "Allows the admin to view shared signals framework receivers",
+
+	// Support permissions
+	"okta.support.cases.manage": "Allows the admin to view, create, and manage Okta Support cases",
+
+	// User API Token permissions
+	"okta.users.apitokens.clear":  "Allows the admin to clear user API tokens",
+	"okta.users.apitokens.manage": "Allows the admin to manage API tokens",
+	"okta.users.apitokens.read":   "Allows the admin to view API tokens",
+
+	// User App Assignment permissions
+	"okta.users.appAssignment.manage": "Allows the admin to manage a user's app assignment (also need okta.apps.assignment.manage to assign to a specific app)",
+
+	// User Create permissions
+	"okta.users.create": "Allows the admin to create users. If the admin is also scoped to manage a group, that admin can add the user to the group on creation and then manage",
+
+	// User Credentials permissions
+	"okta.users.credentials.expirePassword":            "Allows the admin to expire a user's password and set a new temporary password",
+	"okta.users.credentials.manage":                    "Allows the admin to manage only credential lifecycle operations for a user",
+	"okta.users.credentials.manageTemporaryAccessCode": "Allows admin to view, create and delete a user's temporary access code",
+	"okta.users.credentials.resetFactors":              "Allows the admin to reset MFA authenticators for users",
+	"okta.users.credentials.resetPassword":             "Allows the admin to reset passwords for users",
+
+	// User Group Membership permissions
+	"okta.users.groupMembership.manage": "Allows the admin to manage a user's group membership (also need okta.groups.members.manage to assign to a specific group)",
+
+	// User Lifecycle permissions
+	"okta.users.lifecycle.activate":      "Allows the admin to activate user accounts",
+	"okta.users.lifecycle.clearSessions": "Allows the admin to clear all active Okta sessions and OAuth 2.0 tokens for a user",
+	"okta.users.lifecycle.deactivate":    "Allows the admin to deactivate user accounts",
+	"okta.users.lifecycle.delete":        "Allows the admin to permanently delete user accounts",
+	"okta.users.lifecycle.manage":        "Allows the admin to perform any user lifecycle operations",
+	"okta.users.lifecycle.suspend":       "Allows the admin to suspend user access to Okta. When a user is suspended, their user sessions are also cleared",
+	"okta.users.lifecycle.unlock":        "Allows the admin to unlock users who have been locked out of Okta",
+	"okta.users.lifecycle.unsuspend":     "Allows the admin to restore user access to Okta",
+
+	// User Management permissions
+	"okta.users.manage": "Allows the admin to create and manage users and read all profile and credential information for users. Delegated admins with this permission can only manage user credential fields and not the credential values themselves",
+	"okta.users.read":   "Allows the admin to read any user's profile and credential information. Delegated admins with this permission can only manage user credential fields and not the credential values themselves",
+
+	// User Risk permissions
+	"okta.users.risk.manage": "Allows the admin to provide user risk feedback and elevate user risk",
+	"okta.users.risk.read":   "Allows the admin to view user risk",
+
+	// User Profile permissions
+	"okta.users.userprofile.manage": "Allows the admin to only perform operations on the user object, including hidden and sensitive attributes",
+	"okta.users.userprofile.read":   "Allows the admin to view profile of a user",
+
+	// Workflow permissions
+	"okta.workflows.invoke": "Allows the admin to view and run delegated flows",
+	"okta.workflows.read":   "Allows the admin to view delegated flows",
 }
 
 func (p *oktaProvider) LoadPermissions() error {
