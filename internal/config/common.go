@@ -83,21 +83,44 @@ func loadDataFromSource[
 			"path": path,
 		}).Debugln("Loading definitions from file path")
 
+		info, err := os.Stat(path)
+
+		if os.IsNotExist(err) {
+
+			logrus.WithFields(logrus.Fields{
+				"path": path,
+			}).Errorln("File or directory does not exist")
+
+			// Return empty slice if path does not exist
+			return []*T{}, nil
+		}
+
 		// Check if path is a directory
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
+		if info.Mode().IsDir() {
+
 			// Load all YAML and JSON files from directory
 			return loadFromDirectory(path, definition)
+
+		} else if info.Mode().IsRegular() {
+
+			// Convert to single array item
+			item, err := readFile(path, definition)
+
+			if err != nil {
+				logrus.WithError(err).Errorln("Failed to read file")
+				return nil, fmt.Errorf("failed to read file %s: %w", path, err)
+			}
+
+			return []*T{item}, nil
+
+		} else {
+
+			logrus.WithFields(logrus.Fields{
+				"path": path,
+			}).Errorln("Path is neither a file nor a directory")
+
+			return []*T{}, nil
 		}
-
-		// Convert to single array item
-		item, err := readFile(path, definition)
-
-		if err != nil {
-			logrus.WithError(err).Errorln("Failed to read file")
-			return nil, fmt.Errorf("failed to read file %s: %w", path, err)
-		}
-
-		return []*T{item}, nil
 
 	}
 
