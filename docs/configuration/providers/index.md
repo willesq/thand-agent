@@ -78,6 +78,7 @@ Provides user and group discovery capabilities. Providers with this capability c
 | [OAuth2](oauth2/) | Authorizor | Generic OAuth2 authentication for any compliant service |
 | [Google OAuth2](oauth2.google/) | Authorizor | Google account authentication with OAuth2 |
 | [Thand](thand/) | Authorizor | Thand federated OIDC authentication service |
+| [Okta](okta/) | RBAC, Identities | Okta identity management and administrator role control |
 
 ### Business Applications
 

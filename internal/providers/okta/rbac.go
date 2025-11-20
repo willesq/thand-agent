@@ -179,7 +179,7 @@ func (p *oktaProvider) AuthorizeRole(
 
 	}
 
-	if len(assignedRoles) == 0 && len(assignedGroups) == 0 && len(role.Permissions.Allow) == 0 {
+	if len(assignedRoles) == 0 && len(assignedGroups) == 0 {
 		return nil, fmt.Errorf("role %s has no inherits, groups, or permissions defined", role.Name)
 	}
 
