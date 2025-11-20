@@ -35,6 +35,9 @@ func (a *approvalsNotifier) createApprovalSlackBlocks() []slack.Block {
 	// Add inherited roles section
 	a.addInheritedRolesSection(&blocks, elevateRequest)
 
+	// Add groups section
+	a.addGroupsSection(&blocks, elevateRequest)
+
 	// Add permissions section
 	a.addPermissionsSection(&blocks, elevateRequest)
 
@@ -75,22 +78,22 @@ func (a *approvalsNotifier) addRequestDetailsSection(blocks *[]slack.Block, elev
 	requestDetailsText.WriteString("*Access Request Details:*\n")
 
 	if elevateRequest.Role != nil {
-		requestDetailsText.WriteString(fmt.Sprintf("• *Role:* %s\n", elevateRequest.Role.Name))
+		requestDetailsText.WriteString(fmt.Sprintf("- *Role:* %s\n", elevateRequest.Role.Name))
 		if len(elevateRequest.Role.Description) > 0 {
-			requestDetailsText.WriteString(fmt.Sprintf("• *Description:* %s\n", elevateRequest.Role.Description))
+			requestDetailsText.WriteString(fmt.Sprintf("- *Description:* %s\n", elevateRequest.Role.Description))
 		}
 	}
 
 	if len(elevateRequest.Providers) > 0 {
-		requestDetailsText.WriteString(fmt.Sprintf("• *Providers:* %s\n", strings.Join(elevateRequest.Providers, ", ")))
+		requestDetailsText.WriteString(fmt.Sprintf("- *Providers:* %s\n", strings.Join(elevateRequest.Providers, ", ")))
 	}
 
 	if len(elevateRequest.Reason) > 0 {
-		requestDetailsText.WriteString(fmt.Sprintf("• *Reason:* %s\n", elevateRequest.Reason))
+		requestDetailsText.WriteString(fmt.Sprintf("- *Reason:* %s\n", elevateRequest.Reason))
 	}
 
 	if len(elevateRequest.Duration) > 0 {
-		requestDetailsText.WriteString(fmt.Sprintf("• *Duration:* %s\n", elevateRequest.Duration))
+		requestDetailsText.WriteString(fmt.Sprintf("- *Duration:* %s\n", elevateRequest.Duration))
 	}
 
 	*blocks = append(*blocks, slack.NewSectionBlock(
@@ -112,13 +115,46 @@ func (a *approvalsNotifier) addInheritedRolesSection(blocks *[]slack.Block, elev
 		inheritsText.WriteString("*Inherited Roles:*\n")
 
 		for _, inheritedRole := range elevateRequest.Role.Inherits {
-			inheritsText.WriteString(fmt.Sprintf("• %s\n", inheritedRole))
+			inheritsText.WriteString(fmt.Sprintf("- %s\n", inheritedRole))
 		}
 
 		*blocks = append(*blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
 				inheritsText.String(),
+				false,
+				false,
+			),
+			nil,
+			nil,
+		))
+	}
+}
+
+// addGroupsSection adds groups section if available
+func (a *approvalsNotifier) addGroupsSection(blocks *[]slack.Block, elevateRequest *models.ElevateRequestInternal) {
+	if elevateRequest.Role != nil && (len(elevateRequest.Role.Groups.Allow) > 0 || len(elevateRequest.Role.Groups.Deny) > 0) {
+		var groupsText strings.Builder
+		groupsText.WriteString("*Groups:*\n")
+
+		if len(elevateRequest.Role.Groups.Allow) > 0 {
+			groupsText.WriteString("*Allowed:*\n")
+			for _, group := range elevateRequest.Role.Groups.Allow {
+				groupsText.WriteString(fmt.Sprintf("- %s\n", group))
+			}
+		}
+
+		if len(elevateRequest.Role.Groups.Deny) > 0 {
+			groupsText.WriteString("*Denied:*\n")
+			for _, group := range elevateRequest.Role.Groups.Deny {
+				groupsText.WriteString(fmt.Sprintf("- %s\n", group))
+			}
+		}
+
+		*blocks = append(*blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject(
+				slack.MarkdownType,
+				groupsText.String(),
 				false,
 				false,
 			),
@@ -224,7 +260,7 @@ func (a *approvalsNotifier) addIdentitiesSection(blocks *[]slack.Block, elevateR
 		identitiesText.WriteString("*Target Identities:*\n")
 
 		for _, identity := range elevateRequest.Identities {
-			identitiesText.WriteString(fmt.Sprintf("• %s\n", identity))
+			identitiesText.WriteString(fmt.Sprintf("- %s\n", identity))
 		}
 
 		*blocks = append(*blocks, slack.NewSectionBlock(

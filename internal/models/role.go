@@ -8,13 +8,14 @@ import (
 type Role struct {
 	Name           string      `json:"name"`
 	Description    string      `json:"description"`
-	Authenticators []string    `json:"authenticators"`      // All the auth providers that the role can use. If empty then any provider can be used
-	Workflows      []string    `json:"workflows,omitempty"` // The workflows to execute
-	Inherits       []string    `json:"inherits,omitempty"`
-	Permissions    Permissions `json:"permissions,omitempty"`
-	Resources      Resources   `json:"resources,omitempty"`
-	Scopes         *RoleScopes `json:"scopes,omitempty"`
-	Providers      []string    `json:"providers"`
+	Authenticators []string    `json:"authenticators"`         // All the auth providers that the role can use. If empty then any provider can be used
+	Workflows      []string    `json:"workflows,omitempty"`    // The workflows to execute
+	Inherits       []string    `json:"inherits,omitempty"`     // roles to inherit from or provider specific roles/policies etc
+	Groups         Groups      `json:"groups,omitempty"`       // groups to add the user to
+	Permissions    Permissions `json:"permissions,omitempty"`  // granular permissions for the role
+	Resources      Resources   `json:"resources,omitempty"`    // resource access rules, apis, files, systems etc
+	Scopes         *RoleScopes `json:"scopes,omitempty"`       // scope of who can be assigned this role
+	Providers      []string    `json:"providers"`              // providers that can assign this role
 	Enabled        bool        `json:"enabled" default:"true"` // By default enable the role
 }
 
@@ -55,14 +56,24 @@ func (r *Role) GetDescription() string {
 	return r.Description
 }
 
+// Groups defines group-based access controls with allow and deny lists.
+type Groups struct {
+	Allow []string `json:"allow,omitempty"`
+	Deny  []string `json:"deny,omitempty"`
+}
+
+// Permissions defines permission-based access controls with allow and deny lists.
 type Permissions struct {
 	Allow []string `json:"allow,omitempty"`
 	Deny  []string `json:"deny,omitempty"`
 }
 
+// RoleScopes defines the scope of a role in terms of users and groups (identities).
+// Only the specified users and groups can be assigned this role.
 type RoleScopes struct {
-	Groups []string `json:"groups,omitempty"`
-	Users  []string `json:"users,omitempty"`
+	Groups  []string `json:"groups,omitempty"`
+	Users   []string `json:"users,omitempty"`
+	Domains []string `json:"domains,omitempty"`
 }
 
 // RolesResponse represents the response for /roles endpoint

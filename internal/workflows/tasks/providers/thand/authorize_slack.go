@@ -69,18 +69,18 @@ func (a *authorizerNotifier) addAuthorizeRequestDetailsSection(blocks *[]slack.B
 	requestDetailsText.WriteString("*Approved Request Details:*\n")
 
 	if elevateRequest.Role != nil {
-		requestDetailsText.WriteString(fmt.Sprintf("• *Role:* %s\n", elevateRequest.Role.Name))
+		requestDetailsText.WriteString(fmt.Sprintf("- *Role:* %s\n", elevateRequest.Role.Name))
 		if len(elevateRequest.Role.Description) > 0 {
-			requestDetailsText.WriteString(fmt.Sprintf("• *Description:* %s\n", elevateRequest.Role.Description))
+			requestDetailsText.WriteString(fmt.Sprintf("- *Description:* %s\n", elevateRequest.Role.Description))
 		}
 	}
 
 	if len(elevateRequest.Providers) > 0 {
-		requestDetailsText.WriteString(fmt.Sprintf("• *Providers:* %s\n", strings.Join(elevateRequest.Providers, ", ")))
+		requestDetailsText.WriteString(fmt.Sprintf("- *Providers:* %s\n", strings.Join(elevateRequest.Providers, ", ")))
 	}
 
 	if len(elevateRequest.Duration) > 0 {
-		requestDetailsText.WriteString(fmt.Sprintf("• *Duration:* %s\n", elevateRequest.Duration))
+		requestDetailsText.WriteString(fmt.Sprintf("- *Duration:* %s\n", elevateRequest.Duration))
 	}
 
 	*blocks = append(*blocks, slack.NewSectionBlock(

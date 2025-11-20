@@ -1,91 +1,90 @@
 {{template "header" .}}
     <main>
         <div class="container">
-            <div class="hero">
+            <div class="page-header">
                 <h1>Authentication Complete</h1>
+            </div>
                 
-                <!-- Loading State -->
-                <div class="auth-result-card" id="loading-state">
-                    <div class="session-status">
-                        <div class="status-indicator">
-                            <div class="status-dot connecting" id="status-dot"></div>
-                            <span id="status-text">Registering your session...</span>
-                        </div>
-                        <div class="status-details">
-                            Creating secure session with local agent
-                        </div>
+            <!-- Loading State -->
+            <div class="auth-result-card" id="loading-state">
+                <div class="session-status">
+                    <div class="status-indicator">
+                        <div class="status-dot connecting" id="status-dot"></div>
+                        <span id="status-text">Registering your session...</span>
+                    </div>
+                    <div class="status-details">
+                        Creating secure session with local agent
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success State -->
+                            <!-- Success State -->
+            <div class="auth-result-card" id="success-state" style="display: none;">
+                <div class="session-status">
+                    <div class="status-indicator">
+                        <div class="status-dot success"></div>
+                        <span>Session registered successfully!</span>
+                    </div>
+                    <div class="status-details">
+                        Your authentication session is now active and ready to use.
                     </div>
                 </div>
 
-                <!-- Success State -->
-                                <!-- Success State -->
-                <div class="auth-result-card" id="success-state" style="display: none;">
-                    <div class="session-status">
-                        <div class="status-indicator">
-                            <div class="status-dot success"></div>
-                            <span>Session registered successfully!</span>
-                        </div>
-                        <div class="status-details">
-                            Your authentication session is now active and ready to use.
-                        </div>
+                <div class="success-content">
+                    <h3>What's Next?</h3>
+                    <p>Your session is ready. You can now return to your application or test an elevation request.</p>
+                    
+                    <div class="action-buttons">
+                        <button class="button button-primary" onclick="makeElevationRequest()">
+                            Test Elevation Request
+                        </button>
+                        <button class="button button-secondary" onclick="window.close()">
+                            Close Window
+                        </button>
                     </div>
+                </div>
+            </div>
 
-                    <div class="success-content">
-                        <h3>What's Next?</h3>
-                        <p>Your session is ready. You can now return to your application or test an elevation request.</p>
-                        
-                        <div class="action-buttons">
-                            <button class="button button-primary" onclick="makeElevationRequest()">
-                                Test Elevation Request
-                            </button>
-                            <button class="button button-secondary" onclick="window.close()">
-                                Close Window
-                            </button>
-                        </div>
+            <!-- Error State -->
+            <div class="auth-result-card" id="error-state" style="display: none;">
+                <div class="session-status">
+                    <div class="status-indicator">
+                        <div class="status-dot error"></div>
+                        <span>Unable to register session automatically</span>
+                    </div>
+                    <div class="status-details">
+                        Please use the command below to manually register your session.
                     </div>
                 </div>
 
-                <!-- Error State -->
-                <div class="auth-result-card" id="error-state" style="display: none;">
-                    <div class="session-status">
-                        <div class="status-indicator">
-                            <div class="status-dot error"></div>
-                            <span>Unable to register session automatically</span>
-                        </div>
-                        <div class="status-details">
-                            Please use the command below to manually register your session.
-                        </div>
-                    </div>
-
-                    <div class="auth-code-section">
-                        <h3>Authorization Code</h3>
-                        <div class="code-display" id="auth-code">
-                            <span id="code-value">{{.Auth.Code}}</span>
-                            <button class="copy-button" id="copy-button" onclick="copyCode()">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                                Copy
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="manual-instructions">
-                        <h4>Manual Session Registration</h4>
-                        <p>Run this command in your terminal to complete the authentication:</p>
-                        <div class="code-block">
-                            <code id="manual-command">agent session register --code={{.Auth.Code}}</code>
-                            <button class="copy-button" onclick="copyManualCommand()">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            </button>
-                        </div>
+                <div class="auth-code-section">
+                    <h3>Authorization Code</h3>
+                    <div class="code-display" id="auth-code">
+                        <span id="code-value">{{.Auth.Code}}</span>
+                        <button class="copy-button" id="copy-button" onclick="copyCode()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy
+                        </button>
                     </div>
                 </div>
 
+                <div class="manual-instructions">
+                    <h4>Manual Session Registration</h4>
+                    <p>Run this command in your terminal to complete the authentication:</p>
+                    <div class="code-block">
+                        <code id="manual-command">agent session register --code={{.Auth.Code}}</code>
+                        <button class="copy-button" onclick="copyManualCommand()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </main>

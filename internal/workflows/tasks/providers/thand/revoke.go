@@ -106,13 +106,23 @@ func (t *thandTask) executeRevocationTask(
 			// Try to hydrate the authorization response for this identity
 			req := workflowTask.GetContextAsMap()
 			if req != nil {
-				if authorizationsMap, ok := req["authorizations"].(map[string]any); ok {
-					if identityMap, ok := authorizationsMap[identity].(map[string]any); ok {
-						authorizeResponse = &models.AuthorizeRoleResponse{}
+
+				authorizationsMap, ok := req["authorizations"]
+
+				if !ok {
+					logrus.WithField("identity", identity).Debug("No authorizations found in context for revocation")
+					continue
+				}
+
+				if objectMap, ok := authorizationsMap.(map[string]any); ok {
+					if identityMap, ok := objectMap[identity].(map[string]any); ok {
 						if err := common.ConvertMapToInterface(identityMap, authorizeResponse); err != nil {
 							logrus.WithError(err).WithField("identity", identity).Warn("Failed to convert authorize response")
-							authorizeResponse = nil
 						}
+					}
+				} else if authzMap, ok := authorizationsMap.(map[string]*models.AuthorizeRoleResponse); ok {
+					if authResp, ok := authzMap[identity]; ok {
+						authorizeResponse = authResp
 					}
 				}
 			}

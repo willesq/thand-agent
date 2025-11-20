@@ -185,8 +185,12 @@ func validateRole(provider ProviderImpl, _ *Identity, role *Role) error {
 func validateRoleNotEmpty(role *Role) error {
 	if len(role.Permissions.Allow) == 0 &&
 		len(role.Permissions.Deny) == 0 &&
+		len(role.Resources.Allow) == 0 &&
+		len(role.Resources.Deny) == 0 &&
+		len(role.Groups.Allow) == 0 &&
+		len(role.Groups.Deny) == 0 &&
 		len(role.Inherits) == 0 {
-		return fmt.Errorf("role %s has no permissions or inherits from no roles", role.Name)
+		return fmt.Errorf("role %s has no permissions, inherits, groups or resources", role.Name)
 	}
 	return nil
 }

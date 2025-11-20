@@ -2,8 +2,10 @@ package daemon
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -41,10 +43,12 @@ func (s *Server) getIdentities(c *gin.Context) {
 
 	// Get filter parameter from query string
 	filter := c.Query("q")
+	identityType := strings.ToLower(c.Query("t"))
 
 	identityProvidersCount := s.Config.GetProvidersByCapabilityWithUser(
 		foundUser.User, models.ProviderCapabilityIdentities)
-	identities, err := s.Config.GetIdentitiesWithFilter(foundUser.User, filter)
+	identities, err := s.Config.GetIdentitiesWithFilter(foundUser.User, config.IdentityType(identityType), filter)
+
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to get identities", err)
 		return
