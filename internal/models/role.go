@@ -1,6 +1,9 @@
 package models
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 )
@@ -97,4 +100,66 @@ type Resources struct {
 type RoleDefinitions struct {
 	Version string          `yaml:"version" json:"version"`
 	Roles   map[string]Role `yaml:"roles" json:"roles"`
+}
+
+// UnmarshalJSON converts Version to string from any type
+func (h *RoleDefinitions) UnmarshalJSON(data []byte) error {
+	type Alias RoleDefinitions
+	aux := &struct {
+		Version any `json:"version"`
+		*Alias
+	}{
+		Alias: (*Alias)(h),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	switch v := aux.Version.(type) {
+	case string:
+		h.Version = v
+	case float64:
+		h.Version = fmt.Sprintf("%.0f", v)
+	case int, int64:
+		h.Version = fmt.Sprintf("%d", v)
+	default:
+		if v != nil {
+			h.Version = fmt.Sprintf("%v", v)
+		}
+	}
+
+	return nil
+}
+
+// UnmarshalYAML converts Version to string from any type
+func (h *RoleDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
+	type Alias RoleDefinitions
+	aux := &struct {
+		Version any `yaml:"version"`
+		*Alias
+	}{
+		Alias: (*Alias)(h),
+	}
+
+	if err := unmarshal(&aux); err != nil {
+		return err
+	}
+
+	switch v := aux.Version.(type) {
+	case string:
+		h.Version = v
+	case int:
+		h.Version = fmt.Sprintf("%d", v)
+	case int64:
+		h.Version = fmt.Sprintf("%d", v)
+	case float64:
+		h.Version = fmt.Sprintf("%.0f", v)
+	default:
+		if v != nil {
+			h.Version = fmt.Sprintf("%v", v)
+		}
+	}
+
+	return nil
 }

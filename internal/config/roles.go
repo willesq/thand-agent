@@ -14,39 +14,44 @@ import (
 // LoadRoles loads roles from a file or URL
 func (c *Config) LoadRoles() (map[string]models.Role, error) {
 
-	vaultData := ""
-
-	if len(c.Roles.Vault) > 0 {
-
-		if !c.HasVault() {
-			return nil, fmt.Errorf("vault configuration is missing. Cannot load roles from vault")
-		}
-
-		logrus.Debugln("Loading roles from vault: ", c.Roles.Vault)
-
-		// Load roles from Vault
-		data, err := c.GetVault().GetSecret(c.Roles.Vault)
-
-		if err != nil {
-			logrus.WithError(err).Errorln("Error loading roles from vault")
-			return nil, fmt.Errorf("failed to get secret from vault: %w", err)
-		}
-
-		logrus.Debugln("Loaded roles from vault: ", len(data), " bytes")
-
-		vaultData = string(data)
-	}
-
-	foundRoles, err := loadDataFromSource(
-		c.Roles.Path,
-		c.Roles.URL,
-		vaultData,
-		models.RoleDefinitions{},
-	)
+	vaultData, err := c.loadRolesVaultData()
 
 	if err != nil {
-		logrus.WithError(err).Errorln("Failed to load roles data")
-		return nil, fmt.Errorf("failed to load roles data: %w", err)
+		return nil, err
+	}
+
+	foundRoles := []*models.RoleDefinitions{}
+
+	if len(vaultData) > 0 || len(c.Roles.Path) > 0 || c.Roles.URL != nil {
+
+		importedRoles, err := loadDataFromSource(
+			c.Roles.Path,
+			c.Roles.URL,
+			vaultData,
+			models.RoleDefinitions{},
+		)
+
+		if err != nil {
+			logrus.WithError(err).Errorln("Failed to load roles data")
+			return nil, fmt.Errorf("failed to load roles data: %w", err)
+		}
+
+		foundRoles = importedRoles
+
+	}
+
+	if len(c.Roles.Definitions) > 0 {
+		// Add roles defined directly in config
+		logrus.Debugln("Adding roles defined directly in config: ", len(c.Roles.Definitions))
+
+		for roleKey, role := range c.Roles.Definitions {
+			foundRoles = append(foundRoles, &models.RoleDefinitions{
+				Version: "1.0",
+				Roles: map[string]models.Role{
+					roleKey: role,
+				},
+			})
+		}
 	}
 
 	if len(foundRoles) == 0 {
@@ -84,6 +89,32 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 	}
 
 	return defs, nil
+}
+
+func (c *Config) loadRolesVaultData() (string, error) {
+
+	if len(c.Roles.Vault) == 0 {
+		return "", nil
+	}
+
+	if !c.HasVault() {
+		return "", fmt.Errorf("vault configuration is missing. Cannot load roles from vault")
+	}
+
+	logrus.Debugln("Loading roles from vault: ", c.Roles.Vault)
+
+	// Load roles from Vault
+	data, err := c.GetVault().GetSecret(c.Roles.Vault)
+
+	if err != nil {
+		logrus.WithError(err).Errorln("Error loading roles from vault")
+		return "", fmt.Errorf("failed to get secret from vault: %w", err)
+	}
+
+	logrus.Debugln("Loaded roles from vault: ", len(data), " bytes")
+
+	return string(data), nil
+
 }
 
 func (c *Config) GetRoleByName(name string) (*models.Role, error) {

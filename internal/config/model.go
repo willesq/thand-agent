@@ -279,10 +279,6 @@ type RoleConfig struct {
 	Definitions map[string]models.Role `mapstructure:",remain"`
 }
 
-func (r *RoleConfig) IsExternal() bool {
-	return (len(r.Path) > 0 || r.URL != nil || len(r.Vault) > 0)
-}
-
 func (r *RoleConfig) GetRoleByName(name string) (*models.Role, error) {
 	if role, exists := r.Definitions[name]; exists {
 		return &role, nil
@@ -300,10 +296,6 @@ type WorkflowConfig struct {
 
 	// Store everything in memory
 	Definitions map[string]models.Workflow `mapstructure:",remain"`
-}
-
-func (r *WorkflowConfig) IsExternal() bool {
-	return (len(r.Path) > 0 || r.URL != nil || len(r.Vault) > 0)
 }
 
 func (p *WorkflowConfig) GetWorkflowByName(name string) (*models.Workflow, error) {
@@ -338,10 +330,6 @@ type ProviderConfig struct {
 
 	// Load providers directly from config using mapstructure:",remain"
 	Definitions map[string]models.Provider `mapstructure:",remain"`
-}
-
-func (r *ProviderConfig) IsExternal() bool {
-	return (len(r.Path) > 0 || r.URL != nil || len(r.Vault) > 0)
 }
 
 func (p *ProviderConfig) GetProviderByName(name string) (*models.Provider, error) {

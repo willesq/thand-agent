@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -211,4 +212,66 @@ func (p *BaseProvider) Initialize(provider Provider) error {
 type ProviderDefinitions struct {
 	Version   string              `yaml:"version" json:"version"`
 	Providers map[string]Provider `yaml:"providers" json:"providers"`
+}
+
+// UnmarshalJSON converts Version to string from any type
+func (h *ProviderDefinitions) UnmarshalJSON(data []byte) error {
+	type Alias ProviderDefinitions
+	aux := &struct {
+		Version any `json:"version"`
+		*Alias
+	}{
+		Alias: (*Alias)(h),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	switch v := aux.Version.(type) {
+	case string:
+		h.Version = v
+	case float64:
+		h.Version = fmt.Sprintf("%.0f", v)
+	case int, int64:
+		h.Version = fmt.Sprintf("%d", v)
+	default:
+		if v != nil {
+			h.Version = fmt.Sprintf("%v", v)
+		}
+	}
+
+	return nil
+}
+
+// UnmarshalYAML converts Version to string from any type
+func (h *ProviderDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
+	type Alias ProviderDefinitions
+	aux := &struct {
+		Version any `yaml:"version"`
+		*Alias
+	}{
+		Alias: (*Alias)(h),
+	}
+
+	if err := unmarshal(&aux); err != nil {
+		return err
+	}
+
+	switch v := aux.Version.(type) {
+	case string:
+		h.Version = v
+	case int:
+		h.Version = fmt.Sprintf("%d", v)
+	case int64:
+		h.Version = fmt.Sprintf("%d", v)
+	case float64:
+		h.Version = fmt.Sprintf("%.0f", v)
+	default:
+		if v != nil {
+			h.Version = fmt.Sprintf("%v", v)
+		}
+	}
+
+	return nil
 }

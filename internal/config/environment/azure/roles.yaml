@@ -12,7 +12,7 @@ roles:
       allow:
         - "*/read"
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Contributor Access
@@ -30,12 +30,8 @@ roles:
         - "Microsoft.Authorization/*/Delete"
         - "Microsoft.Authorization/*/Write"
         - "Microsoft.Authorization/elevateAccess/Action"
-    scopes:
-      groups:
-        - oidc:admins
-        - oidc:devops
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Owner Access
@@ -49,11 +45,8 @@ roles:
     permissions:
       allow:
         - "*"
-    scopes:
-      groups:
-        - oidc:admins
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Key Vault Secrets Officer
@@ -70,12 +63,8 @@ roles:
         - "Microsoft.KeyVault/vaults/secrets/*"
         - "Microsoft.KeyVault/vaults/keys/read"
         - "Microsoft.KeyVault/vaults/*/read"
-    scopes:
-      groups:
-        - oidc:security
-        - oidc:devops
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Database Administrator
@@ -95,12 +84,8 @@ roles:
         - "Microsoft.Cache/*"
         - "Microsoft.DBforMySQL/*"
         - "Microsoft.DBforPostgreSQL/*"
-    scopes:
-      groups:
-        - oidc:database-admins
-        - oidc:devops
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Storage Administrator
@@ -116,12 +101,8 @@ roles:
       allow:
         - "Microsoft.Storage/*"
         - "Microsoft.StorageCache/*"
-    scopes:
-      groups:
-        - oidc:storage-admins
-        - oidc:devops
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Network Administrator
@@ -137,12 +118,8 @@ roles:
         - "Microsoft.Network/*"
         - "Microsoft.ClassicNetwork/*"
         - "Microsoft.Cdn/*"
-    scopes:
-      groups:
-        - oidc:network-admins
-        - oidc:devops
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Security Administrator
@@ -160,12 +137,8 @@ roles:
         - "Microsoft.Authorization/policyAssignments/*"
         - "Microsoft.Authorization/policyDefinitions/*"
         - "Microsoft.Authorization/policySetDefinitions/*"
-    scopes:
-      groups:
-        - oidc:security
-        - oidc:compliance
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Compute Administrator
@@ -183,12 +156,8 @@ roles:
         - "Microsoft.ContainerInstance/*"
         - "Microsoft.ContainerRegistry/*"
         - "Microsoft.ContainerService/*"
-    scopes:
-      groups:
-        - oidc:compute-admins
-        - oidc:devops
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Developer Access
@@ -211,12 +180,8 @@ roles:
         - "Microsoft.Authorization/*"
         - "Microsoft.Compute/virtualMachines/delete"
         - "Microsoft.Sql/servers/delete"
-    scopes:
-      groups:
-        - oidc:developers
-        - oidc:eng
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true
 
   # Monitoring Administrator
@@ -232,10 +197,6 @@ roles:
         - "Microsoft.Insights/*"
         - "Microsoft.OperationalInsights/*"
         - "Microsoft.Monitor/*"
-    scopes:
-      groups:
-        - oidc:sre
-        - oidc:devops
     providers:
-      - ${AZURE_PROVIDER}
+      - azure
     enabled: true

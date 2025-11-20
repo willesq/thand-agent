@@ -33,10 +33,6 @@ roles:
     permissions:
       allow:
         - "*"
-    scopes:
-      groups:
-        - oidc:admins
-        - oidc:devops
     providers:
       - gcp
     enabled: true
@@ -55,10 +51,6 @@ roles:
         - secretmanager.versions.*
         - cloudkms.cryptoKeys.get
         - cloudkms.cryptoKeys.list
-    scopes:
-      groups:
-        - oidc:security
-        - oidc:devops
     providers:
       - gcp
     enabled: true

@@ -20,7 +20,7 @@ roles:
         - cloudwatch:Get*
         - cloudwatch:List*
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Administrator Access
@@ -34,12 +34,8 @@ roles:
     permissions:
       allow:
         - "*:*"
-    scopes:
-      groups:
-        - oidc:admins
-        - oidc:devops
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Secrets Manager Access
@@ -56,12 +52,8 @@ roles:
         - kms:Decrypt
         - kms:Encrypt
         - kms:DescribeKey
-    scopes:
-      groups:
-        - oidc:security
-        - oidc:devops
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Database Administrator
@@ -79,12 +71,8 @@ roles:
         - dynamodb:*
         - elasticache:*
         - redshift:*
-    scopes:
-      groups:
-        - oidc:database-admins
-        - oidc:devops
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Storage Administrator
@@ -102,12 +90,8 @@ roles:
         - efs:*
         - fsx:*
         - backup:*
-    scopes:
-      groups:
-        - oidc:storage-admins
-        - oidc:devops
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Network Administrator
@@ -128,12 +112,8 @@ roles:
         - ec2:*SecurityGroup*
         - route53:*
         - elasticloadbalancing:*
-    scopes:
-      groups:
-        - oidc:network-admins
-        - oidc:devops
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Security Auditor
@@ -153,12 +133,8 @@ roles:
         - guardduty:List*
         - securityhub:Get*
         - config:Describe*
-    scopes:
-      groups:
-        - oidc:security
-        - oidc:compliance
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Compute Administrator
@@ -178,12 +154,8 @@ roles:
         - eks:*
         - ecr:*
         - autoscaling:*
-    scopes:
-      groups:
-        - oidc:compute-admins
-        - oidc:devops
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 
   # Developer Access
@@ -207,11 +179,7 @@ roles:
       deny:
         - iam:*
         - organizations:*
-    scopes:
-      groups:
-        - oidc:developers
-        - oidc:eng
     providers:
-      - ${AWS_PROVIDER}
+      - aws
     enabled: true
 

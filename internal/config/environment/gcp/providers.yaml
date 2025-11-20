@@ -1,7 +1,11 @@
 version: "1.0"
 providers:
 
-  # TODO(hugh) Add thand as auth provider
+  thand:
+    name: Thand Provider
+    description: Thand internal provider
+    provider: thand
+    enabled: true
 
   gcp:
     name: GCP Cloud Provider
@@ -14,4 +18,3 @@ providers:
     description: GCP SMTP for notifications
     provider: email
     enabled: true
-

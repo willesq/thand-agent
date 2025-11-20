@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"io"
 	"strconv"
+
+	"github.com/sirupsen/logrus"
 )
 
 var ENCODED_WORKFLOW_TASK = "workflow_task"
@@ -53,6 +55,12 @@ func (e EncodingWrapper) encode(modifiers ...EncryptionImpl) string {
 	if len(modifiers) > 0 {
 
 		for _, encryptor := range modifiers {
+
+			if encryptor == nil {
+				logrus.Warningln("No valid encryptor provided")
+				continue
+			}
+
 			// Now encrypt data
 			encryptedData, err := encryptor.Encrypt(ctx, finalData)
 
@@ -93,6 +101,12 @@ func (e EncodingWrapper) decode(input string, modifiers ...EncryptionImpl) (*Enc
 	if len(modifiers) > 0 {
 
 		for _, decryptor := range modifiers {
+
+			if decryptor == nil {
+				logrus.Warningln("No valid decryptor provided")
+				continue
+			}
+
 			// Now decrypt data
 			decryptedData, err := decryptor.Decrypt(ctx, decodedData)
 

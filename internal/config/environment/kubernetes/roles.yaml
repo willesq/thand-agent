@@ -17,10 +17,7 @@ roles:
         - k8s:apps/replicasets:get,list
         - k8s:configmaps:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Developer Access
@@ -45,15 +42,8 @@ roles:
         - k8s:batch/jobs:get,list,create,update,patch,delete
         - k8s:batch/cronjobs:get,list,create,update,patch,delete
         - k8s:events:get,list,create
-    scopes:
-      groups:
-        - oidc:developers
-        - oidc:engineering
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Cluster Viewer
@@ -78,10 +68,7 @@ roles:
         - k8s:configmaps:get,list
         - k8s:secrets:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Deployment Manager
@@ -108,10 +95,7 @@ roles:
         - k8s:configmaps:get,list
         - k8s:namespaces:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Secrets Manager
@@ -127,10 +111,7 @@ roles:
         - k8s:namespaces:get,list
         - k8s:pods:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Network Administrator
@@ -149,10 +130,7 @@ roles:
         - k8s:namespaces:get,list
         - k8s:pods:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Storage Administrator
@@ -170,10 +148,7 @@ roles:
         - k8s:namespaces:get,list
         - k8s:pods:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Namespace Administrator
@@ -189,10 +164,7 @@ roles:
       allow:
         - k8s:*:*
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Cluster Administrator
@@ -205,10 +177,7 @@ roles:
       allow:
         - k8s:*:*
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Security Auditor
@@ -233,10 +202,7 @@ roles:
         - k8s:namespaces:get,list
         - k8s:events:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
   # Production Deployer
@@ -259,9 +225,6 @@ roles:
         - k8s:events:get,list,create
         - k8s:namespaces:get,list
     providers:
-      - kubernetes-local
-      - kubernetes-dev
-      - kubernetes-staging
-      - kubernetes-prod
+      - kubernetes
     enabled: true
 
