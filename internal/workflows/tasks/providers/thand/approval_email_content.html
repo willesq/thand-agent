@@ -47,9 +47,75 @@
     <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Target Identities</h3>
     <ul style="list-style: none; padding: 0; margin: 0;">
     {{range .Identities}}
-        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">• {{.}}</li>
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">- {{.}}</li>
     {{end}}
     </ul>
+</div>
+{{end}}
+
+{{if .Groups}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Groups</h3>
+    {{if .Groups.Allow}}
+    <p><strong>Allowed:</strong></p>
+    <ul style="list-style: none; padding: 0; margin: 0 0 0.75rem 0;">
+    {{range .Groups.Allow}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">- {{.}}</li>
+    {{end}}
+    </ul>
+    {{end}}
+    {{if .Groups.Deny}}
+    <p><strong>Denied:</strong></p>
+    <ul style="list-style: none; padding: 0; margin: 0;">
+    {{range .Groups.Deny}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">- {{.}}</li>
+    {{end}}
+    </ul>
+    {{end}}
+</div>
+{{end}}
+
+{{if .Permissions}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Permissions</h3>
+    {{if .Permissions.Allow}}
+    <p><strong>Allowed:</strong></p>
+    <ul style="list-style: none; padding: 0; margin: 0 0 0.75rem 0;">
+    {{range .Permissions.Allow}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">- {{.}}</li>
+    {{end}}
+    </ul>
+    {{end}}
+    {{if .Permissions.Deny}}
+    <p><strong>Denied:</strong></p>
+    <ul style="list-style: none; padding: 0; margin: 0;">
+    {{range .Permissions.Deny}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">- {{.}}</li>
+    {{end}}
+    </ul>
+    {{end}}
+</div>
+{{end}}
+
+{{if .Resources}}
+<div style="margin-bottom: 1.5rem;">
+    <h3 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Resources</h3>
+    {{if .Resources.Allow}}
+    <p><strong>Allowed:</strong></p>
+    <ul style="list-style: none; padding: 0; margin: 0 0 0.75rem 0;">
+    {{range .Resources.Allow}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">- {{.}}</li>
+    {{end}}
+    </ul>
+    {{end}}
+    {{if .Resources.Deny}}
+    <p><strong>Denied:</strong></p>
+    <ul style="list-style: none; padding: 0; margin: 0;">
+    {{range .Resources.Deny}}
+        <li style="padding: 0.5rem; background-color: #f1f5f9; margin-bottom: 0.25rem; border-radius: 0.25rem;">- {{.}}</li>
+    {{end}}
+    </ul>
+    {{end}}
 </div>
 {{end}}
 

@@ -68,7 +68,7 @@ func (p *oktaProvider) AuthorizeRole(
 	}
 
 	// Determine which Okta roles to assign
-	var assginedRoles []string
+	var assignedRoles []string
 	var assignedGroups []string
 
 	// Check if there are groups to assign
@@ -133,7 +133,7 @@ func (p *oktaProvider) AuthorizeRole(
 				return nil, fmt.Errorf("failed to assign role %s to user: %w", roleType, err)
 			}
 
-			assginedRoles = append(assginedRoles, assignedRole.Id)
+			assignedRoles = append(assignedRoles, assignedRole.Id)
 
 			logrus.WithFields(logrus.Fields{
 				"user_id":       oktaUser.Id,
@@ -143,7 +143,9 @@ func (p *oktaProvider) AuthorizeRole(
 			}).Info("Successfully assigned role to user in Okta")
 		}
 
-	} else if len(role.Permissions.Allow) > 0 {
+	}
+
+	if len(role.Permissions.Allow) > 0 {
 
 		// Create a custom admin role with the specified permissions
 		customRoleType, err := p.createCustomAdminRole(ctx, role)
@@ -173,17 +175,18 @@ func (p *oktaProvider) AuthorizeRole(
 			return nil, fmt.Errorf("failed to assign custom role to user: %w", err)
 		}
 
-		assginedRoles = append(assginedRoles, customRoleType.ID)
+		assignedRoles = append(assignedRoles, customRoleType.ID)
 
-	} else {
+	}
 
-		return nil, fmt.Errorf("role %s has no inherits or permissions defined", role.Name)
+	if len(assignedRoles) == 0 && len(assignedGroups) == 0 && len(role.Permissions.Allow) == 0 {
+		return nil, fmt.Errorf("role %s has no inherits, groups, or permissions defined", role.Name)
 	}
 
 	// Return metadata for later revocation
 	metadata := map[string]any{
 		MetadataUserKey:  oktaUser.Id,
-		MetadataRolesKey: assginedRoles,
+		MetadataRolesKey: assignedRoles,
 		MetadataGroupKey: assignedGroups,
 	}
 

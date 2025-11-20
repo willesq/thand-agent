@@ -60,18 +60,18 @@ func (r *revokeNotifier) addRevokeDetailsSection(blocks *[]slack.Block, elevateR
 	revokeDetailsText.WriteString("*Revoked Access Details:*\n")
 
 	if elevateRequest.Role != nil {
-		revokeDetailsText.WriteString(fmt.Sprintf("• *Role:* %s\n", elevateRequest.Role.Name))
+		revokeDetailsText.WriteString(fmt.Sprintf("- *Role:* %s\n", elevateRequest.Role.Name))
 		if len(elevateRequest.Role.Description) > 0 {
-			revokeDetailsText.WriteString(fmt.Sprintf("• *Description:* %s\n", elevateRequest.Role.Description))
+			revokeDetailsText.WriteString(fmt.Sprintf("- *Description:* %s\n", elevateRequest.Role.Description))
 		}
 	}
 
 	if len(elevateRequest.Providers) > 0 {
-		revokeDetailsText.WriteString(fmt.Sprintf("• *Providers:* %s\n", strings.Join(elevateRequest.Providers, ", ")))
+		revokeDetailsText.WriteString(fmt.Sprintf("- *Providers:* %s\n", strings.Join(elevateRequest.Providers, ", ")))
 	}
 
 	if len(elevateRequest.Duration) > 0 {
-		revokeDetailsText.WriteString(fmt.Sprintf("• *Duration:* %s\n", elevateRequest.Duration))
+		revokeDetailsText.WriteString(fmt.Sprintf("- *Duration:* %s\n", elevateRequest.Duration))
 	}
 
 	*blocks = append(*blocks, slack.NewSectionBlock(

@@ -55,15 +55,15 @@ func (p *oktaProvider) Initialize(provider models.Provider) error {
 	p.client = client
 
 	// Store configuration values
-	orgUrl, found := oktaConfig.GetString("org_url")
+	orgUrl, found := oktaConfig.GetString("endpoint")
 	if !found {
-		return fmt.Errorf("org_url is required for Okta provider")
+		return fmt.Errorf("endpoint is required for Okta provider")
 	}
 	p.orgUrl = orgUrl
 
-	apiToken, found := oktaConfig.GetString("api_token")
+	apiToken, found := oktaConfig.GetString("token")
 	if !found {
-		return fmt.Errorf("api_token is required for Okta provider")
+		return fmt.Errorf("token is required for Okta provider")
 	}
 	p.apiToken = apiToken
 
@@ -103,15 +103,15 @@ func CreateOktaClient(oktaConfig *models.BasicConfig) (*okta.Client, error) {
 	ctx := context.Background()
 
 	// Get required configuration
-	orgUrl, foundOrgUrl := oktaConfig.GetString("org_url")
-	apiToken, foundApiToken := oktaConfig.GetString("api_token")
+	orgUrl, foundOrgUrl := oktaConfig.GetString("endpoint")
+	apiToken, foundApiToken := oktaConfig.GetString("token")
 
 	if !foundOrgUrl {
-		return nil, fmt.Errorf("org_url is required for Okta provider")
+		return nil, fmt.Errorf("endpoint is required for Okta provider")
 	}
 
 	if !foundApiToken {
-		return nil, fmt.Errorf("api_token is required for Okta provider")
+		return nil, fmt.Errorf("token is required for Okta provider")
 	}
 
 	// Configure Okta client
