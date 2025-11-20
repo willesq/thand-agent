@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/thand-io/agent/internal/models"
-	_ "github.com/thand-io/agent/test/mocks/providers" // Register mock providers
+	_ "github.com/thand-io/agent/internal/testing/mocks/providers" // Register mock providers
 )
 
 // newTestConfig creates a Config with mock providers initialized
-// The mock providers are registered via the test/mocks package import
+// The mock providers are registered via the internal/testing/mocks package import
 // This prevents actual cloud provider client initialization during tests
 // but still loads roles and permissions from embedded data
 func newTestConfig(t *testing.T, roles map[string]models.Role, providers map[string]models.Provider) *Config {
@@ -24,7 +24,7 @@ func newTestConfig(t *testing.T, roles map[string]models.Role, providers map[str
 		},
 	}
 
-	// Initialize providers - will use mock implementations registered in test/mocks
+	// Initialize providers - will use mock implementations registered in internal/testing/mocks
 	if len(providers) > 0 {
 		loadedProviders, err := config.InitializeProviders(providers)
 		if err != nil {
