@@ -217,50 +217,48 @@ type ProviderDefinitions struct {
 
 // UnmarshalJSON converts Version to string from any type
 func (h *ProviderDefinitions) UnmarshalJSON(data []byte) error {
-	type Alias ProviderDefinitions
 	aux := &struct {
-		Version any `json:"version"`
-		*Alias
+		Version   any                 `json:"version"`
+		Providers map[string]Provider `json:"providers"`
 	}{
-		Alias: (*Alias)(h),
+		Providers: make(map[string]Provider),
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
-	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
-
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
 	if err != nil {
 		return err
 	}
 
 	h.Version = parsedVersion
+	h.Providers = aux.Providers
 
 	return nil
 }
 
 // UnmarshalYAML converts Version to string from any type
 func (h *ProviderDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
-	type Alias ProviderDefinitions
 	aux := &struct {
-		Version any `yaml:"version"`
-		*Alias
+		Version   any                 `yaml:"version"`
+		Providers map[string]Provider `yaml:"providers"`
 	}{
-		Alias: (*Alias)(h),
+		Providers: make(map[string]Provider),
 	}
 
 	if err := unmarshal(&aux); err != nil {
 		return err
 	}
 
-	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
-
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
 	if err != nil {
 		return err
 	}
 
 	h.Version = parsedVersion
+	h.Providers = aux.Providers
 
 	return nil
 }

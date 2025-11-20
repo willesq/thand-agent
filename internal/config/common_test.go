@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/thand-io/agent/internal/common"
@@ -25,7 +26,7 @@ workflows:
 	require.NotNil(t, result)
 
 	// Verify the result has the expected structure
-	assert.Equal(t, "1.0", result.Version)
+	assert.True(t, result.Version.Equal(version.Must(version.NewVersion("1.0"))))
 	assert.NotNil(t, result.Workflows)
 
 	workflow, exists := result.Workflows["deploy-workflow"]
@@ -109,7 +110,7 @@ func TestReadData_JSONInput(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	assert.Equal(t, "1.0", result.Version)
+	assert.True(t, result.Version.Equal(version.Must(version.NewVersion("1.0"))))
 	assert.NotNil(t, result.Workflows)
 
 	workflow, exists := result.Workflows["test"]

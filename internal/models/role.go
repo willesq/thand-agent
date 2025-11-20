@@ -104,50 +104,48 @@ type RoleDefinitions struct {
 
 // UnmarshalJSON converts Version to string from any type
 func (h *RoleDefinitions) UnmarshalJSON(data []byte) error {
-	type Alias RoleDefinitions
 	aux := &struct {
-		Version any `json:"version"`
-		*Alias
+		Version any             `json:"version"`
+		Roles   map[string]Role `json:"roles"`
 	}{
-		Alias: (*Alias)(h),
+		Roles: make(map[string]Role),
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
-	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
-
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
 	if err != nil {
 		return err
 	}
 
 	h.Version = parsedVersion
+	h.Roles = aux.Roles
 
 	return nil
 }
 
 // UnmarshalYAML converts Version to string from any type
 func (h *RoleDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
-	type Alias RoleDefinitions
 	aux := &struct {
-		Version any `yaml:"version"`
-		*Alias
+		Version any             `yaml:"version"`
+		Roles   map[string]Role `yaml:"roles"`
 	}{
-		Alias: (*Alias)(h),
+		Roles: make(map[string]Role),
 	}
 
 	if err := unmarshal(&aux); err != nil {
 		return err
 	}
 
-	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
-
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
 	if err != nil {
 		return err
 	}
 
 	h.Version = parsedVersion
+	h.Roles = aux.Roles
 
 	return nil
 }

@@ -84,7 +84,7 @@ func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 	return c.InitializeProviders(defs)
 }
 
-// loadVaultData loads provider data from vault if configured
+// loadProviderVaultData loads provider data from vault if configured
 func (c *Config) loadProviderVaultData() (string, error) {
 
 	if len(c.Providers.Vault) == 0 {

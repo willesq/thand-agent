@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"strconv"
 
 	"github.com/sirupsen/logrus"
@@ -272,20 +273,18 @@ func (pc *BasicConfig) Update(updateMap map[string]any) {
 	if *pc == nil {
 		*pc = BasicConfig{}
 	}
-	for key, value := range updateMap {
-		(*pc)[key] = value
-	}
+	maps.Copy((*pc), updateMap)
 }
 
-// convertVersionToString converts a version field from any type to a string.
+// ConvertVersionToString converts a version field from any type to a string.
 // This is a helper function for UnmarshalJSON and UnmarshalYAML methods
 // to handle version fields that may be parsed as different types (string, int, float64, etc.)
-func convertVersionToString(versionAny any) string {
+func ConvertVersionToString(versionAny any) string {
 	switch v := versionAny.(type) {
 	case string:
 		return v
 	case float64:
-		return fmt.Sprintf("%.0f", v)
+		return fmt.Sprintf("%g", v)
 	case int:
 		return fmt.Sprintf("%d", v)
 	case int64:

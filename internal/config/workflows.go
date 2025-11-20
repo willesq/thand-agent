@@ -87,7 +87,7 @@ func (c *Config) LoadWorkflows() (map[string]models.Workflow, error) {
 	return defs, nil
 }
 
-// loadVaultData loads workflow data from vault if configured
+// loadWorkflowsVaultData loads workflow data from vault if configured
 func (c *Config) loadWorkflowsVaultData() (string, error) {
 
 	if len(c.Workflows.Vault) == 0 {

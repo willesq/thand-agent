@@ -155,50 +155,48 @@ type WorkflowDefinitions struct {
 
 // UnmarshalJSON converts Version to string from any type
 func (h *WorkflowDefinitions) UnmarshalJSON(data []byte) error {
-	type Alias WorkflowDefinitions
 	aux := &struct {
-		Version any `json:"version"`
-		*Alias
+		Version   any                 `json:"version"`
+		Workflows map[string]Workflow `json:"workflows"`
 	}{
-		Alias: (*Alias)(h),
+		Workflows: make(map[string]Workflow),
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 
-	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
-
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
 	if err != nil {
 		return err
 	}
 
 	h.Version = parsedVersion
+	h.Workflows = aux.Workflows
 
 	return nil
 }
 
 // UnmarshalYAML converts Version to string from any type
 func (h *WorkflowDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
-	type Alias WorkflowDefinitions
 	aux := &struct {
-		Version any `yaml:"version"`
-		*Alias
+		Version   any                 `yaml:"version"`
+		Workflows map[string]Workflow `yaml:"workflows"`
 	}{
-		Alias: (*Alias)(h),
+		Workflows: make(map[string]Workflow),
 	}
 
 	if err := unmarshal(&aux); err != nil {
 		return err
 	}
 
-	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
-
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
 	if err != nil {
 		return err
 	}
 
 	h.Version = parsedVersion
+	h.Workflows = aux.Workflows
 
 	return nil
 }
