@@ -10,20 +10,21 @@ Licensed Work: The software in this repository.
 
 Licensor: Thand, Inc.
 
-Change Date: 2029-01-01 (four years from release; you may adjust as needed)
+Change Date: 2029-01-01
 
 Change License: Apache License, Version 2.0
 
-## Usage Grant
+## Additional Usage Grant
 
-Subject to the terms of this license, you are allowed to use, copy, modify, and distribute this Licensed Work, but only for non-production use, evaluation, or development purposes, or if your organization’s annual recurring revenue (ARR) is less than $10,000,000 USD.
+You may make production use of the Licensed Work, provided Your use does not include offering the Licensed Work to third parties on a hosted or embedded basis in order to compete with Thand’s paid version(s) of the Licensed Work, or management and control platforms of that work. For purposes of this license:
 
-**Production use by organizations with ARR ≥ $10,000,000 USD requires a commercial license from Thand, Inc.**  
-Contact: sales@thand.io
+A “competitive offering” is a Product that is offered to third parties on a paid basis, including through paid support arrangements, that significantly overlaps with the capabilities of Thand’s paid or enterprise version(s) of the Licensed Work. If Your Product is not a competitive offering when You first make it generally available, it will not become a competitive offering later due to Thand releasing a new version of the Licensed Work with additional capabilities. Products that are provided for free or on an unpaid basis are still considered a competitive offering if they offer capabilities that significantly overlap with Thand’s paid or enterprise version(s) of the Licensed Work.
 
-## Additional Use Grant
+“Product” means software that is offered to end users to manage in their own environments or offered as a service on a hosted basis.
 
-You may use this Licensed Work in production if your organization’s annual recurring revenue (ARR) is less than $10,000,000 USD.
+“Embedded” means including the source code or executable code from the Licensed Work in a competitive offering. “Embedded” also means packaging the competitive offering in such a way that the Licensed Work must be accessed or downloaded for the competitive offering to operate.
+
+Hosting or using the Licensed Work(s) for internal purposes within an organization is not considered a competitive offering. Thand considers your organization to include all of your affiliates under common control.
 
 ## Change License
 
