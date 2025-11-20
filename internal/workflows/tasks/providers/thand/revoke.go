@@ -116,7 +116,6 @@ func (t *thandTask) executeRevocationTask(
 
 				if objectMap, ok := authorizationsMap.(map[string]any); ok {
 					if identityMap, ok := objectMap[identity].(map[string]any); ok {
-						authorizeResponse = &models.AuthorizeRoleResponse{}
 						if err := common.ConvertMapToInterface(identityMap, authorizeResponse); err != nil {
 							logrus.WithError(err).WithField("identity", identity).Warn("Failed to convert authorize response")
 						}

@@ -12,7 +12,7 @@ import (
 
 const resourceTypeApplication = "application"
 
-// Okta has custom admin resources that can span multuiple resources
+// Okta has custom admin resources that can span multiple resources
 
 // OktaApplication is an interface that represents the common methods
 // available on all Okta application types returned by the SDK

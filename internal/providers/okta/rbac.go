@@ -124,7 +124,7 @@ func (p *oktaProvider) AuthorizeRole(
 							"role_type":  roleType,
 						}).Info("User already has the role assigned in Okta, skipping assignment")
 
-						// IF the role has already been assigned, just skip
+						// If the role has already been assigned, just skip
 						// we don't need to mark it for removal later
 						continue
 					}
