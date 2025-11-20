@@ -85,14 +85,22 @@ func loadDataFromSource[
 
 		info, err := os.Stat(path)
 
-		if os.IsNotExist(err) {
+		if err != nil {
 
-			logrus.WithFields(logrus.Fields{
+			if os.IsNotExist(err) {
+				logrus.WithFields(logrus.Fields{
+					"path": path,
+				}).Errorln("File or directory does not exist")
+				// Return empty slice if path does not exist
+				return []*T{}, nil
+			}
+
+			// Handle other errors (permission denied, etc.)
+			logrus.WithError(err).WithFields(logrus.Fields{
 				"path": path,
-			}).Errorln("File or directory does not exist")
+			}).Errorln("Failed to stat path")
 
-			// Return empty slice if path does not exist
-			return []*T{}, nil
+			return nil, fmt.Errorf("failed to stat path %s: %w", path, err)
 		}
 
 		// Check if path is a directory
