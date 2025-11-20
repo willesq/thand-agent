@@ -68,8 +68,10 @@ type Permissions struct {
 	Deny  []string `json:"deny,omitempty"`
 }
 
-// RoleScopes defines the scope of a role in terms of users and groups (identities).
-// Only the specified users and groups can be assigned this role.
+// RoleScopes defines the scope of a role in terms of users, groups, and domains (identities).
+// Only the specified users, groups, or users belonging to the specified domains can be assigned this role.
+// The Domains field allows restricting role assignment to users from particular domains (e.g., email domains or organizational domains),
+// and can be used in conjunction with Groups and Users for more granular access control.
 type RoleScopes struct {
 	Groups  []string `json:"groups,omitempty"`
 	Users   []string `json:"users,omitempty"`
