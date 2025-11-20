@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
@@ -28,21 +29,46 @@ import (
 // LoadProviders loads providers from a file or URL and maps them to their implementations
 func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 
-	vaultData, err := c.loadVaultData()
+	vaultData, err := c.loadProviderVaultData()
 
 	if err != nil {
 		return nil, err
 	}
 
-	foundProviders, err := loadDataFromSource(
-		c.Providers.Path,
-		c.Providers.URL,
-		vaultData,
-		models.ProviderDefinitions{},
-	)
-	if err != nil {
-		logrus.WithError(err).Errorln("Failed to load providers data")
-		return nil, fmt.Errorf("failed to load providers data: %w", err)
+	foundProviders := []*models.ProviderDefinitions{}
+
+	if len(vaultData) > 0 || len(c.Providers.Path) > 0 || c.Providers.URL != nil {
+
+		importedProviders, err := loadDataFromSource(
+			c.Providers.Path,
+			c.Providers.URL,
+			vaultData,
+			models.ProviderDefinitions{},
+		)
+
+		if err != nil {
+			logrus.WithError(err).Errorln("Failed to load providers data")
+			return nil, fmt.Errorf("failed to load providers data: %w", err)
+		}
+
+		foundProviders = importedProviders
+
+	}
+
+	if len(c.Providers.Definitions) > 0 {
+		// Add providers defined directly in config
+		logrus.Debugln("Adding providers defined directly in config: ", len(c.Providers.Definitions))
+
+		defaultVersion := version.Must(version.NewVersion("1.0"))
+
+		for providerKey, provider := range c.Providers.Definitions {
+			foundProviders = append(foundProviders, &models.ProviderDefinitions{
+				Version: defaultVersion,
+				Providers: map[string]models.Provider{
+					providerKey: provider,
+				},
+			})
+		}
 	}
 
 	if len(foundProviders) == 0 {
@@ -58,8 +84,9 @@ func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 	return c.InitializeProviders(defs)
 }
 
-// loadVaultData loads provider data from vault if configured
-func (c *Config) loadVaultData() (string, error) {
+// loadProviderVaultData loads provider data from vault if configured
+func (c *Config) loadProviderVaultData() (string, error) {
+
 	if len(c.Providers.Vault) == 0 {
 		return "", nil
 	}
@@ -71,12 +98,14 @@ func (c *Config) loadVaultData() (string, error) {
 	logrus.Debugln("Loading providers from vault: ", c.Providers.Vault)
 
 	data, err := c.GetVault().GetSecret(c.Providers.Vault)
+
 	if err != nil {
 		logrus.WithError(err).Errorln("Error loading providers from vault")
 		return "", fmt.Errorf("failed to get secret from vault: %w", err)
 	}
 
 	logrus.Debugln("Loaded providers from vault: ", len(data), " bytes")
+
 	return string(data), nil
 }
 

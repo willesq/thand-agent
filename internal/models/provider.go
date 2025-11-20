@@ -1,12 +1,14 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -209,6 +211,54 @@ func (p *BaseProvider) Initialize(provider Provider) error {
 
 // ProviderDefinitions represents a collection of provider configurations loaded from a file or other source.
 type ProviderDefinitions struct {
-	Version   string              `yaml:"version" json:"version"`
+	Version   *version.Version    `yaml:"version" json:"version"`
 	Providers map[string]Provider `yaml:"providers" json:"providers"`
+}
+
+// UnmarshalJSON converts Version to string from any type
+func (h *ProviderDefinitions) UnmarshalJSON(data []byte) error {
+	aux := &struct {
+		Version   any                 `json:"version"`
+		Providers map[string]Provider `json:"providers"`
+	}{
+		Providers: make(map[string]Provider),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
+	if err != nil {
+		return err
+	}
+
+	h.Version = parsedVersion
+	h.Providers = aux.Providers
+
+	return nil
+}
+
+// UnmarshalYAML converts Version to string from any type
+func (h *ProviderDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
+	aux := &struct {
+		Version   any                 `yaml:"version"`
+		Providers map[string]Provider `yaml:"providers"`
+	}{
+		Providers: make(map[string]Provider),
+	}
+
+	if err := unmarshal(&aux); err != nil {
+		return err
+	}
+
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
+	if err != nil {
+		return err
+	}
+
+	h.Version = parsedVersion
+	h.Providers = aux.Providers
+
+	return nil
 }

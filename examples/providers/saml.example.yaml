@@ -1,6 +1,6 @@
 # Example SAML Provider Configuration
 # This configuration shows how to set up a SAML authentication provider
-
+version: "1.0"
 providers:
   company-saml:
     description: Company SAML Identity Provider

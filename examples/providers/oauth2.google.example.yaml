@@ -1,4 +1,4 @@
-version: 1.0
+version: "1.0"
 providers:
   google_oauth2:
     name: Google OAuth2

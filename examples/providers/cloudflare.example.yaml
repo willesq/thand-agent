@@ -14,7 +14,7 @@ providers:
     name: Cloudflare Production
     description: Production Cloudflare account with API token authentication
     provider: cloudflare
-    enabled: true
+    enabled: false  # Disabled by default
     config:
       # Your Cloudflare account ID (found in dashboard URL or account settings)
       account_id: "your-account-id-here"
@@ -30,7 +30,7 @@ providers:
     name: Cloudflare Development
     description: Development Cloudflare account
     provider: cloudflare
-    enabled: true
+    enabled: false  # Disabled by default
     config:
       account_id: "account_id"
       api_token: "your-api-token-here"  # Use environment variable
@@ -53,7 +53,7 @@ providers:
     name: Cloudflare - Customer A
     description: Customer A's Cloudflare account
     provider: cloudflare
-    enabled: true
+    enabled: false  # Disabled by default
     config:
       account_id: "your-account-id-here"
       api_token: "your-api-token-here"
@@ -62,7 +62,7 @@ providers:
     name: Cloudflare - Customer B
     description: Customer B's Cloudflare account
     provider: cloudflare
-    enabled: true
+    enabled: false  # Disabled by default
     config:
       account_id: "your-account-id-here"
       api_token: "your-api-token-here"

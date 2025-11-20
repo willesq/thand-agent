@@ -1,5 +1,12 @@
 version: "1.0"
 providers:
+
+  thand:
+    name: Thand Provider
+    description: Thand internal provider
+    provider: thand
+    enabled: true
+
   local-elevation:
     name: Local Elevation
     description: Local privilege elevation (like sudo or UAC)

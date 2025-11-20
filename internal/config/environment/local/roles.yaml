@@ -6,15 +6,17 @@ roles:
     description: Administrator group with full system access
     workflows: 
       - local_simple_elevation
-    roles:  # Use of system roles for elevated access
-      - admin
-      - administrators
-      - wheel
+    groups:  # Use of system groups for elevated access
+      allow:
+        - admin
+        - administrators
+        - wheel
     scopes:
       groups:
         - local:developer # Only allow roles if user is in developer group
     resources:
-      - path:/root # Only allow access to /root directory
+      allow:
+        - path:/root # Only allow access to /root directory
     providers:
       - local
     enabled: true
@@ -25,16 +27,18 @@ roles:
     description: Power users group with elevated privileges
     workflows: 
       - local_simple_elevation
-    roles:  # Use of system roles for elevated access
-      - poweruser
-      - developers
+    groups:  # Add the user to system groups
+      allow:
+        - poweruser
+        - developers
     scopes:
       groups:
         - local:powerusers
         - local:developers
     resources:
-      - path:/home
-      - path:/opt
+      allow:
+        - path:/home
+        - path:/opt
     providers:
       - local
     enabled: true
@@ -45,15 +49,17 @@ roles:
     description: Standard users group with basic access
     workflows: 
       - local_simple_elevation
-    roles:  # Use of system roles for elevated access
-      - user
-      - users
+    groups:  # Add the user to system groups
+      allow:
+        - user
+        - users
     scopes:
       groups:
         - local:users
     resources:
-      - path:/tmp
-      - path:/var/tmp
+      allow:    
+        - path:/tmp
+        - path:/var/tmp
     providers:
       - local
     enabled: true
@@ -64,16 +70,18 @@ roles:
     description: System operators group with service management access
     workflows: 
       - local_simple_elevation
-    roles:  # Use of system roles for elevated access
-      - operator
-      - systemd-journal
+    groups:  # Use of system roles for elevated access
+      allow:
+        - operator
+        - systemd-journal
     scopes:
       groups:
         - local:operators
         - sudo:operator
     resources:
-      - path:/var/log
-      - path:/etc/systemd
+      allow:
+        - path:/var/log
+        - path:/etc/systemd
     providers:
       - local
     enabled: true

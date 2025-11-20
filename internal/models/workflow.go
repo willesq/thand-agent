@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 )
 
@@ -148,6 +149,54 @@ func (w *WorkflowExecutionInfo) GetAuthorizationTime() *time.Time {
 
 // WorkflowDefinitions represents the structure for workflows YAML/JSON
 type WorkflowDefinitions struct {
-	Version   string              `yaml:"version" json:"version"`
+	Version   *version.Version    `yaml:"version" json:"version"`
 	Workflows map[string]Workflow `yaml:"workflows" json:"workflows"`
+}
+
+// UnmarshalJSON converts Version to string from any type
+func (h *WorkflowDefinitions) UnmarshalJSON(data []byte) error {
+	aux := &struct {
+		Version   any                 `json:"version"`
+		Workflows map[string]Workflow `json:"workflows"`
+	}{
+		Workflows: make(map[string]Workflow),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
+	if err != nil {
+		return err
+	}
+
+	h.Version = parsedVersion
+	h.Workflows = aux.Workflows
+
+	return nil
+}
+
+// UnmarshalYAML converts Version to string from any type
+func (h *WorkflowDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
+	aux := &struct {
+		Version   any                 `yaml:"version"`
+		Workflows map[string]Workflow `yaml:"workflows"`
+	}{
+		Workflows: make(map[string]Workflow),
+	}
+
+	if err := unmarshal(&aux); err != nil {
+		return err
+	}
+
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
+	if err != nil {
+		return err
+	}
+
+	h.Version = parsedVersion
+	h.Workflows = aux.Workflows
+
+	return nil
 }

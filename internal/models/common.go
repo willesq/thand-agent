@@ -6,8 +6,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
+	"maps"
 	"strconv"
+
+	"github.com/sirupsen/logrus"
 )
 
 var ENCODED_WORKFLOW_TASK = "workflow_task"
@@ -53,6 +57,12 @@ func (e EncodingWrapper) encode(modifiers ...EncryptionImpl) string {
 	if len(modifiers) > 0 {
 
 		for _, encryptor := range modifiers {
+
+			if encryptor == nil {
+				logrus.Warningln("No valid encryptor provided")
+				continue
+			}
+
 			// Now encrypt data
 			encryptedData, err := encryptor.Encrypt(ctx, finalData)
 
@@ -93,6 +103,12 @@ func (e EncodingWrapper) decode(input string, modifiers ...EncryptionImpl) (*Enc
 	if len(modifiers) > 0 {
 
 		for _, decryptor := range modifiers {
+
+			if decryptor == nil {
+				logrus.Warningln("No valid decryptor provided")
+				continue
+			}
+
 			// Now decrypt data
 			decryptedData, err := decryptor.Decrypt(ctx, decodedData)
 
@@ -257,7 +273,26 @@ func (pc *BasicConfig) Update(updateMap map[string]any) {
 	if *pc == nil {
 		*pc = BasicConfig{}
 	}
-	for key, value := range updateMap {
-		(*pc)[key] = value
+	maps.Copy((*pc), updateMap)
+}
+
+// ConvertVersionToString converts a version field from any type to a string.
+// This is a helper function for UnmarshalJSON and UnmarshalYAML methods
+// to handle version fields that may be parsed as different types (string, int, float64, etc.)
+func ConvertVersionToString(versionAny any) string {
+	switch v := versionAny.(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%g", v)
+	case int:
+		return fmt.Sprintf("%d", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
+	default:
+		if v != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return "0.0.0"
 	}
 }

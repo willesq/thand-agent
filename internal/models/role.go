@@ -1,6 +1,9 @@
 package models
 
 import (
+	"encoding/json"
+
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 )
@@ -95,6 +98,54 @@ type Resources struct {
 
 // RoleDefinitions represents the structure for roles YAML/JSON
 type RoleDefinitions struct {
-	Version string          `yaml:"version" json:"version"`
-	Roles   map[string]Role `yaml:"roles" json:"roles"`
+	Version *version.Version `yaml:"version" json:"version"`
+	Roles   map[string]Role  `yaml:"roles" json:"roles"`
+}
+
+// UnmarshalJSON converts Version to string from any type
+func (h *RoleDefinitions) UnmarshalJSON(data []byte) error {
+	aux := &struct {
+		Version any             `json:"version"`
+		Roles   map[string]Role `json:"roles"`
+	}{
+		Roles: make(map[string]Role),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
+	if err != nil {
+		return err
+	}
+
+	h.Version = parsedVersion
+	h.Roles = aux.Roles
+
+	return nil
+}
+
+// UnmarshalYAML converts Version to string from any type
+func (h *RoleDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
+	aux := &struct {
+		Version any             `yaml:"version"`
+		Roles   map[string]Role `yaml:"roles"`
+	}{
+		Roles: make(map[string]Role),
+	}
+
+	if err := unmarshal(&aux); err != nil {
+		return err
+	}
+
+	parsedVersion, err := version.NewVersion(ConvertVersionToString(aux.Version))
+	if err != nil {
+		return err
+	}
+
+	h.Version = parsedVersion
+	h.Roles = aux.Roles
+
+	return nil
 }

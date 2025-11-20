@@ -266,64 +266,58 @@ func (c *Config) ReloadConfig() error {
 	var foundErrors []error
 
 	// Load roles in parallel
-	if c.Roles.IsExternal() {
-		wg.Go(func() {
-			roles, err := c.LoadRoles()
-			if err != nil {
-				logrus.WithError(err).Errorln("Error loading roles")
-				mu.Lock()
-				foundErrors = append(foundErrors, fmt.Errorf("loading roles: %w", err))
-				mu.Unlock()
-			} else if len(roles) > 0 {
-				logrus.Infoln("Loaded roles from external source:", len(roles))
-				mu.Lock()
-				c.Roles.Definitions = roles
-				mu.Unlock()
-			} else {
-				logrus.Warningln("No roles loaded from external source")
-			}
-		})
-	}
+	wg.Go(func() {
+		roles, err := c.LoadRoles()
+		if err != nil {
+			logrus.WithError(err).Errorln("Error loading roles")
+			mu.Lock()
+			foundErrors = append(foundErrors, fmt.Errorf("loading roles: %w", err))
+			mu.Unlock()
+		} else if len(roles) > 0 {
+			logrus.Infoln("Loaded roles from external source:", len(roles))
+			mu.Lock()
+			c.Roles.Definitions = roles
+			mu.Unlock()
+		} else {
+			logrus.Warningln("No roles loaded from external source")
+		}
+	})
 
 	// Load workflows in parallel
-	if c.Workflows.IsExternal() {
-		wg.Go(func() {
-			workflows, err := c.LoadWorkflows()
-			if err != nil {
-				logrus.WithError(err).Errorln("Error loading workflows")
-				mu.Lock()
-				foundErrors = append(foundErrors, fmt.Errorf("loading workflows: %w", err))
-				mu.Unlock()
-			} else if len(workflows) > 0 {
-				logrus.Infoln("Loaded workflows from external source:", len(workflows))
-				mu.Lock()
-				c.Workflows.Definitions = workflows
-				mu.Unlock()
-			} else {
-				logrus.Warningln("No workflows loaded from external source")
-			}
-		})
-	}
+	wg.Go(func() {
+		workflows, err := c.LoadWorkflows()
+		if err != nil {
+			logrus.WithError(err).Errorln("Error loading workflows")
+			mu.Lock()
+			foundErrors = append(foundErrors, fmt.Errorf("loading workflows: %w", err))
+			mu.Unlock()
+		} else if len(workflows) > 0 {
+			logrus.Infoln("Loaded workflows from external source:", len(workflows))
+			mu.Lock()
+			c.Workflows.Definitions = workflows
+			mu.Unlock()
+		} else {
+			logrus.Warningln("No workflows loaded from external source")
+		}
+	})
 
 	// Load providers in parallel
-	if c.Providers.IsExternal() {
-		wg.Go(func() {
-			providers, err := c.LoadProviders()
-			if err != nil {
-				logrus.WithError(err).Errorln("Error loading providers")
-				mu.Lock()
-				foundErrors = append(foundErrors, fmt.Errorf("loading providers: %w", err))
-				mu.Unlock()
-			} else if len(providers) > 0 {
-				logrus.Infoln("Loaded providers from external source:", len(providers))
-				mu.Lock()
-				c.Providers.Definitions = providers
-				mu.Unlock()
-			} else {
-				logrus.Warningln("No providers loaded from external source")
-			}
-		})
-	}
+	wg.Go(func() {
+		providers, err := c.LoadProviders()
+		if err != nil {
+			logrus.WithError(err).Errorln("Error loading providers")
+			mu.Lock()
+			foundErrors = append(foundErrors, fmt.Errorf("loading providers: %w", err))
+			mu.Unlock()
+		} else if len(providers) > 0 {
+			logrus.Infoln("Loaded providers from external source:", len(providers))
+			mu.Lock()
+			c.Providers.Definitions = providers
+			mu.Unlock()
+		} else {
+			logrus.Warningln("No providers loaded from external source")
+		}
+	})
 
 	// Wait for all goroutines to complete
 	wg.Wait()
