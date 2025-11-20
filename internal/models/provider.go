@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -210,7 +211,7 @@ func (p *BaseProvider) Initialize(provider Provider) error {
 
 // ProviderDefinitions represents a collection of provider configurations loaded from a file or other source.
 type ProviderDefinitions struct {
-	Version   string              `yaml:"version" json:"version"`
+	Version   *version.Version    `yaml:"version" json:"version"`
 	Providers map[string]Provider `yaml:"providers" json:"providers"`
 }
 
@@ -228,18 +229,13 @@ func (h *ProviderDefinitions) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	switch v := aux.Version.(type) {
-	case string:
-		h.Version = v
-	case float64:
-		h.Version = fmt.Sprintf("%.0f", v)
-	case int, int64:
-		h.Version = fmt.Sprintf("%d", v)
-	default:
-		if v != nil {
-			h.Version = fmt.Sprintf("%v", v)
-		}
+	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
+
+	if err != nil {
+		return err
 	}
+
+	h.Version = parsedVersion
 
 	return nil
 }
@@ -258,20 +254,13 @@ func (h *ProviderDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 
-	switch v := aux.Version.(type) {
-	case string:
-		h.Version = v
-	case int:
-		h.Version = fmt.Sprintf("%d", v)
-	case int64:
-		h.Version = fmt.Sprintf("%d", v)
-	case float64:
-		h.Version = fmt.Sprintf("%.0f", v)
-	default:
-		if v != nil {
-			h.Version = fmt.Sprintf("%v", v)
-		}
+	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
+
+	if err != nil {
+		return err
 	}
+
+	h.Version = parsedVersion
 
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
@@ -58,9 +59,11 @@ func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 		// Add providers defined directly in config
 		logrus.Debugln("Adding providers defined directly in config: ", len(c.Providers.Definitions))
 
+		defaultVersion := version.Must(version.NewVersion("1.0"))
+
 		for providerKey, provider := range c.Providers.Definitions {
 			foundProviders = append(foundProviders, &models.ProviderDefinitions{
-				Version: "1.0",
+				Version: defaultVersion,
 				Providers: map[string]models.Provider{
 					providerKey: provider,
 				},

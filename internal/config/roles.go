@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
@@ -44,9 +45,11 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 		// Add roles defined directly in config
 		logrus.Debugln("Adding roles defined directly in config: ", len(c.Roles.Definitions))
 
+		defaultVersion := version.Must(version.NewVersion("1.0"))
+
 		for roleKey, role := range c.Roles.Definitions {
 			foundRoles = append(foundRoles, &models.RoleDefinitions{
-				Version: "1.0",
+				Version: defaultVersion,
 				Roles: map[string]models.Role{
 					roleKey: role,
 				},

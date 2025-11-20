@@ -5,7 +5,7 @@ providers:
     name: AWS SES Production
     description: Production Email environment
     provider: email
-    enabled: true
+    enabled: false
     config:
       host: email-smtp.eu-central-1.amazonaws.com
       port: 587

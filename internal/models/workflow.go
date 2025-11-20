@@ -2,9 +2,9 @@ package models
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 )
 
@@ -149,7 +149,7 @@ func (w *WorkflowExecutionInfo) GetAuthorizationTime() *time.Time {
 
 // WorkflowDefinitions represents the structure for workflows YAML/JSON
 type WorkflowDefinitions struct {
-	Version   string              `yaml:"version,string" json:"version,string"`
+	Version   *version.Version    `yaml:"version" json:"version"`
 	Workflows map[string]Workflow `yaml:"workflows" json:"workflows"`
 }
 
@@ -167,18 +167,13 @@ func (h *WorkflowDefinitions) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	switch v := aux.Version.(type) {
-	case string:
-		h.Version = v
-	case float64:
-		h.Version = fmt.Sprintf("%.0f", v)
-	case int, int64:
-		h.Version = fmt.Sprintf("%d", v)
-	default:
-		if v != nil {
-			h.Version = fmt.Sprintf("%v", v)
-		}
+	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
+
+	if err != nil {
+		return err
 	}
+
+	h.Version = parsedVersion
 
 	return nil
 }
@@ -197,20 +192,13 @@ func (h *WorkflowDefinitions) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 
-	switch v := aux.Version.(type) {
-	case string:
-		h.Version = v
-	case int:
-		h.Version = fmt.Sprintf("%d", v)
-	case int64:
-		h.Version = fmt.Sprintf("%d", v)
-	case float64:
-		h.Version = fmt.Sprintf("%.0f", v)
-	default:
-		if v != nil {
-			h.Version = fmt.Sprintf("%v", v)
-		}
+	parsedVersion, err := version.NewVersion(convertVersionToString(aux.Version))
+
+	if err != nil {
+		return err
 	}
+
+	h.Version = parsedVersion
 
 	return nil
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
@@ -41,9 +42,11 @@ func (c *Config) LoadWorkflows() (map[string]models.Workflow, error) {
 		// Add workflows defined directly in config
 		logrus.Debugln("Adding workflows defined directly in config: ", len(c.Workflows.Definitions))
 
+		defaultVersion := version.Must(version.NewVersion("1.0"))
+
 		for workflowKey, workflow := range c.Workflows.Definitions {
 			foundWorkflows = append(foundWorkflows, &models.WorkflowDefinitions{
-				Version: "1.0",
+				Version: defaultVersion,
 				Workflows: map[string]models.Workflow{
 					workflowKey: workflow,
 				},
@@ -92,7 +95,7 @@ func (c *Config) loadWorkflowsVaultData() (string, error) {
 	}
 
 	if !c.HasVault() {
-		return "", fmt.Errorf("vault configuration is missing. Cannot load roles from vault")
+		return "", fmt.Errorf("vault configuration is missing. Cannot load workflows from vault")
 	}
 
 	logrus.Debugln("Loading workflows from vault: ", c.Workflows.Vault)

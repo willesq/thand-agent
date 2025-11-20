@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 
@@ -273,5 +274,26 @@ func (pc *BasicConfig) Update(updateMap map[string]any) {
 	}
 	for key, value := range updateMap {
 		(*pc)[key] = value
+	}
+}
+
+// convertVersionToString converts a version field from any type to a string.
+// This is a helper function for UnmarshalJSON and UnmarshalYAML methods
+// to handle version fields that may be parsed as different types (string, int, float64, etc.)
+func convertVersionToString(versionAny any) string {
+	switch v := versionAny.(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%.0f", v)
+	case int:
+		return fmt.Sprintf("%d", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
+	default:
+		if v != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return "0.0.0"
 	}
 }
