@@ -83,15 +83,16 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-functional-${{ hashFiles('**/go.sum') }}
         restore-keys: |
+          ${{ runner.os }}-go-functional-
           ${{ runner.os }}-go-
 
     - name: Run functional tests
       run: |
         # Run functional tests (these use testcontainers/Docker)
         # Docker is available by default on ubuntu-latest runners
-        go test -v -timeout 10m ./test/functional/...
+        cd test && go test -v -timeout 10m ./functional/...
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -115,15 +116,16 @@ jobs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-integration-${{ hashFiles('**/go.sum') }}
         restore-keys: |
+          ${{ runner.os }}-go-integration-
           ${{ runner.os }}-go-
 
     - name: Run integration tests
       run: |
         # Run integration tests (if any exist)
         if [ -n "$(find ./test/integration -name '*_test.go' 2>/dev/null)" ]; then
-          go test -v -timeout 15m ./test/integration/...
+          cd test && go test -v -timeout 15m ./integration/...
         else
           echo "No integration tests found, skipping..."
         fi

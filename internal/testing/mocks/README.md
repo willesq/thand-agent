@@ -5,7 +5,7 @@ This directory contains mock implementations for testing.
 ## Structure
 
 ```
-test/mocks/
+internal/testing/mocks/
 └── providers/          # Mock provider registrations
     ├── aws.go         # AWS provider mock registration
     ├── azure.go       # Azure provider mock registration
@@ -25,12 +25,12 @@ The provider mocks prevent tests from connecting to actual cloud services (AWS, 
    - `internal/providers/azure/mock.go`
    - `internal/providers/kubernetes/mock.go`
 
-2. **Mock registrations** in this directory (`test/mocks/providers/`) use `init()` functions to override the real providers:
+2. **Mock registrations** in this directory (`internal/testing/mocks/providers/`) use `init()` functions to override the real providers:
    - They import the provider package and call `providers.Set(ProviderName, NewMockProvider())`
    - This happens automatically when the package is imported with `_` (blank import)
 
 3. **Test helpers** import the mocks:
-   - `internal/config/test_helpers.go` imports `_ "github.com/thand-io/agent/test/mocks/providers"`
+   - `internal/config/test_helpers.go` imports `_ "github.com/thand-io/agent/internal/testing/mocks/providers"`
    - This ensures mocks are registered before any tests run
 
 ### Provider Name Constants

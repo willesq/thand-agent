@@ -6,12 +6,18 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
 )
 
 const ThandMonitorTask = "monitor"
+
+type MonitorRequest struct {
+	Mode      string `json:"mode,omitempty"`      // e.g., "alert", "log", etc.
+	Threshold int    `json:"threshold,omitempty"` // e.g., number of alerts to trigger action
+}
 
 // ThandMonitorTask represents a custom task for Thand monitoring
 func (t *thandTask) executeMonitorTask(
@@ -22,10 +28,21 @@ func (t *thandTask) executeMonitorTask(
 
 	if !workflowTask.HasTemporalContext() {
 		// Only supported within Temporal workflows
-		return nil, fmt.Errorf("Monitoring is only supported with temporal")
+		return nil, fmt.Errorf("monitoring is only supported with temporal for task: %s", taskName)
 	}
 
-	logrus.Infof("Executing Thand monitor task: %s", taskName)
+	var monitorReq MonitorRequest
+	err := common.ConvertInterfaceToInterface(call.With, &monitorReq)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse monitor request: %w", err)
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"task_name": taskName,
+		"mode":      monitorReq.Mode,
+		"threshold": monitorReq.Threshold,
+	}).Infof("Executing Thand monitor task: %s", taskName)
 
 	thandAlert, err := runner.ListenTaskHandler(workflowTask, taskName, &model.ListenTask{
 		Listen: model.ListenTaskConfiguration{

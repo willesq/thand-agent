@@ -188,9 +188,10 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 			return nil, fmt.Errorf("failed to resolve inherited role '%s': %w", inheritedRoleName, err)
 		}
 
-		// Merge only the inherited permissions and resources
+		// Merge only the inherited permissions, resources, and groups
 		c.mergeRolePermissions(&compositeRole, inheritedRole)
 		c.mergeRoleResources(&compositeRole, inheritedRole)
+		c.mergeRoleGroups(&compositeRole, inheritedRole)
 
 		// Only provider roles are kept in the inherits list; resolved inherited roles are excluded
 	}
@@ -430,6 +431,46 @@ func (c *Config) mergeRoleResources(composite *models.Role, inherited *models.Ro
 	composite.Resources.Deny = make([]string, 0, len(denySet))
 	for resource := range denySet {
 		composite.Resources.Deny = append(composite.Resources.Deny, resource)
+	}
+}
+
+// mergeRoleGroups merges groups from inherited role into composite role
+// with proper Allow/Deny conflict resolution
+// Parent (composite) groups override child (inherited) groups in conflicts
+func (c *Config) mergeRoleGroups(composite *models.Role, inherited *models.Role) {
+	// Start with inherited groups (child)
+	allowSet := make(map[string]bool)
+	denySet := make(map[string]bool)
+
+	// Add inherited groups first (child groups)
+	for _, group := range inherited.Groups.Allow {
+		allowSet[group] = true
+	}
+	for _, group := range inherited.Groups.Deny {
+		denySet[group] = true
+	}
+
+	// Add composite groups (parent) - these take precedence in conflicts
+	for _, group := range composite.Groups.Allow {
+		allowSet[group] = true
+		// Parent Allow overrides child Deny
+		delete(denySet, group)
+	}
+	for _, group := range composite.Groups.Deny {
+		denySet[group] = true
+		// Parent Deny overrides child Allow
+		delete(allowSet, group)
+	}
+
+	// Convert sets back to slices
+	composite.Groups.Allow = make([]string, 0, len(allowSet))
+	for group := range allowSet {
+		composite.Groups.Allow = append(composite.Groups.Allow, group)
+	}
+
+	composite.Groups.Deny = make([]string, 0, len(denySet))
+	for group := range denySet {
+		composite.Groups.Deny = append(composite.Groups.Deny, group)
 	}
 }
 
