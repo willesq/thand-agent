@@ -89,7 +89,7 @@ providers:
     enabled: true
     config:
       endpoint: https://your-domain-dev.okta.com
-      token: 00XyZaBcDeFgHiJkLmNoPqRsTuVw9876543210xy
+      token: <your-api-token-here>
 ```
 
 ### Multi-Environment Setup
@@ -104,7 +104,7 @@ providers:
     enabled: true
     config:
       endpoint: https://your-domain.okta.com
-      token: 00aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890ab
+      token: <your-api-token-here>
   
   okta-dev:
     name: Okta Development
@@ -113,7 +113,7 @@ providers:
     enabled: true
     config:
       endpoint: https://your-domain-dev.okta.com
-      token: 00XyZaBcDeFgHiJkLmNoPqRsTuVw9876543210xy
+      token: <your-api-token-here>
 ```
 
 ## Available Administrator Roles
