@@ -343,7 +343,7 @@ func (c *Config) SyncWithLoginServer() error {
 	// Providers need to be hard synced. Everything else
 	// can be done async
 
-	apiUrl := c.GetLoginServerApiUrl()
+	apiUrl := c.DiscoverLoginServerApiUrl()
 
 	sessionManager := sessions.GetSessionManager()
 
@@ -465,7 +465,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 		Method: http.MethodPost,
 		Endpoint: &model.Endpoint{
 			EndpointConfig: &model.EndpointConfiguration{
-				URI: &model.LiteralUri{Value: c.GetLoginServerApiUrl() + "/register"},
+				URI: &model.LiteralUri{Value: c.DiscoverLoginServerApiUrl() + "/register"},
 				Authentication: &model.ReferenceableAuthenticationPolicy{
 					AuthenticationPolicy: &model.AuthenticationPolicy{
 						Bearer: &model.BearerAuthenticationPolicy{
@@ -509,6 +509,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("config.path", "./config")
 
 	v.SetDefault("environment.name", environment.DetectSystemName())
+	v.SetDefault("environment.hostname", environment.DetectHostname())
 	v.SetDefault("environment.os", environment.DetectOperatingSystem())
 	v.SetDefault("environment.os_version", environment.DetectOSVersion())
 	v.SetDefault("environment.arch", runtime.GOARCH)

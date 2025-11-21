@@ -12,9 +12,3 @@ providers:
     description: Google Cloud Platform provider
     provider: gcp
     enabled: true
-  
-  email:
-    name: GCP Email
-    description: GCP SMTP for notifications
-    provider: email
-    enabled: true

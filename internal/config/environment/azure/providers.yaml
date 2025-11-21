@@ -18,3 +18,5 @@ providers:
     description: Azure SMTP for notifications
     provider: email
     enabled: true
+    with:
+      platform: acs

@@ -21,7 +21,9 @@ const (
 // post environment initialisation
 type EnvironmentConfig struct {
 	// This is the name of the environment or hostname
-	Name string `mapstructure:"name" default:"development"`
+	Name     string `mapstructure:"name" default:"development"`
+	Hostname string `mapstructure:"hostname" default:"localhost"`
+
 	// AWS, GCP, Kubernetes, Local
 	Platform EnvironmentPlatform `mapstructure:"platform" default:"aws"` // aws, gcp, kubernetes
 	// Operating System details

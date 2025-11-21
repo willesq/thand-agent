@@ -860,6 +860,9 @@ definitions:
         default: false
         description: true if running in an ephemeral environment
         type: boolean
+      hostname:
+        default: localhost
+        type: string
       metaData:
         allOf:
         - $ref: '#/definitions/models.BasicConfig'
@@ -896,6 +899,17 @@ definitions:
     - Azure
     - Kubernetes
     - Local
+  models.Groups:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
+    type: object
   models.HealthResponse:
     properties:
       path:
@@ -1086,22 +1100,34 @@ definitions:
         default: true
         description: By default enable the role
         type: boolean
+      groups:
+        allOf:
+        - $ref: '#/definitions/models.Groups'
+        description: groups to add the user to
       inherits:
+        description: roles to inherit from or provider specific roles/policies etc
         items:
           type: string
         type: array
       name:
         type: string
       permissions:
-        $ref: '#/definitions/models.Permissions'
+        allOf:
+        - $ref: '#/definitions/models.Permissions'
+        description: granular permissions for the role
       providers:
+        description: providers that can assign this role
         items:
           type: string
         type: array
       resources:
-        $ref: '#/definitions/models.Resources'
+        allOf:
+        - $ref: '#/definitions/models.Resources'
+        description: resource access rules, apis, files, systems etc
       scopes:
-        $ref: '#/definitions/models.RoleScopes'
+        allOf:
+        - $ref: '#/definitions/models.RoleScopes'
+        description: scope of who can be assigned this role
       workflows:
         description: The workflows to execute
         items:
@@ -1122,22 +1148,34 @@ definitions:
         default: true
         description: By default enable the role
         type: boolean
+      groups:
+        allOf:
+        - $ref: '#/definitions/models.Groups'
+        description: groups to add the user to
       inherits:
+        description: roles to inherit from or provider specific roles/policies etc
         items:
           type: string
         type: array
       name:
         type: string
       permissions:
-        $ref: '#/definitions/models.Permissions'
+        allOf:
+        - $ref: '#/definitions/models.Permissions'
+        description: granular permissions for the role
       providers:
+        description: providers that can assign this role
         items:
           type: string
         type: array
       resources:
-        $ref: '#/definitions/models.Resources'
+        allOf:
+        - $ref: '#/definitions/models.Resources'
+        description: resource access rules, apis, files, systems etc
       scopes:
-        $ref: '#/definitions/models.RoleScopes'
+        allOf:
+        - $ref: '#/definitions/models.RoleScopes'
+        description: scope of who can be assigned this role
       workflows:
         description: The workflows to execute
         items:
@@ -1146,6 +1184,10 @@ definitions:
     type: object
   models.RoleScopes:
     properties:
+      domains:
+        items:
+          type: string
+        type: array
       groups:
         items:
           type: string
@@ -1336,6 +1378,23 @@ info:
   title: Thand Agent API
   version: "1.0"
 paths:
+  /.well-known/api-configuration:
+    get:
+      consumes:
+      - application/json
+      description: Get service configuration including endpoints, capabilities, and
+        authentication methods
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: API configuration
+          schema:
+            additionalProperties: true
+            type: object
+      summary: API configuration
+      tags:
+      - discovery
   /auth:
     get:
       consumes:

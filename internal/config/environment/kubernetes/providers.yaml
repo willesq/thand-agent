@@ -6,12 +6,6 @@ providers:
     description: Thand internal provider
     provider: thand
     enabled: true
-      
-  email:
-    name: GCP Email
-    description: GCP SMTP for notifications
-    provider: email
-    enabled: true
 
   kubernetes:
     name: Kubernetes
