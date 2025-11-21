@@ -24,6 +24,30 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/.well-known/api-configuration": {
+            "get": {
+                "description": "Get service configuration including endpoints, capabilities, and authentication methods",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "discovery"
+                ],
+                "summary": "API configuration",
+                "responses": {
+                    "200": {
+                        "description": "API configuration",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/auth": {
             "get": {
                 "description": "Display the authentication page with available providers",
@@ -3009,6 +3033,10 @@ const docTemplate = `{
                     "type": "boolean",
                     "default": false
                 },
+                "hostname": {
+                    "type": "string",
+                    "default": "localhost"
+                },
                 "metaData": {
                     "description": "Metadata for the environment",
                     "allOf": [
@@ -3059,6 +3087,23 @@ const docTemplate = `{
                 "Kubernetes",
                 "Local"
             ]
+        },
+        "models.Groups": {
+            "type": "object",
+            "properties": {
+                "allow": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "deny": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
         },
         "models.HealthResponse": {
             "type": "object",
@@ -3345,7 +3390,16 @@ const docTemplate = `{
                     "type": "boolean",
                     "default": true
                 },
+                "groups": {
+                    "description": "groups to add the user to",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Groups"
+                        }
+                    ]
+                },
                 "inherits": {
+                    "description": "roles to inherit from or provider specific roles/policies etc",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -3355,19 +3409,35 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "permissions": {
-                    "$ref": "#/definitions/models.Permissions"
+                    "description": "granular permissions for the role",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Permissions"
+                        }
+                    ]
                 },
                 "providers": {
+                    "description": "providers that can assign this role",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "resources": {
-                    "$ref": "#/definitions/models.Resources"
+                    "description": "resource access rules, apis, files, systems etc",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Resources"
+                        }
+                    ]
                 },
                 "scopes": {
-                    "$ref": "#/definitions/models.RoleScopes"
+                    "description": "scope of who can be assigned this role",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.RoleScopes"
+                        }
+                    ]
                 },
                 "workflows": {
                     "description": "The workflows to execute",
@@ -3396,7 +3466,16 @@ const docTemplate = `{
                     "type": "boolean",
                     "default": true
                 },
+                "groups": {
+                    "description": "groups to add the user to",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Groups"
+                        }
+                    ]
+                },
                 "inherits": {
+                    "description": "roles to inherit from or provider specific roles/policies etc",
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -3406,19 +3485,35 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "permissions": {
-                    "$ref": "#/definitions/models.Permissions"
+                    "description": "granular permissions for the role",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Permissions"
+                        }
+                    ]
                 },
                 "providers": {
+                    "description": "providers that can assign this role",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "resources": {
-                    "$ref": "#/definitions/models.Resources"
+                    "description": "resource access rules, apis, files, systems etc",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Resources"
+                        }
+                    ]
                 },
                 "scopes": {
-                    "$ref": "#/definitions/models.RoleScopes"
+                    "description": "scope of who can be assigned this role",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.RoleScopes"
+                        }
+                    ]
                 },
                 "workflows": {
                     "description": "The workflows to execute",
@@ -3432,6 +3527,12 @@ const docTemplate = `{
         "models.RoleScopes": {
             "type": "object",
             "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "groups": {
                     "type": "array",
                     "items": {

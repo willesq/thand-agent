@@ -13,6 +13,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
 
+	"cloud.google.com/go/compute/metadata"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
 
@@ -112,7 +113,20 @@ func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, 
 	projectId, foundProjectId := gcpConfig.GetString("project_id")
 
 	if !foundProjectId {
-		return nil, fmt.Errorf("project_id not found in config")
+
+		// Try and figure out the project ID from the environment
+
+		if metadata.OnGCE() {
+			id, err := metadata.ProjectIDWithContext(context.Background())
+			if err != nil {
+				return nil, fmt.Errorf("project_id not found in config and failed to get project_id from GCE metadata: %w", err)
+			}
+			projectId = id
+		}
+	}
+
+	if len(projectId) == 0 {
+		return nil, fmt.Errorf("project_id must be specified in GCP provider configuration")
 	}
 
 	projectStage := gcpConfig.GetStringWithDefault("stage", DefaultStage)

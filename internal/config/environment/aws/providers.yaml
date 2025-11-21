@@ -18,3 +18,5 @@ providers:
     description: AWS Simple Email Service for notifications
     provider: email
     enabled: true
+    with:
+      platform: ses

@@ -289,6 +289,8 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 	// Swagger documentation
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
+	router.GET("/.well-known/api-configuration", s.apiConfigurationHandler)
+
 	// Health endpoint
 	if s.Config.Server.Health.Enabled {
 		router.GET(s.Config.Server.Health.Path, s.healthHandler)
@@ -489,6 +491,73 @@ func (s *Server) healthHandler(c *gin.Context) {
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Version:     s.GetVersion(),
 		Services:    servicesHealth,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// apiConfigurationHandler handles the API configuration endpoint
+//
+//	@Summary		API configuration
+//	@Description	Get service configuration including endpoints, capabilities, and authentication methods
+//	@Tags			discovery
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	map[string]any	"API configuration"
+//	@Router			/.well-known/api-configuration [get]
+func (s *Server) apiConfigurationHandler(c *gin.Context) {
+	serviceType := "agent"
+	if s.Config.IsServer() {
+		serviceType = "server"
+	} else if s.Config.IsClient() {
+		serviceType = "client"
+	}
+
+	capabilities := make(map[string]bool)
+	workflows := []string{}  // TODO: populate workflows list
+	activities := []string{} // TODO: populate activities list
+
+	if s.Config.IsServer() {
+		services := s.Config.GetServices()
+		capabilities["temporal"] = services.HasTemporal()
+		capabilities["vault"] = services.HasVault()
+		capabilities["encryption"] = services.HasEncryption()
+		capabilities["scheduler"] = services.HasScheduler()
+		capabilities["llm"] = services.HasLargeLanguageModel()
+		capabilities["storage"] = services.HasStorage()
+	}
+
+	response := gin.H{
+		// Service Identity
+		"serviceName": "Thand " + serviceType,
+		"serviceType": serviceType,
+		"version":     s.GetVersion(),
+
+		// Endpoints
+		"baseUrl":     s.Config.GetLocalServerUrl(),
+		"apiBasePath": s.Config.GetApiBasePath(),
+		"hostname":    s.Config.Environment.Hostname,
+		"port":        s.Config.Server.Port,
+
+		// Authentication
+		"authEndpoint": s.Config.GetLocalServerUrl() + "/auth",
+		"authMethods":  []string{"session", "bearer"},
+
+		// Documentation
+		"docsUrl":     s.Config.GetLocalServerUrl() + "/swagger/index.html",
+		"openApiSpec": s.Config.GetLocalServerUrl() + "/swagger/doc.json",
+
+		// Capabilities
+		"workflows":    workflows,
+		"activities":   activities,
+		"capabilities": capabilities,
+
+		// Health
+		"healthEndpoint":  s.Config.Server.Health.Path,
+		"metricsEndpoint": s.Config.Server.Metrics.Path,
+
+		// Related Services
+		"loginServer": s.Config.GetLoginServerUrl(),
 	}
 
 	c.JSON(http.StatusOK, response)

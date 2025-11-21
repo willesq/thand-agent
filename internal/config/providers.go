@@ -209,7 +209,7 @@ func (c *Config) getProviderImplementation(providerKey string, providerName stri
 	}
 
 	if c.IsClient() {
-		return providers.NewRemoteProviderProxy(providerKey, c.GetLoginServerApiUrl()), nil
+		return providers.NewRemoteProviderProxy(providerKey, c.DiscoverLoginServerApiUrl()), nil
 	}
 
 	return nil, fmt.Errorf("unknown config mode, cannot load providers")

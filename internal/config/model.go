@@ -371,14 +371,15 @@ func (c *Config) GetLoginServerUrl() string {
 		"/")
 }
 
-func (c *Config) GetLoginServerApiUrl() string {
+func (c *Config) DiscoverLoginServerApiUrl() string {
 
-	// Make request to the login server to get the /health endpoint
+	// Make request to the login server to get the
+	// /.well-known/api-configuration endpoint
 	// to get the base param which is our api endpoint using resty
 
 	baseUrl := c.GetLoginServerUrl()
 
-	healthCheckUrl := fmt.Sprintf("%s/health", baseUrl)
+	healthCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", baseUrl)
 	defaultUrl := fmt.Sprintf("%s/api/v1", baseUrl)
 
 	client := resty.New()
@@ -396,13 +397,14 @@ func (c *Config) GetLoginServerApiUrl() string {
 
 	// Get the path field in the JSON response this is our API path
 	var healthCheckResponse struct {
-		Path string `json:"path"`
+		ApiBasePath string `json:"apiBasePath"`
 	}
+
 	if err := json.Unmarshal(res.Body(), &healthCheckResponse); err != nil {
 		return defaultUrl
 	}
 
-	trimPath := strings.TrimSuffix(strings.TrimPrefix(healthCheckResponse.Path, "/"), "/")
+	trimPath := strings.TrimSuffix(strings.TrimPrefix(healthCheckResponse.ApiBasePath, "/"), "/")
 
 	return fmt.Sprintf("%s/%s", c.GetLoginServerUrl(), trimPath)
 }

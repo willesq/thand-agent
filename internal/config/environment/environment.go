@@ -1,12 +1,14 @@
 package environment
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"github.com/go-resty/resty/v2"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -24,10 +26,11 @@ const (
 func DetectEnvironmentConfig() models.EnvironmentConfig {
 	config := models.EnvironmentConfig{
 		Name:                   DetectSystemName(),
-		OperatingSystem:        DetectOperatingSystem(),
-		OperatingSystemVersion: DetectOSVersion(),
-		Architecture:           runtime.GOARCH,
+		Hostname:               DetectHostname(),
 		Platform:               DetectPlatform(),
+		OperatingSystem:        DetectOperatingSystem(),
+		Architecture:           runtime.GOARCH,
+		OperatingSystemVersion: DetectOSVersion(),
 		Ephemeral:              IsEphemeralEnvironment(),
 		Config:                 &models.BasicConfig{},
 		MetaData: &models.BasicConfig{
@@ -72,18 +75,6 @@ func DetectSystemName() string {
 		return siteName
 	}
 
-	// Check for container/pod names
-	if hostname, err := os.Hostname(); err == nil && len(hostname) > 0 {
-		// In Kubernetes, hostname is often the pod name
-		if isKubernetes() {
-			return hostname
-		}
-		// For other environments, use hostname if it's not generic
-		if !isGenericHostname(hostname) {
-			return hostname
-		}
-	}
-
 	// Check for environment-specific naming
 	if envName := os.Getenv("ENVIRONMENT"); len(envName) > 0 {
 		return envName
@@ -106,6 +97,35 @@ func DetectSystemName() string {
 	}
 
 	return string(platform) + "-" + os
+}
+
+func DetectHostname() string {
+
+	if isGCP() {
+		// Timeout context to avoid hanging for too long
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		// Try to get the hostname from metadata
+		hostname, _ := metadata.HostnameWithContext(timeoutCtx)
+		if len(hostname) > 0 {
+			return hostname
+		}
+	}
+
+	// Check for container/pod names
+	if hostname, err := os.Hostname(); err == nil && len(hostname) > 0 {
+		// In Kubernetes, hostname is often the pod name
+		if isKubernetes() {
+			return hostname
+		}
+		// For other environments, use hostname if it's not generic
+		if !isGenericHostname(hostname) {
+			return hostname
+		}
+	}
+
+	return "localhost"
 }
 
 // isGenericHostname checks if a hostname is too generic to be useful
@@ -229,8 +249,7 @@ func isGCP() bool {
 	}
 
 	// Check GCP metadata service
-	// return checkGCPMetadata()
-	return false
+	return checkGCPMetadata()
 }
 
 // isAzure checks if we're running on Microsoft Azure
@@ -276,14 +295,7 @@ func checkAWSMetadata() bool {
 
 // checkGCPMetadata attempts to contact GCP metadata service
 func checkGCPMetadata() bool {
-	client := resty.New().SetTimeout(2 * time.Second)
-	resp, err := client.R().
-		SetHeader("Metadata-Flavor", "Google").
-		Get("http://metadata.google.internal/computeMetadata/v1/")
-	if err != nil {
-		return false
-	}
-	return resp.StatusCode() == http.StatusOK
+	return metadata.OnGCE()
 }
 
 // checkAzureMetadata attempts to contact Azure metadata service

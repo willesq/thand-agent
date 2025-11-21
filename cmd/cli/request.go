@@ -49,7 +49,7 @@ var requestCmd = &cobra.Command{
 
 		fmt.Println(successStyle.Render("Generating request .."))
 
-		loginServer := strings.TrimSuffix(cfg.GetLoginServerApiUrl(), "/")
+		loginServer := strings.TrimSuffix(cfg.DiscoverLoginServerApiUrl(), "/")
 		evaluateReason := fmt.Sprintf("%s/elevate/llm", loginServer)
 
 		client := resty.New()

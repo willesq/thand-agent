@@ -27,7 +27,7 @@ roles:
     name: GCP Administrator
     description: Full administrative access to all GCP resources
     workflows: 
-      - gcp_email_approval
+      - gcp_simple_elevation
     inherits:
       - roles/owner
     permissions:
@@ -42,7 +42,7 @@ roles:
     name: GCP Secret Manager Admin
     description: Full access to Secret Manager for managing secrets
     workflows:
-      - gcp_email_approval
+      - gcp_simple_elevation
     inherits:
       - roles/secretmanager.admin
     permissions:
@@ -60,7 +60,7 @@ roles:
     name: GCP Database Administrator
     description: Full access to Cloud SQL, Spanner, and database services
     workflows:
-      - gcp_email_approval
+      - gcp_simple_elevation
     inherits:
       - roles/cloudsql.admin
       - roles/spanner.admin
