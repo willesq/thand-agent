@@ -295,6 +295,9 @@ func checkAWSMetadata() bool {
 
 // checkGCPMetadata attempts to contact GCP metadata service
 func checkGCPMetadata() bool {
+
+	// The result for this is cached by the metadata package and
+	// has a context timeout internally
 	return metadata.OnGCE()
 }
 

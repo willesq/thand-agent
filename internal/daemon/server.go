@@ -536,8 +536,8 @@ func (s *Server) apiConfigurationHandler(c *gin.Context) {
 		// Endpoints
 		"baseUrl":     s.Config.GetLocalServerUrl(),
 		"apiBasePath": s.Config.GetApiBasePath(),
-		"hostname":    s.Config.Environment.Hostname,
-		"port":        s.Config.Server.Port,
+		//"hostname":    s.Config.Environment.Hostname,
+		//"port":        s.Config.Server.Port,
 
 		// Authentication
 		"authEndpoint": s.Config.GetLocalServerUrl() + "/auth",

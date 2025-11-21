@@ -122,6 +122,8 @@ func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, 
 				return nil, fmt.Errorf("project_id not found in config and failed to get project_id from GCE metadata: %w", err)
 			}
 			projectId = id
+		} else {
+			return nil, fmt.Errorf("project_id not found in config and not running on GCE")
 		}
 	}
 
