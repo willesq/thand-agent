@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/temporal"
 )
 
 // CustomAdminRoleResponse represents the response from creating a custom admin role in Okta
@@ -56,6 +58,13 @@ func (p *oktaProvider) AuthorizeRole(
 
 	user := req.GetUser()
 	role := req.GetRole()
+
+	if len(role.Inherits) == 0 &&
+		len(role.Groups.Allow) == 0 &&
+		len(role.Permissions.Allow) == 0 &&
+		len(role.Resources.Allow) == 0 {
+		return nil, fmt.Errorf("role %s has no inherits, groups, permissions, or resources defined", role.Name)
+	}
 
 	// Get the Okta user
 	oktaUser, _, err := p.client.User.GetUser(ctx, user.Email)
@@ -122,12 +131,21 @@ func (p *oktaProvider) AuthorizeRole(
 						}).Info("User already has the role assigned in Okta, skipping assignment")
 
 						// If the role has already been assigned, just skip
-						// we don't need to mark it for removal later
+						// we don't need to mark it for removal later. As this might
+						// be a standing permission.
+
 						continue
 					}
 				}
 
-				return nil, fmt.Errorf("failed to assign role %s to user: %w", roleType, err)
+				return nil, temporal.NewApplicationErrorWithOptions(
+					fmt.Sprintf("failed to assign role %s to user: %w", roleType, err),
+					"OktaRoleAssignmentError",
+					temporal.ApplicationErrorOptions{
+						NextRetryDelay: 3 * time.Second,
+						Cause:          err,
+					},
+				)
 			}
 
 			assignedRoles = append(assignedRoles, assignedRole.Id)
@@ -169,7 +187,14 @@ func (p *oktaProvider) AuthorizeRole(
 		})
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to assign custom role to user: %w", err)
+			return nil, temporal.NewApplicationErrorWithOptions(
+				fmt.Sprintf("failed to assign custom role to user: %w", err),
+				"OktaCustomRoleAssignmentError",
+				temporal.ApplicationErrorOptions{
+					NextRetryDelay: 3 * time.Second,
+					Cause:          err,
+				},
+			)
 		}
 
 		assignedRoles = append(assignedRoles, customRoleType.ID)
@@ -199,8 +224,16 @@ func (p *oktaProvider) AuthorizeRole(
 				}
 
 				_, _, err = p.client.Application.AssignUserToApplication(ctx, appResource.Id, appUser)
+
 				if err != nil {
-					return nil, fmt.Errorf("failed to assign user to application %s: %w", appResource.Name, err)
+					return nil, temporal.NewApplicationErrorWithOptions(
+						fmt.Sprintf("failed to assign user to application %s: %w", appResource.Name, err),
+						"OktaApplicationAssignmentError",
+						temporal.ApplicationErrorOptions{
+							NextRetryDelay: 3 * time.Second,
+							Cause:          err,
+						},
+					)
 				}
 
 				logrus.WithFields(logrus.Fields{
@@ -210,13 +243,14 @@ func (p *oktaProvider) AuthorizeRole(
 					"app_name":   appResource.Name,
 				}).Info("Successfully assigned user to application in Okta")
 
-				assignedResources = append(assignedResources, appResource.Id)
+				assignedResources = append(assignedResources, fmt.Sprintf("application:%s", appResource.Id))
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"role_name": role.Name,
+					"resource":  resource,
+				}).Warn("Resource does not match expected 'application:' prefix and will be ignored")
 			}
 		}
-	}
-
-	if len(assignedRoles) == 0 && len(assignedGroups) == 0 && len(assignedResources) == 0 {
-		return nil, fmt.Errorf("role %s has no inherits, groups, permissions, or resources defined", role.Name)
 	}
 
 	return &models.AuthorizeRoleResponse{
@@ -328,7 +362,7 @@ func (p *oktaProvider) revokeRoles(ctx context.Context, roleIds []string, userId
 func (p *oktaProvider) revokeGroups(ctx context.Context, groupIds []string, userId string, userEmail string) error {
 	for _, groupId := range groupIds {
 
-		// Get the okta groups and add the user to each
+		// Get the okta groups and remove the user from each
 		identity, err := p.GetIdentity(ctx, groupId)
 
 		if err != nil {
@@ -359,17 +393,27 @@ func (p *oktaProvider) revokeGroups(ctx context.Context, groupIds []string, user
 func (p *oktaProvider) revokeResources(ctx context.Context, resourceIds []string, userId string, userEmail string) error {
 	for _, resourceId := range resourceIds {
 
-		_, err := p.client.Application.DeleteApplicationUser(ctx, resourceId, userId, nil)
+		if after, ok := strings.CutPrefix(resourceId, "application:"); ok {
 
-		if err != nil {
-			return fmt.Errorf("failed to remove user from resource %s: %w", resourceId, err)
+			_, err := p.client.Application.DeleteApplicationUser(ctx, after, userId, nil)
+
+			if err != nil {
+				return fmt.Errorf("failed to remove user from resource %s: %w", resourceId, err)
+			}
+
+			logrus.WithFields(logrus.Fields{
+				"user_id":     userId,
+				"user_email":  userEmail,
+				"resource_id": resourceId,
+			}).Info("Successfully removed user from resource in Okta")
+
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"user_id":     userId,
+				"user_email":  userEmail,
+				"resource_id": resourceId,
+			}).Warn("Resource does not match expected 'application:' prefix and will be ignored")
 		}
-
-		logrus.WithFields(logrus.Fields{
-			"user_id":     userId,
-			"user_email":  userEmail,
-			"resource_id": resourceId,
-		}).Info("Successfully removed user from resource in Okta")
 	}
 
 	return nil

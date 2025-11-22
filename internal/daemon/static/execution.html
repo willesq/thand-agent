@@ -447,13 +447,19 @@
 
                     console.log('Initialized with data:', {
                         execution: this.execution,
-                        workflow: this.workflow
+                        workflow: this.workflow,
+                        isComplete: this.isWorkflowComplete(),
+                        temporalAvailable: this.temporalAvailable
                     });
 
                     // Start auto-refresh if needed
                     if (this.temporalAvailable && !this.isWorkflowComplete()) {
                         this.fetchWorkflowStatus('init');
                         this.startAutoRefresh();
+                    } else if (this.isWorkflowComplete()) {
+                        console.log('Workflow already complete - skipping auto-refresh');
+                    } else if (!this.temporalAvailable) {
+                        console.log('Temporal not available - skipping auto-refresh');
                     }
                 },
                 
@@ -479,6 +485,7 @@
                         
                         // Stop auto-refresh if workflow is complete
                         if (this.isWorkflowComplete()) {
+                            console.log(`[${new Date().toISOString()}] Workflow complete - stopping auto-refresh`);
                             this.stopAutoRefresh();
                         }
                         
@@ -491,6 +498,19 @@
                 
                 // Auto-refresh management
                 startAutoRefresh() {
+                    // Don't start if already running
+                    if (this.refreshInterval) {
+                        console.log('Auto-refresh already running');
+                        return;
+                    }
+                    
+                    // Don't start if workflow is already complete
+                    if (this.isWorkflowComplete()) {
+                        console.log('Workflow already complete - not starting auto-refresh');
+                        return;
+                    }
+                    
+                    console.log(`[${new Date().toISOString()}] Starting auto-refresh (polling every 5 seconds)`);
                     this.refreshInterval = setInterval(() => {
                         this.fetchWorkflowStatus('interval');
                     }, 5000);
@@ -498,6 +518,7 @@
                 
                 stopAutoRefresh() {
                     if (this.refreshInterval) {
+                        console.log(`[${new Date().toISOString()}] Stopping auto-refresh`);
                         clearInterval(this.refreshInterval);
                         this.refreshInterval = null;
                     }
