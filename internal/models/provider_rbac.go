@@ -15,7 +15,12 @@ type AuthorizeRoleRequest struct {
 }
 
 type AuthorizeRoleResponse struct {
-	Metadata map[string]any `json:"metadata,omitempty"` // Any metadata returned from the provider
+	UserId      string         `json:"user_id,omitempty"`     // The ID of the user the role was authorized for
+	Roles       []string       `json:"roles,omitempty"`       // The roles that were authorized
+	Permissions []string       `json:"permissions,omitempty"` // The permissions that were authorized
+	Groups      []string       `json:"groups,omitempty"`      // The groups that were authorized
+	Resources   []string       `json:"resources,omitempty"`   // The resources that were authorized
+	Metadata    map[string]any `json:"metadata,omitempty"`    // Any metadata returned from the provider
 }
 
 type RevokeRoleRequest struct {
