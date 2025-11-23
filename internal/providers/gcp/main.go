@@ -65,19 +65,33 @@ func (p *gcpProvider) Initialize(provider models.Provider) error {
 	clientOptions := gcpClient.ClientOptions
 	projectStage := gcpClient.Stage
 
-	// Load GCP Permissions and Roles from embedded resources
-	err = p.LoadPermissions(projectStage)
+	// Load GCP Permissions and Roles from shared singleton
+	data, err := getSharedData(projectStage)
 	if err != nil {
-		return fmt.Errorf("failed to load permissions: %w", err)
+		return fmt.Errorf("failed to load shared GCP data: %w", err)
 	}
 
-	err = p.LoadRoles(projectStage)
-	if err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
 
-	// Start background indexing
-	go p.buildSearchIndex()
+	// Assign indices if ready, otherwise wait in background
+	select {
+	case <-data.indexReady:
+		p.indexMu.Lock()
+		p.permissionsIndex = data.permissionsIndex
+		p.rolesIndex = data.rolesIndex
+		p.indexMu.Unlock()
+	default:
+		go func() {
+			<-data.indexReady
+			p.indexMu.Lock()
+			p.permissionsIndex = data.permissionsIndex
+			p.rolesIndex = data.rolesIndex
+			p.indexMu.Unlock()
+		}()
+	}
 
 	iamService, err := iam.NewService(ctx, clientOptions...)
 	if err != nil {

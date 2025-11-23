@@ -1,14 +1,15 @@
 package gcp
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 )
 
-// buildSearchIndex builds the Bleve search index for GCP permissions and roles
-func (p *gcpProvider) buildSearchIndex() {
+func buildIndices(permissions []models.ProviderPermission, roles []models.ProviderRole) (bleve.Index, bleve.Index, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
@@ -19,41 +20,33 @@ func (p *gcpProvider) buildSearchIndex() {
 	permissionsMapping := bleve.NewIndexMapping()
 	permissionsIndex, err := bleve.NewMemOnly(permissionsMapping)
 	if err != nil {
-		logrus.Errorf("Failed to create permissions search index: %v", err)
-		return
+		return nil, nil, fmt.Errorf("failed to create permissions search index: %v", err)
 	}
 
 	rolesMapping := bleve.NewIndexMapping()
 	rolesIndex, err := bleve.NewMemOnly(rolesMapping)
 	if err != nil {
-		logrus.Errorf("Failed to create roles search index: %v", err)
-		return
+		return nil, nil, fmt.Errorf("failed to create roles search index: %v", err)
 	}
 
 	// Index permissions
-	for _, perm := range p.permissions {
+	for _, perm := range permissions {
 		if err := permissionsIndex.Index(perm.Name, perm); err != nil {
-			logrus.Errorf("Failed to index permission %s: %v", perm.Name, err)
-			return
+			return nil, nil, fmt.Errorf("failed to index permission %s: %v", perm.Name, err)
 		}
 	}
 
 	// Index roles
-	for _, role := range p.roles {
+	for _, role := range roles {
 		if err := rolesIndex.Index(role.Name, role); err != nil {
-			logrus.Errorf("Failed to index role %s: %v", role.Name, err)
-			return
+			return nil, nil, fmt.Errorf("failed to index role %s: %v", role.Name, err)
 		}
 	}
 
-	// Safely update the indices
-	p.indexMu.Lock()
-	p.permissionsIndex = permissionsIndex
-	p.rolesIndex = rolesIndex
-	p.indexMu.Unlock()
-
 	logrus.WithFields(logrus.Fields{
-		"permissions": len(p.permissions),
-		"roles":       len(p.roles),
+		"permissions": len(permissions),
+		"roles":       len(roles),
 	}).Debug("GCP search indices ready")
+
+	return permissionsIndex, rolesIndex, nil
 }

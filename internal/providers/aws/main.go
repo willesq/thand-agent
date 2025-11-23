@@ -62,11 +62,22 @@ func (p *awsProvider) Initialize(provider models.Provider) error {
 	p.roles = data.roles
 	p.rolesMap = data.rolesMap
 
-	// Assign indices
-	p.indexMu.Lock()
-	p.permissionsIndex = data.permissionsIndex
-	p.rolesIndex = data.rolesIndex
-	p.indexMu.Unlock()
+	// Assign indices if ready, otherwise wait in background
+	select {
+	case <-data.indexReady:
+		p.indexMu.Lock()
+		p.permissionsIndex = data.permissionsIndex
+		p.rolesIndex = data.rolesIndex
+		p.indexMu.Unlock()
+	default:
+		go func() {
+			<-data.indexReady
+			p.indexMu.Lock()
+			p.permissionsIndex = data.permissionsIndex
+			p.rolesIndex = data.rolesIndex
+			p.indexMu.Unlock()
+		}()
+	}
 
 	// Right lets figure out how to initialize the AWS SDK
 	awsConfig := p.GetConfig()

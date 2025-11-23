@@ -15,6 +15,8 @@ type awsData struct {
 	roles      []models.ProviderRole
 	rolesMap   map[string]*models.ProviderRole
 	rolesIndex bleve.Index
+
+	indexReady chan struct{}
 }
 
 var (
@@ -25,7 +27,9 @@ var (
 
 func getSharedData() (*awsData, error) {
 	sharedDataOnce.Do(func() {
-		sharedData = &awsData{}
+		sharedData = &awsData{
+			indexReady: make(chan struct{}),
+		}
 		var err error
 
 		sharedData.permissions, sharedData.permissionsMap, err = loadPermissions()
@@ -40,11 +44,18 @@ func getSharedData() (*awsData, error) {
 			return
 		}
 
-		sharedData.permissionsIndex, sharedData.rolesIndex, err = buildIndices(sharedData.permissions, sharedData.roles)
-		if err != nil {
-			sharedDataErr = err
-			return
-		}
+		// Build indices in background
+		go func() {
+			pIdx, rIdx, err := buildIndices(sharedData.permissions, sharedData.roles)
+			if err != nil {
+				// Log error but don't fail the whole provider initialization
+				// The provider will continue without search capabilities
+				return
+			}
+			sharedData.permissionsIndex = pIdx
+			sharedData.rolesIndex = rIdx
+			close(sharedData.indexReady)
+		}()
 	})
 	return sharedData, sharedDataErr
 }
