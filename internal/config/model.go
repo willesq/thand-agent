@@ -116,6 +116,18 @@ func (c *Config) GetServices() models.ServicesClientImpl {
 
 }
 
+func (c *Config) GetProvider(providerName string) (string, *models.Provider, error) {
+
+	// Get the first provider by provider name
+	for foundName, provider := range c.Providers.Definitions {
+		if strings.Compare(provider.Provider, providerName) == 0 {
+			return foundName, &provider, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("provider not found: %s", providerName)
+}
+
 func (c *Config) GetProviderByName(name string) (*models.Provider, error) {
 	if provider, exists := c.Providers.Definitions[name]; exists {
 		return &provider, nil

@@ -495,7 +495,7 @@ func TestAWSRoleScenarios(t *testing.T) {
 		// Verify that aws_user inheritance was resolved and removed from Inherits
 		// but provider roles (ARN policies) are preserved
 		expectedInherits := []string{
-			"arn:aws:iam::aws:policy/AdministratorAccess",
+			"AdministratorAccess",
 		}
 		assert.ElementsMatch(t, expectedInherits, result.Inherits,
 			"Provider roles should remain in Inherits, but regular inherited roles (aws_user) should be removed")

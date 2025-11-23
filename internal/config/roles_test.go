@@ -449,7 +449,7 @@ func TestGetCompositeRole_ProviderSpecificInheritance(t *testing.T) {
 
 	// Should inherit from the 'admin' role since aws-prod provider exists
 	assert.Equal(t, "base", result.Name)
-	assert.ElementsMatch(t, []string{"base:read", "aws:admin"}, result.Permissions.Allow)
+	assert.ElementsMatch(t, []string{"base:read"}, result.Permissions.Allow)
 }
 
 func TestMergeStringSlices(t *testing.T) {

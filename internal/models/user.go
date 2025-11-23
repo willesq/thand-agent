@@ -1,6 +1,8 @@
 package models
 
 import (
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 )
@@ -26,6 +28,21 @@ func (u *User) GetName() string {
 	return "Unknown"
 }
 
+func (u *User) GetUsername() string {
+	if len(u.Username) > 0 {
+		return u.Username
+	} else if len(u.Name) > 0 {
+		return common.ConvertToSnakeCase(u.Name)
+	} else if len(u.Email) > 0 {
+		// Use the part before @ in email
+		return common.ConvertToSnakeCase(u.Email[:strings.Index(u.Email, "@")])
+	} else if len(u.ID) > 0 {
+		return common.ConvertToSnakeCase(u.ID)
+	}
+
+	return ""
+}
+
 func (u *User) GetIdentity() string {
 	if len(u.Email) > 0 {
 		return u.Email
@@ -35,6 +52,26 @@ func (u *User) GetIdentity() string {
 		return u.ID
 	}
 	return common.ConvertToSnakeCase(u.Name)
+}
+
+func (u *User) GetFirstName() string {
+	if len(u.Name) > 0 {
+		parts := strings.Split(u.Name, " ")
+		if len(parts) > 0 {
+			return parts[0]
+		}
+	}
+	return ""
+}
+
+func (u *User) GetLastName() string {
+	if len(u.Name) > 0 {
+		parts := strings.Split(u.Name, " ")
+		if len(parts) > 1 {
+			return parts[len(parts)-1]
+		}
+	}
+	return ""
 }
 
 func (u *User) AsMap() map[string]any {

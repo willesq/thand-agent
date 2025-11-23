@@ -4,9 +4,15 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/simpleforce/simpleforce"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/temporal"
 )
+
+const MetadataPriorProfileKey = "prior_profile"
 
 func (p *salesForceProvider) AuthorizeRole(
 	ctx context.Context,
@@ -22,23 +28,6 @@ func (p *salesForceProvider) AuthorizeRole(
 
 	client := p.client
 
-	// First find the user by their email (using parameterized query to prevent injection)
-	userQuery := "SELECT Id, Name, ProfileId FROM User WHERE Email = ?"
-	userResult, err := p.queryWithParams(userQuery, user.Email)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query user: %w", err)
-	}
-
-	if len(userResult.Records) == 0 {
-		// TODO Create the user if they don't exist?
-		return nil, fmt.Errorf("user not found in Salesforce")
-	}
-
-	primaryUser := userResult.Records[0]
-
-	salesforceUserId := primaryUser.StringField("Id")
-	currentProfileId := primaryUser.StringField("ProfileId")
-
 	// For salesforce we must inherit the role by changing the user's profile
 
 	if len(role.Inherits) > 1 {
@@ -51,21 +40,60 @@ func (p *salesForceProvider) AuthorizeRole(
 	profileResult, err := p.GetRole(ctx, profileName)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get role profile: %w", err)
+		return nil, temporal.NewApplicationErrorWithOptions(
+			fmt.Sprintf("failed to get role profile: %v", err),
+			"SalesforceGetRoleError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+				Cause:          err,
+			},
+		)
 	}
 
-	// We need to store the old profile Id so we can revert it on revoke
-	salesforceProfile := &models.AuthorizeRoleResponse{
-		Metadata: map[string]any{
-			"id":              salesforceUserId,
-			"current_profile": profileResult.Id,
-			"prior_profile":   currentProfileId,
-		},
+	// First find the user by their email (using parameterized query to prevent injection)
+	userQuery := "SELECT Id, Name, ProfileId FROM User WHERE Email = ?"
+	userResult, err := p.queryWithParams(userQuery, user.Email)
+	if err != nil {
+		return nil, temporal.NewApplicationErrorWithOptions(
+			fmt.Sprintf("failed to query user: %v", err),
+			"SalesforceUserQueryError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+				Cause:          err,
+			},
+		)
 	}
+
+	var primaryUser *simpleforce.SObject
+
+	if len(userResult.Records) == 0 {
+		newUserObj, err := p.createUser(user, profileResult.Id)
+		if err != nil {
+			return nil, err
+		}
+		primaryUser = newUserObj
+	} else {
+		primaryUser = &userResult.Records[0]
+	}
+
+	salesforceUserId := primaryUser.ID()
+	currentProfileId := primaryUser.StringField("ProfileId")
 
 	// Check if user already has the target profile
 	if currentProfileId == profileResult.Id {
-		return salesforceProfile, nil // User already has the correct profile
+		logrus.WithFields(logrus.Fields{
+			"user_id":    salesforceUserId,
+			"user_email": user.Email,
+			"profile_id": profileResult.Id,
+		}).Info("User already has the target profile in Salesforce, skipping assignment")
+
+		return &models.AuthorizeRoleResponse{
+			UserId: salesforceUserId,
+			Roles:  []string{profileResult.Id},
+			Metadata: map[string]any{
+				MetadataPriorProfileKey: currentProfileId,
+			},
+		}, nil
 	}
 
 	// Update user's profile
@@ -75,13 +103,32 @@ func (p *salesForceProvider) AuthorizeRole(
 
 	result := userObj.Update()
 	if result == nil {
-		return nil, fmt.Errorf("failed to update user profile")
+		return nil, temporal.NewApplicationErrorWithOptions(
+			"failed to update user profile",
+			"SalesforceProfileUpdateError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+			},
+		)
 	}
 
-	return salesforceProfile, nil
+	logrus.WithFields(logrus.Fields{
+		"user_id":               salesforceUserId,
+		"user_email":            user.Email,
+		"profile_id":            profileResult.Id,
+		MetadataPriorProfileKey: currentProfileId,
+	}).Info("Successfully updated user profile in Salesforce")
+
+	return &models.AuthorizeRoleResponse{
+		UserId: salesforceUserId,
+		Roles:  []string{profileResult.Id},
+		Metadata: map[string]any{
+			MetadataPriorProfileKey: currentProfileId,
+		},
+	}, nil
 }
 
-// Revoke removes access for a user from a role by reverting to a default profile
+// Revoke removes access for a user from a role by reverting to the prior profile
 func (p *salesForceProvider) RevokeRole(
 	ctx context.Context,
 	req *models.RevokeRoleRequest,
@@ -89,13 +136,25 @@ func (p *salesForceProvider) RevokeRole(
 	client := p.client
 
 	user := req.GetUser()
-	role := req.GetRole()
+
+	if req.AuthorizeRoleResponse == nil {
+		return nil, fmt.Errorf("no authorize role response found for revocation")
+	}
+
+	metadata := req.AuthorizeRoleResponse
 
 	// First find the user by their email
 	userQuery := "SELECT Id, Name, ProfileId FROM User WHERE Email = ?"
 	userResult, err := p.queryWithParams(userQuery, user.Email)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query user: %w", err)
+		return nil, temporal.NewApplicationErrorWithOptions(
+			fmt.Sprintf("failed to query user: %v", err),
+			"SalesforceUserQueryError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+				Cause:          err,
+			},
+		)
 	}
 
 	if len(userResult.Records) == 0 {
@@ -105,57 +164,65 @@ func (p *salesForceProvider) RevokeRole(
 	salesforceUserId := userResult.Records[0].StringField("Id")
 	currentProfileId := userResult.Records[0].StringField("ProfileId")
 
-	// Check if the user currently has the role profile that we want to revoke
-	roleProfileQuery := "SELECT Id FROM Profile WHERE Name = ?"
-	roleProfileResult, err := p.queryWithParams(roleProfileQuery, role.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query role profile: %w", err)
-	}
+	// Get the profile to revert to from metadata
+	priorProfileId, ok := metadata.Metadata[MetadataPriorProfileKey].(string)
+	if !ok || priorProfileId == "" {
+		// If no prior profile stored, use a default profile
+		defaultProfiles := []string{"Standard User", "Minimum Access - Salesforce"}
 
-	if len(roleProfileResult.Records) == 0 {
-		return nil, fmt.Errorf("profile '%s' not found in Salesforce", role.Name)
-	}
+		for _, profileName := range defaultProfiles {
+			defaultProfileQuery := "SELECT Id FROM Profile WHERE Name = ?"
+			defaultProfileResult, err := p.queryWithParams(defaultProfileQuery, profileName)
+			if err != nil {
+				logrus.Warnf("Failed to query default profile '%s': %v", profileName, err)
+				continue
+			}
 
-	roleProfileId := roleProfileResult.Records[0].StringField("Id")
-
-	// If user doesn't have the role profile, nothing to revoke
-	if currentProfileId != roleProfileId {
-		return nil, nil // User doesn't have this profile, nothing to revoke
-	}
-
-	// Find a default profile to assign (typically "Standard User" or similar)
-	// You may want to make this configurable based on your organization's needs
-	defaultProfileQuery := "SELECT Id FROM Profile WHERE Name = 'Standard User'"
-	defaultProfileResult, err := p.queryWithParams(defaultProfileQuery)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query default profile: %w", err)
-	}
-
-	if len(defaultProfileResult.Records) == 0 {
-		// If "Standard User" doesn't exist, try "Minimum Access - Salesforce"
-		defaultProfileQuery = "SELECT Id FROM Profile WHERE Name = 'Minimum Access - Salesforce'"
-		defaultProfileResult, err = p.queryWithParams(defaultProfileQuery)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query fallback default profile: %w", err)
+			if len(defaultProfileResult.Records) > 0 {
+				priorProfileId = defaultProfileResult.Records[0].StringField("Id")
+				break
+			}
 		}
-		if len(defaultProfileResult.Records) == 0 {
-			return nil, fmt.Errorf("no suitable default profile found in Salesforce")
+
+		if priorProfileId == "" {
+			return nil, fmt.Errorf("no suitable default profile found in Salesforce (tried: %s)", strings.Join(defaultProfiles, ", "))
 		}
 	}
 
-	defaultProfileId := defaultProfileResult.Records[0].StringField("Id")
+	// If user already has the prior profile, nothing to do
+	if currentProfileId == priorProfileId {
+		logrus.WithFields(logrus.Fields{
+			"user_id":    salesforceUserId,
+			"user_email": user.Email,
+			"profile_id": priorProfileId,
+		}).Info("User already has the prior profile in Salesforce, nothing to revoke")
+		return &models.RevokeRoleResponse{}, nil
+	}
 
-	// Update user's profile to the default profile
+	// Update user's profile to the prior profile
 	userObj := client.SObject("User")
 	userObj.Set("Id", salesforceUserId)
-	userObj.Set("ProfileId", defaultProfileId)
+	userObj.Set("ProfileId", priorProfileId)
 
 	result := userObj.Update()
 	if result == nil {
-		return nil, fmt.Errorf("failed to update user profile to default")
+		return nil, temporal.NewApplicationErrorWithOptions(
+			"failed to update user profile to prior profile",
+			"SalesforceProfileUpdateError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+			},
+		)
 	}
 
-	return nil, nil
+	logrus.WithFields(logrus.Fields{
+		"user_id":               salesforceUserId,
+		"user_email":            user.Email,
+		MetadataPriorProfileKey: priorProfileId,
+		"current_profile":       currentProfileId,
+	}).Info("Successfully revoked Salesforce role and reverted to prior profile")
+
+	return &models.RevokeRoleResponse{}, nil
 }
 
 func (p *salesForceProvider) GetAuthorizedAccessUrl(
@@ -165,6 +232,63 @@ func (p *salesForceProvider) GetAuthorizedAccessUrl(
 ) string {
 
 	return p.GetConfig().GetStringWithDefault(
-		"sso_start_url", "https://login.salesforce.com/")
+		"sso_start_url",
+		p.GetConfig().GetStringWithDefault(
+			"endpoint", "https://login.salesforce.com/",
+		),
+	)
 
+}
+
+func (p *salesForceProvider) createUser(user *models.User, profileId string) (*simpleforce.SObject, error) {
+	logrus.WithField("email", user.Email).Info("User not found in Salesforce, creating new user")
+
+	username := user.GetUsername()
+
+	if len(username) == 0 {
+		return nil, fmt.Errorf("cannot create salesforce user without username")
+	}
+
+	newUser := p.client.SObject("User")
+	newUser.Set("Username", user.Email) // Username must be in email format
+	newUser.Set("Email", user.Email)
+
+	firstName := user.GetFirstName()
+	lastName := user.GetLastName()
+
+	// Salesforce firstname and lastname cannot be empty
+	if len(firstName) == 0 {
+		firstName = "Unknown"
+	}
+	if len(lastName) == 0 {
+		lastName = "Unknown"
+	}
+
+	newUser.Set("FirstName", firstName)
+	newUser.Set("LastName", lastName)
+	// Salesforce Alias field has a maximum length of 8 characters
+	alias := username
+	if len(alias) > 8 {
+		alias = alias[:8]
+	}
+	newUser.Set("Alias", alias)
+
+	newUser.Set("TimeZoneSidKey", "America/Los_Angeles")
+	newUser.Set("LocaleSidKey", "en_US")
+	newUser.Set("EmailEncodingKey", "UTF-8")
+	newUser.Set("LanguageLocaleKey", "en_US")
+	newUser.Set("ProfileId", profileId)
+
+	result := newUser.Create()
+	if result == nil {
+		return nil, temporal.NewApplicationErrorWithOptions(
+			"failed to create user in Salesforce",
+			"SalesforceUserCreateError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+			},
+		)
+	}
+
+	return result, nil
 }

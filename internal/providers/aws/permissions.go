@@ -14,6 +14,16 @@ import (
 )
 
 func (p *awsProvider) LoadPermissions() error {
+	data, err := getSharedData()
+	if err != nil {
+		return err
+	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	return nil
+}
+
+func loadPermissions() ([]models.ProviderPermission, map[string]*models.ProviderPermission, error) {
 
 	startTime := time.Now()
 	defer func() {
@@ -24,7 +34,7 @@ func (p *awsProvider) LoadPermissions() error {
 	// Get pre-parsed AWS permissions from data package
 	docs, err := data.GetParsedAwsDocs()
 	if err != nil {
-		return fmt.Errorf("failed to get parsed AWS permissions: %w", err)
+		return nil, nil, fmt.Errorf("failed to get parsed AWS permissions: %w", err)
 	}
 
 	var permissions []models.ProviderPermission
@@ -40,14 +50,7 @@ func (p *awsProvider) LoadPermissions() error {
 		permissionsMap[strings.ToLower(name)] = &permissions[len(permissions)-1] // Reference to the slice element
 	}
 
-	p.permissions = permissions
-	p.permissionsMap = permissionsMap
-
-	logrus.WithFields(logrus.Fields{
-		"permissions": len(permissions),
-	}).Debug("Loaded AWS permissions, building search index in background")
-
-	return nil
+	return permissions, permissionsMap, nil
 }
 
 func (p *awsProvider) GetPermission(ctx context.Context, permission string) (*models.ProviderPermission, error) {
