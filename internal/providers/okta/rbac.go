@@ -139,7 +139,7 @@ func (p *oktaProvider) AuthorizeRole(
 				}
 
 				return nil, temporal.NewApplicationErrorWithOptions(
-					fmt.Sprintf("failed to assign role %s to user: %w", roleType, err),
+					fmt.Sprintf("failed to assign role %s to user: %v", roleType, err),
 					"OktaRoleAssignmentError",
 					temporal.ApplicationErrorOptions{
 						NextRetryDelay: 3 * time.Second,
@@ -188,7 +188,7 @@ func (p *oktaProvider) AuthorizeRole(
 
 		if err != nil {
 			return nil, temporal.NewApplicationErrorWithOptions(
-				fmt.Sprintf("failed to assign custom role to user: %w", err),
+				fmt.Sprintf("failed to assign custom role to user: %v", err),
 				"OktaCustomRoleAssignmentError",
 				temporal.ApplicationErrorOptions{
 					NextRetryDelay: 3 * time.Second,
@@ -227,7 +227,7 @@ func (p *oktaProvider) AuthorizeRole(
 
 				if err != nil {
 					return nil, temporal.NewApplicationErrorWithOptions(
-						fmt.Sprintf("failed to assign user to application %s: %w", appResource.Name, err),
+						fmt.Sprintf("failed to assign user to application %s: %v", appResource.Name, err),
 						"OktaApplicationAssignmentError",
 						temporal.ApplicationErrorOptions{
 							NextRetryDelay: 3 * time.Second,
@@ -289,21 +289,42 @@ func (p *oktaProvider) RevokeRole(
 	// Revoke roles
 	if len(metadata.Roles) > 0 {
 		if err := p.revokeRoles(ctx, metadata.Roles, oktaUser.Id, user.Email); err != nil {
-			return nil, err
+			return nil, temporal.NewApplicationErrorWithOptions(
+				"Failed to revoke roles from user",
+				"OktaRolesRevokationError",
+				temporal.ApplicationErrorOptions{
+					NextRetryDelay: 3 * time.Second,
+					Cause:          err,
+				},
+			)
 		}
 	}
 
 	// Revoke groups
 	if len(metadata.Groups) > 0 {
 		if err := p.revokeGroups(ctx, metadata.Groups, oktaUser.Id, user.Email); err != nil {
-			return nil, err
+			return nil, temporal.NewApplicationErrorWithOptions(
+				"Failed to revoke groups from user",
+				"OktaGroupsRevocationError",
+				temporal.ApplicationErrorOptions{
+					NextRetryDelay: 3 * time.Second,
+					Cause:          err,
+				},
+			)
 		}
 	}
 
 	// Revoke applications
 	if len(metadata.Resources) > 0 {
 		if err := p.revokeResources(ctx, metadata.Resources, oktaUser.Id, user.Email); err != nil {
-			return nil, err
+			return nil, temporal.NewApplicationErrorWithOptions(
+				"Failed to revoke resources from user",
+				"OktaResourcesRevocationError",
+				temporal.ApplicationErrorOptions{
+					NextRetryDelay: 3 * time.Second,
+					Cause:          err,
+				},
+			)
 		}
 	}
 
@@ -313,46 +334,20 @@ func (p *oktaProvider) RevokeRole(
 // revokeRoles revokes roles from user
 func (p *oktaProvider) revokeRoles(ctx context.Context, roleIds []string, userId string, userEmail string) error {
 	for _, roleId := range roleIds {
-		// First check if the role is a custom role
-		foundRole, err := p.GetRole(ctx, roleId)
+
+		// This is a standard role, remove via Assignments API
+		_, err := p.client.User.RemoveRoleFromUser(ctx, userId, roleId)
 
 		if err != nil {
-			// This is a custom role we need to remove via resource set assignments
-			err = p.assignCustomRoleToUser(ctx, ResourceSetAssignmentRequest{
-				Remove: []ResourceSetAssignment{
-					{
-						PrincipalID:     userId,
-						PrincipalType:   "USER",
-						PermissionSetID: roleId,
-						ResourceSetID:   "", // Assuming empty for now; adjust as needed
-					},
-				},
-			})
-
-			if err != nil {
-				return fmt.Errorf("failed to revoke custom role %s from user: %w", roleId, err)
-			}
-
-			logrus.WithFields(logrus.Fields{
-				"user_id":    userId,
-				"user_email": userEmail,
-				"role_id":    roleId,
-			}).Info("Successfully revoked custom role from user in Okta")
-
-		} else if foundRole != nil {
-			// This is a standard role, remove via Assignments API
-			_, err = p.client.User.RemoveRoleFromUser(ctx, userId, roleId)
-
-			if err != nil {
-				return fmt.Errorf("failed to revoke role %s from user: %w", roleId, err)
-			}
-
-			logrus.WithFields(logrus.Fields{
-				"user_id":    userId,
-				"user_email": userEmail,
-				"role_id":    roleId,
-			}).Info("Successfully revoked role from user in Okta")
+			return fmt.Errorf("failed to revoke role %s from user: %w", roleId, err)
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"user_id":    userId,
+			"user_email": userEmail,
+			"role_id":    roleId,
+		}).Info("Successfully revoked role from user in Okta")
+
 	}
 
 	return nil
