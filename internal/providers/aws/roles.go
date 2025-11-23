@@ -14,6 +14,16 @@ import (
 )
 
 func (p *awsProvider) LoadRoles() error {
+	data, err := getSharedData()
+	if err != nil {
+		return err
+	}
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
+	return nil
+}
+
+func loadRoles() ([]models.ProviderRole, map[string]*models.ProviderRole, error) {
 
 	startTime := time.Now()
 	defer func() {
@@ -24,7 +34,7 @@ func (p *awsProvider) LoadRoles() error {
 	// Get pre-parsed AWS roles from data package
 	docs, err := data.GetParsedAwsRoles()
 	if err != nil {
-		return fmt.Errorf("failed to get parsed AWS roles: %w", err)
+		return nil, nil, fmt.Errorf("failed to get parsed AWS roles: %w", err)
 	}
 
 	var roles []models.ProviderRole
@@ -39,14 +49,7 @@ func (p *awsProvider) LoadRoles() error {
 		rolesMap[strings.ToLower(policy.Name)] = &roles[len(roles)-1] // Reference to the slice element
 	}
 
-	p.roles = roles
-	p.rolesMap = rolesMap
-
-	logrus.WithFields(logrus.Fields{
-		"roles": len(roles),
-	}).Debug("Loaded AWS roles, building search index in background")
-
-	return nil
+	return roles, rolesMap, nil
 }
 
 func (p *awsProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
