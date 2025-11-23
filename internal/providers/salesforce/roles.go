@@ -31,6 +31,7 @@ func (p *salesForceProvider) LoadRoles() ([]models.ProviderRole, error) {
 	}
 
 	var roles []models.ProviderRole
+	rolesMap := make(map[string]*models.ProviderRole)
 
 	// Process query results
 	for _, record := range result.Records {
@@ -38,11 +39,14 @@ func (p *salesForceProvider) LoadRoles() ([]models.ProviderRole, error) {
 			Id:          record.StringField("Id"),
 			Name:        record.StringField("Name"),
 			Description: record.StringField("Description"),
+			Role:        record,
 		}
 		roles = append(roles, role)
+		rolesMap[strings.ToLower(role.Name)] = &roles[len(roles)-1]
 	}
 
 	p.roles = roles
+	p.rolesMap = rolesMap
 	p.rolesIndex = rolesIndex
 
 	logrus.WithFields(logrus.Fields{
@@ -55,11 +59,9 @@ func (p *salesForceProvider) LoadRoles() ([]models.ProviderRole, error) {
 
 func (p *salesForceProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
 
-	// loop over and match role by name
-	for _, r := range p.roles {
-		if strings.Compare(r.Name, role) == 0 {
-			return &r, nil
-		}
+	role = strings.ToLower(role)
+	if r, exists := p.rolesMap[role]; exists {
+		return r, nil
 	}
 	return nil, fmt.Errorf("role not found")
 }

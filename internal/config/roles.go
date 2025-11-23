@@ -202,16 +202,49 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 	var remainingInherits []string
 	for _, inheritedRoleName := range baseRole.Inherits {
 
-		// First check to see if the rolename exists as-is for
-		// one of the providers
-		providerRole := c.GetProviderRole(inheritedRoleName, baseRole.Providers...)
+		var providerRole *models.ProviderRole
+
+		// Inherited roles can cascade through providers
+		// if we have a provider called aws-prod then an inherited role
+		// like this "aws-prod:admin" should only apply to that provider
+		// if however, I have the "aws:admin" which is the underlying provider type
+		// then this should apply to any aws provider. The baseRole is the context here.
+		// Always compare against the baseRole's providers.
+
+		// Check if the prefix is a matching provider
+		if providerName, roleName, isProvider := c.parseRoleSpec(inheritedRoleName); isProvider {
+			// Use that exact provider to lookup the role
+			providerRole = c.GetProviderRole(roleName, providerName)
+
+			// Check to make sure that the found provider role is in the base provider
+			if !slices.Contains(baseRole.Providers, providerName) {
+
+				logrus.WithFields(logrus.Fields{
+					"base_role":      baseRole.Name,
+					"inherited_role": inheritedRoleName,
+				}).Infoln("The provider role found does not belong to the base role's providers, skipping")
+				continue
+			}
+
+		}
+
+		// If not found as explicit provider role, check against baseRole's providers
+		if providerRole == nil {
+			providerRole = c.GetProviderRole(inheritedRoleName, baseRole.Providers...)
+		}
 
 		if providerRole != nil {
+
 			// Keep provider roles in the inherits list
-			remainingInherits = append(remainingInherits, inheritedRoleName)
+			if len(providerRole.Name) > 0 {
+				remainingInherits = append(remainingInherits, providerRole.Name)
+			} else if len(providerRole.Id) > 0 {
+				remainingInherits = append(remainingInherits, providerRole.Id)
+			}
 			continue
 		}
 
+		// Lastly, as the role does not belong to a provider, we try to resolve it as a normal role
 		// Try to resolve the inherited role (which handles provider-specific inheritance and scope checking)
 		inheritedRole, err := c.resolveInheritedRole(identity, inheritedRoleName, visited)
 		if err != nil {
@@ -241,33 +274,9 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 }
 
 // resolveInheritedRole handles provider-specific role inheritance and scope checking
-func (c *Config) resolveInheritedRole(identity *models.Identity, inheritSpec string, visited map[string]bool) (*models.Role, error) {
-	var baseRoleName string
+func (c *Config) resolveInheritedRole(identity *models.Identity, baseRoleName string, visited map[string]bool) (*models.Role, error) {
 	var baseRole *models.Role
 	var err error
-
-	// Check if inheritance specifies a provider (format: "provider:role")
-	// Split only on the first colon to handle role names with multiple colons (e.g., AWS ARNs)
-	colonIndex := strings.Index(inheritSpec, ":")
-	if colonIndex > 0 && colonIndex < len(inheritSpec)-1 {
-		providerName := inheritSpec[:colonIndex]
-		roleName := inheritSpec[colonIndex+1:]
-
-		// First try to find a provider with this name
-		_, err := c.GetProviderByName(providerName)
-		if err != nil {
-			// If provider not found, treat the whole string as a role name
-			baseRoleName = inheritSpec
-		} else {
-			// If provider exists, use the role name part
-			// For now, we'll fall back to treating it as a regular role name
-			// This could be extended to support provider-specific role resolution
-			baseRoleName = roleName
-		}
-	} else {
-		// Regular role inheritance
-		baseRoleName = inheritSpec
-	}
 
 	// Get the base role for scope checking
 	baseRole, err = c.GetRoleByName(baseRoleName)
@@ -532,6 +541,30 @@ func (c *Config) mergeStringSlices(slice1, slice2 []string) []string {
 	}
 
 	return result
+}
+
+// parseRoleSpec parses a role specification string (e.g. "provider:role")
+// Returns providerName, roleName, and true if it matches a known provider.
+// If it matches a provider, roleName is the part after the first colon.
+// If it does not match a provider, providerName is empty and roleName is the original spec.
+func (c *Config) parseRoleSpec(spec string) (string, string, bool) {
+	// Split only on the first colon to handle role names with multiple colons (e.g., AWS ARNs)
+	colonIndex := strings.Index(spec, ":")
+	if colonIndex > 0 && colonIndex < len(spec)-1 {
+		providerName := spec[:colonIndex]
+		roleName := spec[colonIndex+1:]
+
+		// First, check if providerName matches a known provider
+		if _, err := c.GetProviderByName(providerName); err == nil {
+			return providerName, roleName, true
+		}
+
+		// Otherwise, it's not a known provider and it might be the provider engine i.e. "aws", "gcp", etc.
+		if foundProviderName, _, err := c.GetProvider(providerName); err == nil {
+			return foundProviderName, roleName, true
+		}
+	}
+	return "", spec, false
 }
 
 // expandCondensedActions expands a condensed permission like "k8s:pods:get,list,watch"

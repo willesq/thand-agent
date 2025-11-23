@@ -17,6 +17,7 @@ type salesForceProvider struct {
 	*models.BaseProvider
 	client     *simpleforce.Client
 	roles      []models.ProviderRole
+	rolesMap   map[string]*models.ProviderRole
 	rolesIndex bleve.Index
 }
 
