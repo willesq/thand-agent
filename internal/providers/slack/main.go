@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/slack-go/slack"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
+	"go.temporal.io/sdk/temporal"
 )
 
 const SlackProviderName = "slack"
@@ -109,7 +111,14 @@ func (p *slackProvider) SendNotification(ctx context.Context, notification model
 	// Send the message
 	_, _, err := p.client.PostMessageContext(ctx, slackRequest.To, options...)
 	if err != nil {
-		return fmt.Errorf("failed to send Slack message: %w", err)
+		return temporal.NewApplicationErrorWithOptions(
+			fmt.Sprintf("failed to send Slack message to %s: %v", slackRequest.To, err),
+			"SlackNotificationError",
+			temporal.ApplicationErrorOptions{
+				NextRetryDelay: 3 * time.Second,
+				Cause:          err,
+			},
+		)
 	}
 
 	return nil

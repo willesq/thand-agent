@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -79,13 +80,12 @@ func (p *oktaProvider) loadApplicationResources(ctx context.Context) ([]models.P
 	for _, app := range apps {
 		// Type assertion to get the underlying Application struct
 		// The App interface wraps different application types
-		if appImpl, ok := app.(OktaApplication); ok {
+		if appImpl, ok := app.(*okta.Application); ok {
 			resource := models.ProviderResource{
-				Id:          appImpl.GetId(),
-				Type:        resourceTypeApplication,
-				Name:        appImpl.GetLabel(),
-				Description: fmt.Sprintf("Application: %s (Type: %s, Status: %s)", appImpl.GetLabel(), appImpl.GetName(), appImpl.GetStatus()),
-				Resource:    app, // In-memory only: stores the full app object to avoid GetApplication API calls later; not persisted due to json:"-" tag
+				Id:       appImpl.Id,
+				Type:     resourceTypeApplication,
+				Name:     appImpl.Label,
+				Resource: app, // In-memory only: stores the full app object to avoid GetApplication API calls later; not persisted due to json:"-" tag
 			}
 			resources = append(resources, resource)
 		}
