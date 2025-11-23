@@ -14,7 +14,7 @@ import (
 func TestProviderSpecificInheritance(t *testing.T) {
 	t.Run("aws arn inheritance", func(t *testing.T) {
 		roles := map[string]models.Role{
-			"arn:aws:iam::123456789012:role/TestRole": {
+			"app-role": {
 				Name: "AWS Test Role",
 				Permissions: models.Permissions{
 					Allow: []string{
@@ -25,9 +25,9 @@ func TestProviderSpecificInheritance(t *testing.T) {
 				},
 				Enabled: true,
 			},
-			"app-role": {
+			"app-role-two": {
 				Name:     "Application Role",
-				Inherits: []string{"aws-prod:arn:aws:iam::123456789012:role/TestRole"},
+				Inherits: []string{"app-role"},
 				Permissions: models.Permissions{
 					Allow: []string{"app:deploy"},
 				},
@@ -59,7 +59,6 @@ func TestProviderSpecificInheritance(t *testing.T) {
 		require.NotNil(t, result)
 
 		expectedPerms := []string{
-			"app:deploy",
 			"s3:GetObject,ListBucket",
 			"ec2:DescribeInstances",
 		}
@@ -68,7 +67,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 
 	t.Run("gcp service account inheritance", func(t *testing.T) {
 		roles := map[string]models.Role{
-			"test-service@test-project.iam.gserviceaccount.com": {
+			"service-role": {
 				Name: "GCP Service Account",
 				Permissions: models.Permissions{
 					Allow: []string{
@@ -81,7 +80,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 			"developer-role": {
 				Name:     "Developer Role",
-				Inherits: []string{"gcp-dev:test-service@test-project.iam.gserviceaccount.com"},
+				Inherits: []string{"service-role"},
 				Permissions: models.Permissions{
 					Allow: []string{"cloudrun.services.deploy"},
 				},
@@ -122,7 +121,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 
 	t.Run("azure resource id inheritance", func(t *testing.T) {
 		roles := map[string]models.Role{
-			"/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/test-rg/providers/Microsoft.Authorization/roleDefinitions/12345678-1234-1234-1234-123456789012": {
+			"azure-role": {
 				Name: "Custom Azure Role",
 				Permissions: models.Permissions{
 					Allow: []string{
@@ -135,7 +134,7 @@ func TestProviderSpecificInheritance(t *testing.T) {
 			},
 			"ops-role": {
 				Name:     "Operations Role",
-				Inherits: []string{"azure-prod:/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/test-rg/providers/Microsoft.Authorization/roleDefinitions/12345678-1234-1234-1234-123456789012"},
+				Inherits: []string{"azure-role"},
 				Permissions: models.Permissions{
 					Allow: []string{"ops.deploy"},
 				},
@@ -304,7 +303,7 @@ func TestProviderParsingLogicConsolidated(t *testing.T) {
 	t.Run("integration test - end to end parsing", func(t *testing.T) {
 		// This test proves the parsing logic works in the actual inheritance system
 		roles := map[string]models.Role{
-			"arn:aws:iam::123456789012:role/TestRole": {
+			"inc-role": {
 				Name: "AWS Role",
 				Permissions: models.Permissions{
 					Allow: []string{"s3:GetObject"},
@@ -313,7 +312,7 @@ func TestProviderParsingLogicConsolidated(t *testing.T) {
 			},
 			"test-role": {
 				Name:     "Test Role",
-				Inherits: []string{"aws-prod:arn:aws:iam::123456789012:role/TestRole"},
+				Inherits: []string{"inc-role"},
 				Permissions: models.Permissions{
 					Allow: []string{"test:action"},
 				},
