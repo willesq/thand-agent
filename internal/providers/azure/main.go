@@ -47,20 +47,33 @@ func (p *azureProvider) Initialize(provider models.Provider) error {
 		models.ProviderCapabilityRBAC,
 	)
 
-	// Load Azure Permissions from internal/data/iam-dataset/azure/provider-operations.json
-	err := p.LoadPermissions()
+	// Load Azure Permissions and Roles from shared singleton
+	data, err := getSharedData()
 	if err != nil {
-		return fmt.Errorf("failed to load permissions: %w", err)
+		return fmt.Errorf("failed to load shared Azure data: %w", err)
 	}
 
-	// Load Azure Roles from internal/data/iam-dataset/azure/built-in-roles.json
-	err = p.LoadRoles()
-	if err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
 
-	// Start background indexing
-	go p.buildSearchIndex()
+	// Assign indices if ready, otherwise wait in background
+	select {
+	case <-data.indexReady:
+		p.indexMu.Lock()
+		p.permissionsIndex = data.permissionsIndex
+		p.rolesIndex = data.rolesIndex
+		p.indexMu.Unlock()
+	default:
+		go func() {
+			<-data.indexReady
+			p.indexMu.Lock()
+			p.permissionsIndex = data.permissionsIndex
+			p.rolesIndex = data.rolesIndex
+			p.indexMu.Unlock()
+		}()
+	}
 
 	config := p.GetConfig()
 

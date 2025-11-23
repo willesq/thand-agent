@@ -253,6 +253,16 @@ func (p *azureProvider) ListRoles(ctx context.Context, filters ...string) ([]mod
 
 // LoadRoles loads Azure built-in roles from the embedded roles data
 func (p *azureProvider) LoadRoles() error {
+	data, err := getSharedData()
+	if err != nil {
+		return err
+	}
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
+	return nil
+}
+
+func loadRoles() ([]models.ProviderRole, map[string]*models.ProviderRole, error) {
 
 	startTime := time.Now()
 	defer func() {
@@ -263,7 +273,7 @@ func (p *azureProvider) LoadRoles() error {
 	// Get pre-parsed Azure roles from data package
 	azureRoles, err := data.GetParsedAzureRoles()
 	if err != nil {
-		return fmt.Errorf("failed to get parsed Azure roles: %w", err)
+		return nil, nil, fmt.Errorf("failed to get parsed Azure roles: %w", err)
 	}
 
 	var roles []models.ProviderRole
@@ -278,14 +288,7 @@ func (p *azureProvider) LoadRoles() error {
 		rolesMap[strings.ToLower(role.Name)] = &roles[len(roles)-1] // Reference to the slice element
 	}
 
-	p.roles = roles
-	p.rolesMap = rolesMap
-
-	logrus.WithFields(logrus.Fields{
-		"roles": len(roles),
-	}).Debug("Loaded Azure built-in roles, building search index in background")
-
-	return nil
+	return roles, rolesMap, nil
 }
 
 /*

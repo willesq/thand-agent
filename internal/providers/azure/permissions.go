@@ -60,6 +60,16 @@ func (p *azureProvider) ListPermissions(ctx context.Context, filters ...string) 
 
 // LoadPermissions loads Azure permissions from the embedded provider operations data
 func (p *azureProvider) LoadPermissions() error {
+	data, err := getSharedData()
+	if err != nil {
+		return err
+	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	return nil
+}
+
+func loadPermissions() ([]models.ProviderPermission, map[string]*models.ProviderPermission, error) {
 
 	startTime := time.Now()
 	defer func() {
@@ -70,7 +80,7 @@ func (p *azureProvider) LoadPermissions() error {
 	// Get pre-parsed Azure permissions from data package
 	azureOperations, err := data.GetParsedAzurePermissions()
 	if err != nil {
-		return fmt.Errorf("failed to get parsed Azure permissions: %w", err)
+		return nil, nil, fmt.Errorf("failed to get parsed Azure permissions: %w", err)
 	}
 
 	var permissions []models.ProviderPermission
@@ -85,12 +95,5 @@ func (p *azureProvider) LoadPermissions() error {
 		permissionsMap[strings.ToLower(operation.Name)] = &permissions[len(permissions)-1] // Reference to the slice element
 	}
 
-	p.permissions = permissions
-	p.permissionsMap = permissionsMap
-
-	logrus.WithFields(logrus.Fields{
-		"permissions": len(permissions),
-	}).Debug("Loaded Azure permissions, building search index in background")
-
-	return nil
+	return permissions, permissionsMap, nil
 }
