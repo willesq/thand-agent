@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -59,14 +60,14 @@ func getSharedData(stage string) (*gcpData, error) {
 
 		// Build indices in background
 		go func() {
+			defer close(data.indexReady)
 			pIdx, rIdx, err := buildIndices(data.permissions, data.roles)
 			if err != nil {
-				// Log error but don't fail the whole provider initialization
+				logrus.WithError(err).Error("Failed to build GCP search indices")
 				return
 			}
 			data.permissionsIndex = pIdx
 			data.rolesIndex = rIdx
-			close(data.indexReady)
 		}()
 
 		singleton.data = data

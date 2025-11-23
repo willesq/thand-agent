@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -46,15 +47,14 @@ func getSharedData() (*awsData, error) {
 
 		// Build indices in background
 		go func() {
+			defer close(sharedData.indexReady)
 			pIdx, rIdx, err := buildIndices(sharedData.permissions, sharedData.roles)
 			if err != nil {
-				// Log error but don't fail the whole provider initialization
-				// The provider will continue without search capabilities
+				logrus.WithError(err).Error("Failed to build AWS search indices")
 				return
 			}
 			sharedData.permissionsIndex = pIdx
 			sharedData.rolesIndex = rIdx
-			close(sharedData.indexReady)
 		}()
 	})
 	return sharedData, sharedDataErr
