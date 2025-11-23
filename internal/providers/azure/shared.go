@@ -1,4 +1,4 @@
-package aws
+package azure
 
 import (
 	"sync"
@@ -8,7 +8,7 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-type awsData struct {
+type azureData struct {
 	permissions      []models.ProviderPermission
 	permissionsMap   map[string]*models.ProviderPermission
 	permissionsIndex bleve.Index
@@ -21,14 +21,14 @@ type awsData struct {
 }
 
 var (
-	sharedData     *awsData
+	sharedData     *azureData
 	sharedDataOnce sync.Once
 	sharedDataErr  error
 )
 
-func getSharedData() (*awsData, error) {
+func getSharedData() (*azureData, error) {
 	sharedDataOnce.Do(func() {
-		sharedData = &awsData{
+		sharedData = &azureData{
 			indexReady: make(chan struct{}),
 		}
 		var err error
@@ -50,7 +50,7 @@ func getSharedData() (*awsData, error) {
 			defer close(sharedData.indexReady)
 			pIdx, rIdx, err := buildIndices(sharedData.permissions, sharedData.roles)
 			if err != nil {
-				logrus.WithError(err).Error("Failed to build AWS search indices")
+				logrus.WithError(err).Error("Failed to build Azure search indices")
 				return
 			}
 			sharedData.permissionsIndex = pIdx

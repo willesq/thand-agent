@@ -27,16 +27,23 @@ func (p *azureProviderMock) Initialize(provider models.Provider) error {
 		models.ProviderCapabilityRBAC,
 	)
 
-	// Load Azure Permissions and Roles from embedded resources (no cloud connection)
-	err := p.LoadPermissions()
+	// Load Azure Permissions and Roles from shared singleton
+	data, err := getSharedData()
 	if err != nil {
 		return err
 	}
 
-	err = p.LoadRoles()
-	if err != nil {
-		return err
-	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
+
+	// Wait for indices to be ready for mock
+	<-data.indexReady
+	p.indexMu.Lock()
+	p.permissionsIndex = data.permissionsIndex
+	p.rolesIndex = data.rolesIndex
+	p.indexMu.Unlock()
 
 	// Skip initializing Azure clients and credentials
 	// This prevents actual Azure API connections during tests

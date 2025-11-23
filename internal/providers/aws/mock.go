@@ -25,20 +25,23 @@ func (p *awsProviderMock) Initialize(provider models.Provider) error {
 		models.ProviderCapabilityRBAC,
 	)
 
-	// Load AWS Permissions. This loads from internal/data/iam-dataset/aws/docs.json
-	// this is an embedded resource
-	err := p.awsProvider.LoadPermissions()
+	// Load AWS Permissions and Roles from shared singleton
+	data, err := getSharedData()
 	if err != nil {
-		return fmt.Errorf("failed to load permissions: %w", err)
+		return fmt.Errorf("failed to load shared AWS data: %w", err)
 	}
 
-	err = p.awsProvider.LoadRoles()
-	if err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
 
-	// Start indexing synchronously for testing to avoid race conditions
-	p.awsProvider.buildSearchIndex()
+	// Wait for indices to be ready for mock
+	<-data.indexReady
+	p.indexMu.Lock()
+	p.permissionsIndex = data.permissionsIndex
+	p.rolesIndex = data.rolesIndex
+	p.indexMu.Unlock()
 
 	// TODO: Implement AWS client initialization if mock interactions with AWS services are needed.
 

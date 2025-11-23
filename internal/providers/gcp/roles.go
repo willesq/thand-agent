@@ -14,6 +14,16 @@ import (
 )
 
 func (p *gcpProvider) LoadRoles(stage string) error {
+	data, err := getSharedData(stage)
+	if err != nil {
+		return err
+	}
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
+	return nil
+}
+
+func loadRoles(stage string) ([]models.ProviderRole, map[string]*models.ProviderRole, error) {
 
 	startTime := time.Now()
 	defer func() {
@@ -24,7 +34,7 @@ func (p *gcpProvider) LoadRoles(stage string) error {
 	// Get pre-parsed GCP roles from data package
 	predefinedRoles, err := data.GetParsedGcpRoles()
 	if err != nil {
-		return fmt.Errorf("failed to get parsed GCP roles: %w", err)
+		return nil, nil, fmt.Errorf("failed to get parsed GCP roles: %w", err)
 	}
 
 	var roles = make([]models.ProviderRole, 0, len(predefinedRoles))
@@ -49,14 +59,7 @@ func (p *gcpProvider) LoadRoles(stage string) error {
 		rolesMap[strings.ToLower(gcpRole.Name)] = &roles[len(roles)-1] // Reference to the slice element
 	}
 
-	p.roles = roles
-	p.rolesMap = rolesMap
-
-	logrus.WithFields(logrus.Fields{
-		"roles": len(roles),
-	}).Debug("Loaded GCP roles, building search index in background")
-
-	return nil
+	return roles, rolesMap, nil
 }
 
 func (p *gcpProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {

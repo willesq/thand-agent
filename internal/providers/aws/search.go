@@ -9,19 +9,6 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-// buildSearchIndex builds the Bleve search index for AWS permissions and roles
-func (p *awsProvider) buildSearchIndex() {
-	data, err := getSharedData()
-	if err != nil {
-		logrus.Errorf("Failed to get shared data for search index: %v", err)
-		return
-	}
-	p.indexMu.Lock()
-	p.permissionsIndex = data.permissionsIndex
-	p.rolesIndex = data.rolesIndex
-	p.indexMu.Unlock()
-}
-
 func buildIndices(permissions []models.ProviderPermission, roles []models.ProviderRole) (bleve.Index, bleve.Index, error) {
 	startTime := time.Now()
 	defer func() {

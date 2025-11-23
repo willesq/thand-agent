@@ -27,17 +27,24 @@ func (p *gcpProviderMock) Initialize(provider models.Provider) error {
 		models.ProviderCapabilityRBAC,
 	)
 
-	// Load GCP Permissions and Roles from embedded resources (no cloud connection)
+	// Load GCP Permissions and Roles from shared singleton
 	// Use default stage for testing
-	err := p.LoadPermissions(DefaultStage)
+	data, err := getSharedData(DefaultStage)
 	if err != nil {
 		return err
 	}
 
-	err = p.LoadRoles(DefaultStage)
-	if err != nil {
-		return err
-	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	p.roles = data.roles
+	p.rolesMap = data.rolesMap
+
+	// Wait for indices to be ready for mock
+	<-data.indexReady
+	p.indexMu.Lock()
+	p.permissionsIndex = data.permissionsIndex
+	p.rolesIndex = data.rolesIndex
+	p.indexMu.Unlock()
 
 	// Skip initializing GCP clients (iamClient, crmClient)
 	// This prevents actual GCP API connections during tests

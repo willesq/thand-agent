@@ -42,6 +42,16 @@ type gcpPermissionMap []struct {
 }
 
 func (p *gcpProvider) LoadPermissions(stage string) error {
+	data, err := getSharedData(stage)
+	if err != nil {
+		return err
+	}
+	p.permissions = data.permissions
+	p.permissionsMap = data.permissionsMap
+	return nil
+}
+
+func loadPermissions(stage string) ([]models.ProviderPermission, map[string]*models.ProviderPermission, error) {
 	var permissionMap gcpPermissionMap
 
 	startTime := time.Now()
@@ -52,7 +62,7 @@ func (p *gcpProvider) LoadPermissions(stage string) error {
 
 	// Load GCP Permissions
 	if err := json.Unmarshal(GetGcpPermissions(), &permissionMap); err != nil {
-		return fmt.Errorf("failed to unmarshal GCP permissions: %w", err)
+		return nil, nil, fmt.Errorf("failed to unmarshal GCP permissions: %w", err)
 	}
 
 	var permissions = make([]models.ProviderPermission, 0, len(permissionMap))
@@ -81,14 +91,7 @@ func (p *gcpProvider) LoadPermissions(stage string) error {
 		permissionsMap[strings.ToLower(perm.Name)] = &permissions[len(permissions)-1] // Reference to the slice element
 	}
 
-	p.permissions = permissions
-	p.permissionsMap = permissionsMap
-
-	logrus.WithFields(logrus.Fields{
-		"permissions": len(permissions),
-	}).Debug("Loaded GCP permissions, building search index in background")
-
-	return nil
+	return permissions, permissionsMap, nil
 }
 
 func (p *gcpProvider) GetPermission(ctx context.Context, permission string) (*models.ProviderPermission, error) {
