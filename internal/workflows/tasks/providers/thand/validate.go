@@ -7,7 +7,6 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
@@ -30,8 +29,9 @@ func (t *thandTask) executeValidateTask(
 		return nil, errors.New("request cannot be nil")
 	}
 
-	// The request should always map to an Elevate Request object
+	log := workflowTask.GetLogger()
 
+	// The request should always map to an Elevate Request object
 	var elevateRequest models.ElevateRequestInternal
 	if err := common.ConvertMapToInterface(req, &elevateRequest); err != nil {
 		return nil, fmt.Errorf("failed to convert request: %w", err)
@@ -61,7 +61,7 @@ func (t *thandTask) executeValidateTask(
 		duration = "t" + duration
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"duration": duration,
 		"role":     role,
 		"reason":   reason,
@@ -83,7 +83,7 @@ func (t *thandTask) executeValidateTask(
 		validator = VALIDATOR_STATIC
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"validator": validator,
 	}).Info("Executing validation")
 
@@ -112,7 +112,7 @@ func (t *thandTask) executeValidateTask(
 		maps.Copy(responseOut, validateOut)
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"role":      elevateRequest.Role,
 		"providers": elevateRequest.Providers,
 		"output":    validateOut,
