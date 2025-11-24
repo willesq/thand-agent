@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -18,7 +18,9 @@ func (r *ResumableWorkflowRunner) executeTryTask(
 	input any,
 ) (any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 	}).Info("Executing Try task")
 
@@ -40,7 +42,7 @@ func (r *ResumableWorkflowRunner) executeTryTask(
 		return tryOutput, nil
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"task":  taskName,
 		"error": tryErr,
 	}).Debug("Try block failed, evaluating catch conditions")
@@ -85,7 +87,7 @@ func (r *ResumableWorkflowRunner) executeTryTask(
 		}
 
 		// If retry also failed, continue to catch block execution
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":       taskName,
 			"retryError": retryErr,
 		}).Debug("Retry attempts exhausted, executing catch block")
@@ -93,7 +95,7 @@ func (r *ResumableWorkflowRunner) executeTryTask(
 
 	// Execute catch block if specified
 	if tryTask.Catch.Do != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).Debug("Executing catch block")
 
@@ -255,10 +257,12 @@ func (r *ResumableWorkflowRunner) validateRetryPolicy(taskName string, retryPoli
 		return nil, fmt.Errorf("no retry policy")
 	}
 
+	log := r.GetLogger()
+
 	// Resolve retry policy reference if needed
 	if len(retryPolicy.Ref) > 0 {
 		// TODO: Implement reference resolution from workflow.Use.Retries
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 			"ref":  retryPolicy.Ref,
 		}).Warn("Retry policy references not yet implemented")
@@ -287,7 +291,8 @@ func (r *ResumableWorkflowRunner) validateRetryPolicy(taskName string, retryPoli
 func (r *ResumableWorkflowRunner) checkRetryLimits(taskName string, config *retryConfig, attempt int) bool {
 	// Check if we've exceeded the maximum duration
 	if config.maxDuration > 0 && time.Since(config.startTime) > config.maxDuration {
-		logrus.WithFields(logrus.Fields{
+		log := r.GetLogger()
+		log.WithFields(models.Fields{
 			"task":        taskName,
 			"attempt":     attempt,
 			"maxDuration": config.maxDuration,
@@ -305,13 +310,15 @@ func (r *ResumableWorkflowRunner) executeRetryAttempt(
 	retryPolicy *model.RetryPolicy,
 	attempt int,
 ) (any, error) {
+
 	workflowTask := r.GetWorkflowTask()
+	log := workflowTask.GetLogger()
 
 	// Calculate delay before retry
 	delay := r.calculateRetryDelay(retryPolicy, attempt)
 
 	if delay > 0 {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":    taskName,
 			"attempt": attempt,
 			"delay":   delay,
@@ -328,7 +335,7 @@ func (r *ResumableWorkflowRunner) executeRetryAttempt(
 	}
 
 	// Retry the try block
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"task":    taskName,
 		"attempt": attempt,
 	}).Info("Retrying try block")
@@ -339,6 +346,7 @@ func (r *ResumableWorkflowRunner) executeRetryAttempt(
 // handleRetryLogic implements the retry mechanism with backoff strategies
 func (r *ResumableWorkflowRunner) handleRetryLogic(taskName string, tryTask *model.TryTask, input any, originalErr error) (any, error) {
 	retryPolicy := tryTask.Catch.Retry
+	log := r.GetLogger()
 
 	config, err := r.validateRetryPolicy(taskName, retryPolicy)
 	if err != nil {
@@ -353,15 +361,14 @@ func (r *ResumableWorkflowRunner) handleRetryLogic(taskName string, tryTask *mod
 		// Check retry conditions
 		shouldRetry, err := r.shouldRetry(retryPolicy, input, originalErr)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"task":  taskName,
-				"error": err,
-			}).Warn("Failed to evaluate retry conditions")
+			log.WithFields(models.Fields{
+				"task": taskName,
+			}).WithError(err).Warn("Failed to evaluate retry conditions")
 			break
 		}
 
 		if !shouldRetry {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"task":    taskName,
 				"attempt": attempt,
 			}).Debug("Retry conditions not met")
@@ -370,7 +377,7 @@ func (r *ResumableWorkflowRunner) handleRetryLogic(taskName string, tryTask *mod
 
 		retryOutput, retryErr := r.executeRetryAttempt(taskName, tryTask, input, retryPolicy, attempt)
 		if retryErr == nil {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"task":    taskName,
 				"attempt": attempt,
 			}).Info("Retry succeeded")
@@ -378,7 +385,7 @@ func (r *ResumableWorkflowRunner) handleRetryLogic(taskName string, tryTask *mod
 		}
 
 		// Log retry failure
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":    taskName,
 			"attempt": attempt,
 			"error":   retryErr,
@@ -422,6 +429,7 @@ func (r *ResumableWorkflowRunner) shouldRetry(retryPolicy *model.RetryPolicy, in
 // calculateRetryDelay calculates the delay before the next retry attempt
 func (r *ResumableWorkflowRunner) calculateRetryDelay(retryPolicy *model.RetryPolicy, attempt int) time.Duration {
 	var baseDelay time.Duration
+	log := r.GetLogger()
 
 	// Get base delay
 	if retryPolicy.Delay != nil {
@@ -450,7 +458,7 @@ func (r *ResumableWorkflowRunner) calculateRetryDelay(retryPolicy *model.RetryPo
 	// Apply jitter if specified
 	if retryPolicy.Jitter != nil {
 		// TODO: Implement jitter logic
-		logrus.Debug("Jitter not yet implemented for retry delays")
+		log.Debug("Jitter not yet implemented for retry delays")
 	}
 
 	return baseDelay

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -30,7 +29,9 @@ func SwitchTaskHandler(
 	switchTask *model.SwitchTask,
 ) (*model.FlowDirective, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := workflowTask.GetLogger()
+
+	log.WithFields(models.Fields{
 		"taskKey": taskKey,
 	}).Info("Evaluating switch task")
 
@@ -52,7 +53,7 @@ func SwitchTaskHandler(
 
 			if err != nil {
 
-				logrus.WithError(err).WithFields(logrus.Fields{
+				log.WithError(err).WithFields(models.Fields{
 					"taskKey": taskKey,
 					"case":    switchCase.When.String(),
 					"input":   input,
@@ -62,7 +63,7 @@ func SwitchTaskHandler(
 			}
 			if !result {
 
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(models.Fields{
 					"taskKey": taskKey,
 					"case":    switchCase.When.String(),
 					"result":  result,
@@ -71,7 +72,7 @@ func SwitchTaskHandler(
 
 			} else {
 
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(models.Fields{
 					"taskKey": taskKey,
 					"case":    switchCase.When.String(),
 					"result":  result,
@@ -80,7 +81,7 @@ func SwitchTaskHandler(
 
 				if switchCase.Then == nil {
 
-					logrus.WithFields(logrus.Fields{
+					log.WithFields(models.Fields{
 						"taskKey": taskKey,
 					}).Error("Missing 'then' directive in matched switch case")
 
@@ -92,14 +93,14 @@ func SwitchTaskHandler(
 	}
 	if defaultThen != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"taskKey": taskKey,
 		}).Info("No switch cases matched, using default 'then' directive")
 
 		return defaultThen, nil
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"taskKey": taskKey,
 	}).Info("No switch cases matched and no default 'then' directive defined")
 

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -33,7 +33,9 @@ func (r *ResumableWorkflowRunner) executeCallFunction(
 	input any,
 ) (any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 		"call": call.Call,
 	}).Info("Executing function call")

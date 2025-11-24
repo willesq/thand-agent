@@ -8,7 +8,6 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/workflow"
@@ -32,7 +31,11 @@ func ListenTaskHandler(
 	input any,
 ) (any, error) {
 
-	logrus.Infof("Got signal for: %s", taskName)
+	log := workflowTask.GetLogger()
+
+	log.WithFields(models.Fields{
+		"taskName": taskName,
+	}).Info("Got signal")
 
 	if workflowTask.HasTemporalContext() {
 
@@ -45,7 +48,7 @@ func ListenTaskHandler(
 
 		workflowSelector.AddReceive(resumeChan, func(c workflow.ReceiveChannel, more bool) {
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"taskName": taskName,
 			}).Info("Receiving resume signal...")
 
@@ -61,7 +64,7 @@ func ListenTaskHandler(
 
 			// Check if its a brand new cloudevent input or a task resumption
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"taskName": taskName,
 			}).Info("Receiving event signal...")
 
@@ -78,10 +81,14 @@ func ListenTaskHandler(
 			// This will be triggered immediately if context is already cancelled
 			// or when context gets cancelled
 
-			logrus.Info("Adding timer to detect context cancellation")
+			log.WithFields(models.Fields{
+				"taskName": taskName,
+			}).Info("Adding timer to detect context cancellation")
 
 			if cancelCtx.Err() != nil {
-				logrus.Info("Context cancellation detected via timer")
+				log.WithFields(models.Fields{
+					"taskName": taskName,
+				}).Info("Context cancellation detected via timer")
 			}
 		})
 
@@ -97,7 +104,9 @@ func ListenTaskHandler(
 
 					if errors.Is(cancelCtx.Err(), context.Canceled) {
 						// Context was cancelled
-						logrus.Info("Context was cancelled")
+						log.WithFields(models.Fields{
+							"taskName": taskName,
+						}).Info("Context was cancelled")
 					}
 					// return true to exit the wait loop
 					return true
@@ -105,29 +114,33 @@ func ListenTaskHandler(
 
 				pending := workflowSelector.HasPending()
 
-				logrus.Info("Signal listen pending")
+				log.WithFields(models.Fields{
+					"taskName": taskName,
+				}).Info("Signal listen pending")
 
 				return pending
 			})
 
 			if err != nil {
 
-				logrus.WithError(err).Error("Error while waiting for signal")
+				log.WithError(err).Error("Error while waiting for signal")
 				return nil, err
 
 			} else if cancelCtx.Err() != nil {
 
 				if errors.Is(cancelCtx.Err(), context.Canceled) {
-					logrus.Info("Workflow context cancelled, exiting main loop")
+					log.WithFields(models.Fields{
+						"taskName": taskName,
+					}).Info("Workflow context cancelled, exiting main loop")
 					break
 				}
 
-				logrus.WithError(cancelCtx.Err()).Error("Error while waiting for signal")
+				log.WithError(cancelCtx.Err()).Error("Error while waiting for signal")
 				return nil, cancelCtx.Err()
 			}
 
 			// No signal received yet, so we are in waiting state
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"taskName": taskName,
 			}).Info("Waiting for signal... for listening task")
 
@@ -136,7 +149,7 @@ func ListenTaskHandler(
 			if input == nil {
 				// The signal is empty so lets return
 
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(models.Fields{
 					"taskName": taskName,
 				}).Info("Empty signal input yet, continuing to listen...")
 				continue
@@ -148,19 +161,19 @@ func ListenTaskHandler(
 
 			if err != nil {
 
-				logrus.WithError(err).Error("Failed to handle listen task")
+				log.WithError(err).Error("Failed to handle listen task")
 				return nil, err
 			}
 
 			if out == nil {
 
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(models.Fields{
 					"taskName": taskName,
 				}).Info("Still listening for more events...")
 				continue
 			}
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"taskName": taskName,
 				"signal":   input,
 			}).Info("Received event, exiting listen task")
@@ -176,7 +189,7 @@ func ListenTaskHandler(
 		if common.IsNilOrZero(input) {
 			// if temporal then wait for signal, otherwise just return
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"taskName": taskName,
 			}).Info("Not a Temporal workflow, cannot wait for signal")
 
@@ -189,14 +202,14 @@ func ListenTaskHandler(
 
 		if err != nil {
 
-			logrus.WithError(err).Error("Failed to handle listen task")
+			log.WithError(err).Error("Failed to handle listen task")
 
 			return nil, err
 		}
 
 		if out == nil {
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"taskName": taskName,
 			}).Info("Still listening for more events... but cannot wait as not a temporal workflow")
 
@@ -221,20 +234,22 @@ func handleListenTask(
 		return nil, fmt.Errorf("no signal input provided")
 	}
 
+	log := workflowTask.GetLogger()
+
 	// Right lets validate the signal and covert it to a cloudevent
 	var signal cloudevents.Event
 	err := common.ConvertInterfaceToInterface(input, &signal)
 
 	if err != nil {
 
-		logrus.WithError(err).Error("Failed to convert signal to cloudevent")
+		log.WithError(err).Error("Failed to convert signal to cloudevent")
 		return nil, fmt.Errorf("failed to convert signal to cloudevent: %w", err)
 
 	}
 
 	if listen.Listen.To == nil {
 
-		logrus.Error("To in listener not defined")
+		log.Error("To in listener not defined")
 		return nil, fmt.Errorf("to in listener not defined")
 	}
 
@@ -284,7 +299,7 @@ func handleListenTask(
 		return nil, fmt.Errorf("no valid listener defined")
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"taskName": taskName,
 		"signal":   signal,
 	}).Info("Listening for more events ...")
@@ -294,7 +309,11 @@ func handleListenTask(
 
 func evaluateUntilEventFilter(
 	workflowTask *models.WorkflowTask,
-	listenUntil *model.EventConsumptionUntil, signal cloudevents.Event) bool {
+	listenUntil *model.EventConsumptionUntil,
+	signal cloudevents.Event,
+) bool {
+
+	log := workflowTask.GetLogger()
 
 	if strings.Compare(listenUntil.Strategy.One.With.Type, signal.Type()) != 0 {
 
@@ -304,7 +323,7 @@ func evaluateUntilEventFilter(
 			listenUntil.Condition.String(), signal.DataAs(map[string]any{}))
 
 		if err != nil {
-			logrus.Error("Failed to evaluate event filter", "Error", err)
+			log.WithError(err).Error("Failed to evaluate event filter")
 			return false
 		}
 
@@ -316,12 +335,6 @@ func evaluateUntilEventFilter(
 }
 
 func evaluateListenEvent(with *model.EventProperties, signal cloudevents.Event) bool {
-
-	logrus.WithFields(logrus.Fields{
-		"expectedType": with.Type,
-		"signalType":   signal.Type(),
-	}).Info("Evaluating listen event")
-
 	return strings.Compare(with.Type, signal.Type()) == 0
 }
 

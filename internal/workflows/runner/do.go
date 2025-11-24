@@ -7,7 +7,7 @@ import (
 	swctx "github.com/serverlessworkflow/sdk-go/v3/impl/ctx"
 	utils "github.com/serverlessworkflow/sdk-go/v3/impl/utils"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 )
 
 func (r *ResumableWorkflowRunner) executeDoRunner(
@@ -34,6 +34,7 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 	}
 
 	taskSupport := d.GetWorkflowTask()
+	log := d.GetLogger()
 
 	output = input
 
@@ -67,7 +68,7 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 		err := d.updateTemporalSearchAttributes(currentTask, swctx.RunningStatus)
 
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"task":  currentTask,
 				"error": err,
 			}).Warn("Failed to update temporal search attributes")
@@ -75,7 +76,7 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 
 		taskSupport.SetTaskStatus(currentTask.Key, swctx.RunningStatus)
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":  currentTask.Key,
 			"input": input,
 		}).Info("Starting task execution")
@@ -96,7 +97,7 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 			idx, currentTask = taskList.KeyAndIndex(flowDirective.Value)
 			if currentTask == nil {
 
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(models.Fields{
 					"task":  currentTask,
 					"error": err,
 				}).Error("Flow directive target not found")
@@ -109,7 +110,7 @@ func (d *ResumableWorkflowRunner) resumeTasks(
 
 		input = utils.DeepCloneValue(output)
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"currentTask": currentTask.Key,
 			"taskOutput":  output,
 			"nextInput":   input,
@@ -135,6 +136,7 @@ func (d *ResumableWorkflowRunner) runTaskItem(
 	taskName := task.Key
 
 	taskSupport := d.GetWorkflowTask()
+	log := d.GetLogger()
 
 	taskSupport.SetTaskStartedAt(time.Now())
 	taskSupport.SetTaskRawInput(input)
@@ -145,7 +147,7 @@ func (d *ResumableWorkflowRunner) runTaskItem(
 			taskSupport.SetTaskRawInput(input)
 		} else {
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"task": taskName,
 			}).WithError(err).Error("Failed to process task input")
 
@@ -157,7 +159,7 @@ func (d *ResumableWorkflowRunner) runTaskItem(
 
 	if err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":  taskName,
 			"error": err,
 		}).Error("Task execution failed")
@@ -169,7 +171,7 @@ func (d *ResumableWorkflowRunner) runTaskItem(
 
 	if output, err = d.processTaskOutput(task.GetBase(), output, taskName); err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to process task output")
 
@@ -178,7 +180,7 @@ func (d *ResumableWorkflowRunner) runTaskItem(
 
 	if err = d.processTaskExport(task.GetBase(), output, taskName); err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to process task export")
 

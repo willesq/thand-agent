@@ -9,7 +9,6 @@ import (
 	swctx "github.com/serverlessworkflow/sdk-go/v3/impl/ctx"
 	utils "github.com/serverlessworkflow/sdk-go/v3/impl/utils"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config"
 	models "github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/functions"
@@ -60,6 +59,10 @@ func (r *ResumableWorkflowRunner) GetWorkflowTask() *models.WorkflowTask {
 	return r.workflowTask
 }
 
+func (r *ResumableWorkflowRunner) GetLogger() *models.LogBuilder {
+	return r.GetWorkflowTask().GetLogger()
+}
+
 func (r *ResumableWorkflowRunner) GetTaskList() *model.TaskList {
 	return r.GetWorkflowTask().GetTaskList()
 }
@@ -82,6 +85,7 @@ func NewResumableRunner(config *config.Config, functions *functions.FunctionRegi
 func (wr *ResumableWorkflowRunner) Run(input any) (output any, err error) {
 
 	workflowTask := wr.GetWorkflowTask()
+	log := wr.GetLogger()
 
 	defer func() {
 
@@ -140,7 +144,7 @@ func (wr *ResumableWorkflowRunner) Run(input any) (output any, err error) {
 		workflowTask.GetInput(),
 	)
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"resumeTaskListOutput": output,
 		"resumeTaskListError":  err,
 	}).Info("Task list execution completed")
@@ -157,7 +161,7 @@ func (wr *ResumableWorkflowRunner) Run(input any) (output any, err error) {
 		return nil, err
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"processedOutput": output,
 	}).Info("Output processing completed")
 
@@ -212,7 +216,10 @@ func (wr *ResumableWorkflowRunner) wrapWorkflowError(err error) error {
 
 // processOutput applies output transformations.
 func (wr *ResumableWorkflowRunner) processOutput(output any) (any, error) {
+
 	workflow := wr.GetWorkflow()
+	log := wr.GetLogger()
+
 	if workflow.Output != nil {
 		if workflow.Output.As != nil {
 			var err error
@@ -220,18 +227,18 @@ func (wr *ResumableWorkflowRunner) processOutput(output any) (any, error) {
 				TraverseAndEvaluateObj(workflow.Output.As, output, "/")
 			if err != nil {
 
-				logrus.WithError(err).Error("Failed to apply output 'as' transformation")
+				log.WithError(err).Error("Failed to apply output 'as' transformation")
 
 				return nil, err
 			}
 		}
 		if workflow.Output.Schema != nil {
 
-			logrus.WithField("workflow", workflow.Document.Name).Debug("Validating output against schema")
+			log.WithField("workflow", workflow.Document.Name).Debug("Validating output against schema")
 
 			if err := utils.ValidateSchema(output, workflow.Output.Schema, "/"); err != nil {
 
-				logrus.WithError(err).Error("Output validation against schema failed")
+				log.WithError(err).Error("Output validation against schema failed")
 
 				return nil, err
 			}
@@ -242,12 +249,15 @@ func (wr *ResumableWorkflowRunner) processOutput(output any) (any, error) {
 
 // processInput validates and transforms input if needed.
 func (wr *ResumableWorkflowRunner) processInput(input any) (output any, err error) {
+
 	workflow := wr.GetWorkflow()
+	log := wr.GetLogger()
+
 	if workflow.Input != nil {
 		if workflow.Input.Schema != nil {
 			if err = utils.ValidateSchema(input, workflow.Input.Schema, "/"); err != nil {
 
-				logrus.WithError(err).Error("Input validation against schema failed")
+				log.WithError(err).Error("Input validation against schema failed")
 
 				return nil, err
 			}
@@ -257,7 +267,7 @@ func (wr *ResumableWorkflowRunner) processInput(input any) (output any, err erro
 			output, err = wr.GetWorkflowTask().TraverseAndEvaluateObj(workflow.Input.From, input, "/")
 			if err != nil {
 
-				logrus.WithError(err).Error("Failed to apply input 'from' transformation")
+				log.WithError(err).Error("Failed to apply input 'from' transformation")
 
 				return nil, err
 			}
@@ -278,6 +288,7 @@ func (wr *ResumableWorkflowRunner) updateTemporalSearchAttributes(
 	}
 
 	workflowTask := wr.GetWorkflowTask()
+	log := workflowTask.GetLogger()
 
 	ctx := workflowTask.GetTemporalContext()
 
@@ -303,7 +314,7 @@ func (wr *ResumableWorkflowRunner) updateTemporalSearchAttributes(
 
 	if err != nil {
 
-		logrus.WithError(err).Warn("No valid elevation context found, skipping search attribute update.")
+		log.WithError(err).Warn("No valid elevation context found, skipping search attribute update.")
 
 	} else {
 		if elevationRequest.User != nil && len(elevationRequest.User.Email) > 0 {
@@ -338,7 +349,7 @@ func (wr *ResumableWorkflowRunner) updateTemporalSearchAttributes(
 
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"workflowID": workflowTask.WorkflowID,
 	}).Info("Updating temporal search attributes")
 

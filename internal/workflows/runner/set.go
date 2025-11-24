@@ -5,7 +5,7 @@ import (
 
 	utils "github.com/serverlessworkflow/sdk-go/v3/impl/utils"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 )
 
 /*
@@ -37,7 +37,9 @@ func (r *ResumableWorkflowRunner) executeSetTask(
 	input any,
 ) (any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 		"set":  task.Set,
 	}).Info("Executing Set task")
@@ -53,7 +55,7 @@ func (r *ResumableWorkflowRunner) executeSetTask(
 
 	if err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":  taskName,
 			"input": input,
 		}).WithError(err).Error("Failed to evaluate set expression")

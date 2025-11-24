@@ -37,7 +37,9 @@ func (r *ResumableWorkflowRunner) executeOpenAPIFunction(
 	input any,
 ) (map[string]any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 		"call": call.Call,
 	}).Info("Executing OpenAPI function call")
@@ -123,7 +125,7 @@ func MakeOpenAPIRequest(args model.OpenAPIArguments, input any) (map[string]any,
 	// Format output according to spec
 	result := formatOpenAPIOutput(res, outputFormat)
 
-	logrus.WithFields(logrus.Fields{
+	logrus.WithFields(models.Fields{
 		"operation": operationId,
 		"status":    res.StatusCode(),
 		"output":    outputFormat,

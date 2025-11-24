@@ -6,7 +6,7 @@ import (
 
 	utils "github.com/serverlessworkflow/sdk-go/v3/impl/utils"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 )
 
 func (d *ResumableWorkflowRunner) shouldRunTask(input any, task *model.TaskItem) (bool, error) {
@@ -28,9 +28,11 @@ func (d *ResumableWorkflowRunner) processTaskInput(task *model.TaskBase, taskInp
 		return taskInput, nil
 	}
 
+	log := d.GetLogger()
+
 	if err = utils.ValidateSchema(taskInput, task.Input.Schema, taskName); err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to validate task input schema")
 
@@ -39,7 +41,7 @@ func (d *ResumableWorkflowRunner) processTaskInput(task *model.TaskBase, taskInp
 
 	if output, err = d.GetWorkflowTask().TraverseAndEvaluateObj(task.Input.From, taskInput, taskName); err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to process task input")
 
@@ -56,9 +58,11 @@ func (d *ResumableWorkflowRunner) processTaskOutput(task *model.TaskBase, taskOu
 		return taskOutput, nil
 	}
 
+	log := d.GetLogger()
+
 	if output, err = d.GetWorkflowTask().TraverseAndEvaluateObj(task.Output.As, taskOutput, taskName); err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to process task output")
 
@@ -67,7 +71,7 @@ func (d *ResumableWorkflowRunner) processTaskOutput(task *model.TaskBase, taskOu
 
 	if err = utils.ValidateSchema(output, task.Output.Schema, taskName); err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to validate task output schema")
 
@@ -80,6 +84,7 @@ func (d *ResumableWorkflowRunner) processTaskOutput(task *model.TaskBase, taskOu
 func (d *ResumableWorkflowRunner) processTaskExport(task *model.TaskBase, taskOutput any, taskName string) (err error) {
 
 	taskSupport := d.GetWorkflowTask()
+	log := d.GetLogger()
 
 	if task.Export == nil {
 		return nil
@@ -92,7 +97,7 @@ func (d *ResumableWorkflowRunner) processTaskExport(task *model.TaskBase, taskOu
 
 		fmt.Println(string(data))
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to process task export")
 
@@ -101,7 +106,7 @@ func (d *ResumableWorkflowRunner) processTaskExport(task *model.TaskBase, taskOu
 
 	if err = utils.ValidateSchema(output, task.Export.Schema, taskName); err != nil {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": taskName,
 		}).WithError(err).Error("Failed to validate task export schema")
 

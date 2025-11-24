@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
+	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -16,7 +16,9 @@ func (r *ResumableWorkflowRunner) executeWaitTask(
 	input any,
 ) (map[string]any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 		"wait": call.Wait,
 	}).Info("Executing Wait task")
@@ -76,7 +78,7 @@ func (r *ResumableWorkflowRunner) executeWaitTask(
 
 	if workflowTask.HasTemporalContext() {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":     taskName,
 			"duration": duration,
 		}).Info("Registering temporal wait")
@@ -88,7 +90,7 @@ func (r *ResumableWorkflowRunner) executeWaitTask(
 
 	} else {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":     taskName,
 			"duration": duration,
 		}).Info("Executing standard wait")
@@ -100,7 +102,7 @@ func (r *ResumableWorkflowRunner) executeWaitTask(
 		time.Sleep(duration)
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"task": taskName,
 	}).Info("Wait task completed")
 
