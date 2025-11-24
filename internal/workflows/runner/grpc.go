@@ -78,6 +78,8 @@ func (r *ResumableWorkflowRunner) executeGRPCFunction(
 
 	} else {
 
+		result, err := MakeGrpcRequest(grpcCall, finalInput)
+
 		log.WithFields(models.Fields{
 			"service": grpcCall.Service.Name,
 			"method":  grpcCall.Method,
@@ -85,7 +87,7 @@ func (r *ResumableWorkflowRunner) executeGRPCFunction(
 			"port":    grpcCall.Service.Port,
 		}).Info("gRPC call completed successfully")
 
-		return MakeGrpcRequest(grpcCall, finalInput)
+		return result, err
 	}
 
 }

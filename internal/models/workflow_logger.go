@@ -57,7 +57,7 @@ func (r *WorkflowTask) GetLogger() *LogBuilder {
 	} else if activity.IsActivity(r.GetContext()) {
 		logger = activity.GetLogger(r.GetContext())
 	} else {
-		// Use the existing gobal logger
+		// Use the existing global logger
 		logger = &LogrusAdapter{logger: logrus.StandardLogger()}
 	}
 	return &LogBuilder{logger: logger}
