@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
@@ -26,7 +27,9 @@ func (r *ResumableWorkflowRunner) executeGRPCFunction(
 	input any,
 ) (any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 		"call": call.Call,
 	}).Info("Executing gRPC function call")
@@ -41,7 +44,7 @@ func (r *ResumableWorkflowRunner) executeGRPCFunction(
 
 	returnedInput, err := workflowTask.TraverseAndEvaluate(grpcCall.Arguments, input)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":  taskName,
 			"input": input,
 		}).WithError(err).Error("Failed to evaluate gRPC call arguments")
@@ -75,7 +78,16 @@ func (r *ResumableWorkflowRunner) executeGRPCFunction(
 
 	} else {
 
-		return MakeGrpcRequest(grpcCall, finalInput)
+		result, err := MakeGrpcRequest(grpcCall, finalInput)
+
+		log.WithFields(models.Fields{
+			"service": grpcCall.Service.Name,
+			"method":  grpcCall.Method,
+			"host":    grpcCall.Service.Host,
+			"port":    grpcCall.Service.Port,
+		}).Info("gRPC call completed successfully")
+
+		return result, err
 	}
 
 }
@@ -119,13 +131,6 @@ func MakeGrpcRequest(grpcCall model.GRPCArguments, finalInput map[string]any) (a
 		return nil, fmt.Errorf("failed to convert response: %w", err)
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"service": grpcCall.Service.Name,
-		"method":  grpcCall.Method,
-		"host":    grpcCall.Service.Host,
-		"port":    grpcCall.Service.Port,
-	}).Info("gRPC call completed successfully")
-
 	return result, nil
 }
 
@@ -160,9 +165,10 @@ func createGRPCContext(serviceAuth, callAuth *model.ReferenceableAuthenticationP
 
 	// Handle different authentication types
 	if auth.AuthenticationPolicy.Basic != nil {
-		// Basic auth would typically be handled at the HTTP/2 transport level
-		// For gRPC, we might need to pass it as metadata
-		logrus.Warn("Basic authentication for gRPC is not fully supported, consider using Bearer tokens")
+		basicAuth := auth.AuthenticationPolicy.Basic
+		authStr := fmt.Sprintf("%s:%s", basicAuth.Username, basicAuth.Password)
+		encodedAuth := base64.StdEncoding.EncodeToString([]byte(authStr))
+		md.Set("authorization", "Basic "+encodedAuth)
 	} else if auth.AuthenticationPolicy.Bearer != nil {
 		md.Set("authorization", "Bearer "+auth.AuthenticationPolicy.Bearer.Token)
 	}
@@ -301,7 +307,11 @@ func findMethodInService(svc protoreflect.ServiceDescriptor, methodName string) 
 }
 
 // buildRequestMessage builds a dynamic protobuf message from arguments
-func buildRequestMessage(methodDesc protoreflect.MethodDescriptor, arguments map[string]any) (*dynamicpb.Message, error) {
+func buildRequestMessage(
+	methodDesc protoreflect.MethodDescriptor,
+	arguments map[string]any,
+) (*dynamicpb.Message, error) {
+
 	inputMsgDesc := methodDesc.Input()
 	msg := dynamicpb.NewMessage(inputMsgDesc)
 

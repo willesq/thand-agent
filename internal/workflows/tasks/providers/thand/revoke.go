@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
@@ -32,6 +31,8 @@ func (t *thandTask) executeRevokeTask(
 	taskName string,
 	call *taskModel.ThandTask) (any, error) {
 
+	log := workflowTask.GetLogger()
+
 	elevateRequest, err := workflowTask.GetContextAsElevationRequest()
 
 	if err != nil {
@@ -42,7 +43,7 @@ func (t *thandTask) executeRevokeTask(
 	var revokeCallTask RevokeTask
 	err = common.ConvertInterfaceToInterface(call.With, &revokeCallTask)
 	if err != nil {
-		logrus.WithError(err).Error("Failed to parse revoke task configuration")
+		log.WithError(err).Error("Failed to parse revoke task configuration")
 		// Continue without notifiers if parsing fails
 	}
 
@@ -84,6 +85,8 @@ func (t *thandTask) executeRevocationTask(
 		return nil, errors.New("invalid elevate request")
 	}
 
+	log := workflowTask.GetLogger()
+
 	duration, err := elevateRequest.AsDuration()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get duration: %w", err)
@@ -110,7 +113,7 @@ func (t *thandTask) executeRevocationTask(
 				authorizationsMap, ok := req["authorizations"]
 
 				if !ok {
-					logrus.WithField("identity", identity).Debug("No authorizations found in context for revocation")
+					log.WithField("identity", identity).Debug("No authorizations found in context for revocation")
 					continue
 				}
 
@@ -118,7 +121,7 @@ func (t *thandTask) executeRevocationTask(
 					if identityMap, ok := objectMap[identity].(map[string]any); ok {
 						localResponse := models.AuthorizeRoleResponse{}
 						if err := common.ConvertMapToInterface(identityMap, &localResponse); err != nil {
-							logrus.WithError(err).WithField("identity", identity).Warn("Failed to convert authorize response")
+							log.WithError(err).WithField("identity", identity).Warn("Failed to convert authorize response")
 						}
 						authorizeResponse = &localResponse
 					}
@@ -148,7 +151,7 @@ func (t *thandTask) executeRevocationTask(
 				AuthorizeResponse: authorizeResponse,
 			})
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"user":     identity,
 				"role":     elevateRequest.Role.GetName(),
 				"provider": providerName,
@@ -175,7 +178,7 @@ func (t *thandTask) executeRevocationTask(
 
 	for _, result := range revokeResults {
 		if result.Error != nil {
-			logrus.WithError(result.Error).WithField("identity", result.Identity).Error("Revocation failed")
+			log.WithError(result.Error).WithField("identity", result.Identity).Error("Revocation failed")
 
 			foundError := unwrapTemporalError(result.Error)
 
@@ -208,7 +211,7 @@ func (t *thandTask) executeRevocationTask(
 		)
 
 		if err != nil {
-			logrus.WithError(err).Warn("Failed to send revocation notifications, continuing anyway")
+			log.WithError(err).Warn("Failed to send revocation notifications, continuing anyway")
 			// Don't fail the revocation if notification fails
 		}
 	}
@@ -332,7 +335,9 @@ func (t *thandTask) makeRevocationNotifications(
 	revocations map[string]any,
 ) error {
 
-	logrus.Info("Preparing revocation notifications")
+	log := workflowTask.GetLogger()
+
+	log.Info("Preparing revocation notifications")
 
 	// Build notification tasks for each provider
 	var notifyTasks []notifyTask
@@ -362,7 +367,7 @@ func (t *thandTask) makeRevocationNotifications(
 				Provider:  revokeNotifier.GetProviderName(),
 			})
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"recipient":   recipient,
 				"provider":    revokeNotifier.GetProviderName(),
 				"providerKey": providerKey,
@@ -381,7 +386,7 @@ func (t *thandTask) makeRevocationNotifications(
 	}
 
 	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
+		log.WithError(err).WithFields(models.Fields{
 			"taskName": taskName,
 		}).Error("Failed to execute revocation notifications")
 
@@ -391,7 +396,7 @@ func (t *thandTask) makeRevocationNotifications(
 	// Process results using shared helper
 	if err := processNotificationResults(notifyResults, "Revocation notification"); err != nil {
 
-		logrus.WithError(err).WithFields(logrus.Fields{
+		log.WithError(err).WithFields(models.Fields{
 			"taskName": taskName,
 		}).Error("Failed to process revocation notification results")
 

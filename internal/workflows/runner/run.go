@@ -13,7 +13,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 )
 
 // executeRunTask handles task execution
@@ -23,10 +23,16 @@ func (r *ResumableWorkflowRunner) executeRunTask(
 	input any,
 ) (map[string]any, error) {
 
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
+		"task": taskName,
+	}).Info("Executing run task")
+
 	runTask := run.Run
 
 	if runTask.Await != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task":  taskName,
 			"await": runTask.Await,
 		}).Info("Run task with await is not implemented yet")
@@ -62,6 +68,8 @@ func (r *ResumableWorkflowRunner) executeShellProcess(taskName string, shellTask
 		return nil, fmt.Errorf("shell process is nil")
 	}
 
+	log := r.GetLogger()
+
 	// Timeout / context: if DSL adds timeout later; for now use a default or workflow-level context
 	// TODO: integrate with task-level timeout configuration once available.
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -80,7 +88,7 @@ func (r *ResumableWorkflowRunner) executeShellProcess(taskName string, shellTask
 	cmd.Stderr = &stderr
 
 	started := time.Now()
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"task":        taskName,
 		"command":     shellTask.Command,
 		"args":        shellTask.Arguments,
@@ -120,7 +128,7 @@ func (r *ResumableWorkflowRunner) executeShellProcess(taskName string, shellTask
 		"timeMs": duration.Milliseconds(),
 	}
 
-	logFields := logrus.Fields{
+	logFields := models.Fields{
 		"task":      taskName,
 		"code":      exitCode,
 		"timeMs":    duration.Milliseconds(),
@@ -129,9 +137,9 @@ func (r *ResumableWorkflowRunner) executeShellProcess(taskName string, shellTask
 	}
 	if waitErr != nil {
 		logFields["error"] = waitErr.Error()
-		logrus.WithFields(logFields).Warn("Shell command finished with error")
+		log.WithFields(logFields).Warn("Shell command finished with error")
 	} else {
-		logrus.WithFields(logFields).Info("Shell command finished successfully")
+		log.WithFields(logFields).Info("Shell command finished successfully")
 	}
 
 	// For now, we align with DSL 'return' default = stdout; if 'return' property available on runTask, adapt accordingly.
@@ -179,9 +187,13 @@ func (r *ResumableWorkflowRunner) executeContainerProcess(taskName string, conta
 
 	// Pull image according to policy
 
-	logrus.WithFields(logrus.Fields{
-		"task": taskName, "image": imageName,
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
+		"task":  taskName,
+		"image": imageName,
 	}).Info("Pulling image")
+
 	rc, perr := cli.ImagePull(ctx, imageName, image.PullOptions{
 		All: true,
 	})
@@ -205,7 +217,7 @@ func (r *ResumableWorkflowRunner) executeContainerProcess(taskName string, conta
 	containerID := createResp.ID
 
 	startedAt := time.Now()
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"task":       taskName,
 		"image":      imageName,
 		"id":         containerID,
@@ -245,7 +257,7 @@ func (r *ResumableWorkflowRunner) executeContainerProcess(taskName string, conta
 		// Simpler: copy raw to a buffer then naive split is overkill; here we copy all to stdoutBuf.
 		io.Copy(&stdoutBuf, logsReader)
 	} else {
-		logrus.WithError(lerr).Warn("Failed to fetch container logs")
+		log.WithError(lerr).Warn("Failed to fetch container logs")
 	}
 
 	duration := time.Since(startedAt)
@@ -259,7 +271,7 @@ func (r *ResumableWorkflowRunner) executeContainerProcess(taskName string, conta
 		"timeMs": duration.Milliseconds(),
 	}
 
-	logFields := logrus.Fields{
+	logFields := models.Fields{
 		"task":      taskName,
 		"id":        containerID,
 		"image":     imageName,
@@ -267,7 +279,7 @@ func (r *ResumableWorkflowRunner) executeContainerProcess(taskName string, conta
 		"timeMs":    duration.Milliseconds(),
 		"stdoutLen": len(result["stdout"].(string)),
 	}
-	logrus.WithFields(logFields).Info("Container finished")
+	log.WithFields(logFields).Info("Container finished")
 
 	go func(cid string) {
 		// use background context, ignore error

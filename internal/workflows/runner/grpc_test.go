@@ -221,14 +221,17 @@ func TestCreateGRPCContext_BasicAuth(t *testing.T) {
 		},
 	}
 
-	// This should not fail but should log a warning
 	ctx, err := createGRPCContext(auth, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, ctx)
 
-	// Verify no metadata is set (basic auth not supported for gRPC)
+	// Verify basic auth header is set in metadata
 	md, ok := metadata.FromOutgoingContext(ctx)
-	assert.True(t, !ok || len(md) == 0)
+	assert.True(t, ok)
+
+	// "user:pass" base64 encoded is "dXNlcjpwYXNz"
+	expectedAuth := "Basic dXNlcjpwYXNz"
+	assert.Equal(t, []string{expectedAuth}, md["authorization"])
 }
 
 func TestBuildRequestMessage_EmptyArguments(t *testing.T) {

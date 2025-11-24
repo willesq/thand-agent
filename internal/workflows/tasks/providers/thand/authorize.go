@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	thandFunction "github.com/thand-io/agent/internal/workflows/functions/providers/thand"
 	taskModel "github.com/thand-io/agent/internal/workflows/tasks/model"
@@ -100,12 +100,14 @@ func (t *thandTask) executeAuthorization(
 	elevateRequest *models.ElevateRequestInternal,
 ) (any, error) {
 
+	log := workflowTask.GetLogger()
+
 	// Send notification to the requester if notifier is configured
 	var authorizeCallTask AuthorizeTask
 	err := common.ConvertInterfaceToInterface(call.With, &authorizeCallTask)
 
 	if err != nil {
-		logrus.WithError(err).Error("Failed to convert call.With to authorizeCallTask")
+		log.WithError(err).Error("Failed to convert call.With to authorizeCallTask")
 		return nil, err
 	}
 
@@ -173,7 +175,7 @@ func (t *thandTask) executeAuthorization(
 				ThandAuthReq: thandAuthReq,
 			})
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"user":     authReq.User.GetIdentity(),
 				"role":     authReq.Role.GetName(),
 				"provider": providerName,
@@ -192,7 +194,7 @@ func (t *thandTask) executeAuthorization(
 
 	if err != nil {
 
-		logrus.WithError(err).Error("Failed to execute authorization tasks")
+		log.WithError(err).Error("Failed to execute authorization tasks")
 		return nil, err
 
 	}
@@ -208,7 +210,7 @@ func (t *thandTask) executeAuthorization(
 
 	for _, result := range authResults {
 		if result.Error != nil {
-			logrus.WithError(result.Error).WithField("identity", result.Identity).Error("Authorization failed")
+			log.WithError(result.Error).WithField("identity", result.Identity).Error("Authorization failed")
 
 			foundError := unwrapTemporalError(result.Error)
 
@@ -234,7 +236,7 @@ func (t *thandTask) executeAuthorization(
 
 	// Schedule revocation if revocation state provided
 	if err := t.scheduleRevocation(workflowTask, authorizeCallTask.Revocation, revocationDate); err != nil {
-		logrus.WithError(err).Error("Failed to schedule revocation")
+		log.WithError(err).Error("Failed to schedule revocation")
 		return nil, fmt.Errorf("failed to schedule revocation: %w", err)
 	}
 
@@ -253,7 +255,7 @@ func (t *thandTask) executeAuthorization(
 		)
 
 		if err != nil {
-			logrus.WithError(err).Warn("Failed to send authorization notifications, continuing anyway")
+			log.WithError(err).Warn("Failed to send authorization notifications, continuing anyway")
 			// Don't fail the authorization if notification fails
 		}
 	}
@@ -379,7 +381,7 @@ func (t *thandTask) validateRoleAndBuildOutput(
 
 	validateOut, err := models.ValidateRole(providerCall.GetClient(), elevateRequest)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		logrus.WithFields(models.Fields{
 			"error": err,
 			"role":  elevateRequest.Role,
 		}).Error("Failed to validate role")
@@ -410,6 +412,8 @@ func (t *thandTask) scheduleRevocation(
 	revocationAt time.Time,
 ) error {
 
+	log := workflowTask.GetLogger()
+
 	newTask := workflowTask.Clone().(*models.WorkflowTask)
 	newTask.SetEntrypoint(revocationTask)
 
@@ -438,11 +442,11 @@ func (t *thandTask) scheduleRevocation(
 		)
 
 		if err != nil {
-			logrus.WithError(err).Error("Failed to signal workflow for revocation")
+			log.WithError(err).Error("Failed to signal workflow for revocation")
 			return fmt.Errorf("failed to signal workflow: %w", err)
 		}
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"task": newTask.GetTaskName(),
 			"url":  t.config.GetResumeCallbackUrl(newTask),
 		}).Info("Scheduled revocation via Temporal")
@@ -472,19 +476,19 @@ func (t *thandTask) scheduleRevocation(
 					})
 
 					if err != nil {
-						logrus.WithError(err).Error("Failed to call revoke endpoint")
+						log.WithError(err).Error("Failed to call revoke endpoint")
 						return
 					}
 
 					if response.StatusCode() != http.StatusOK {
-						logrus.WithFields(logrus.Fields{
+						log.WithFields(models.Fields{
 							"status_code": response.StatusCode(),
 							"body":        response.Body(),
 						}).Error("Revoke endpoint returned non-200 status")
 						return
 					}
 
-					logrus.WithFields(logrus.Fields{
+					log.WithFields(models.Fields{
 						"revocation_task": newTask.GetTaskName(),
 						"workflow":        workflowTask,
 					}).Info("Scheduled revocation")
@@ -499,7 +503,7 @@ func (t *thandTask) scheduleRevocation(
 
 	} else {
 
-		logrus.Error("No scheduler available to schedule revocation")
+		log.Error("No scheduler available to schedule revocation")
 		return fmt.Errorf("no scheduler available to schedule revocation")
 
 	}
@@ -517,7 +521,9 @@ func (t *thandTask) makeAuthorizationNotifications(
 	authorizations map[string]*models.AuthorizeRoleResponse,
 ) error {
 
-	logrus.Info("Preparing authorization notifications")
+	log := workflowTask.GetLogger()
+
+	log.Info("Preparing authorization notifications")
 
 	// Build notification tasks for each provider
 	var notifyTasks []notifyTask
@@ -548,7 +554,7 @@ func (t *thandTask) makeAuthorizationNotifications(
 				Provider:  authorizeNotifier.GetProviderName(),
 			})
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"recipient":   recipient,
 				"provider":    authorizeNotifier.GetProviderName(),
 				"providerKey": providerKey,
@@ -567,7 +573,7 @@ func (t *thandTask) makeAuthorizationNotifications(
 	}
 
 	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
+		log.WithError(err).WithFields(models.Fields{
 			"taskName": taskName,
 		}).Error("Failed to execute authorization notifications")
 
@@ -577,7 +583,7 @@ func (t *thandTask) makeAuthorizationNotifications(
 	// Process results using shared helper
 	if err := processNotificationResults(notifyResults, "Authorization notification"); err != nil {
 
-		logrus.WithError(err).WithFields(logrus.Fields{
+		log.WithError(err).WithFields(models.Fields{
 			"taskName": taskName,
 		}).Error("Failed to process authorization notification results")
 

@@ -20,7 +20,9 @@ func (r *ResumableWorkflowRunner) executeHttpFunction(
 	input any,
 ) (any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 		"call": call.Call,
 	}).Info("Executing HTTP function call")
@@ -40,17 +42,17 @@ func (r *ResumableWorkflowRunner) executeHttpFunction(
 
 	if uri.URITemplate != nil && uri.URITemplate.IsURITemplate() {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"template": uri.String(),
 		}).Debug("Expanding URI template")
 
 		// Expand URI template with variables from input
 		expandedURI, err := expandURITemplate(uri.String(), input)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"template": uri.String(),
 				"error":    err,
-			}).Warnln("Failed to expand URI template")
+			}).Warn("Failed to expand URI template")
 			// Continue with original URI if expansion fails
 		} else {
 			finalURL = expandedURI
@@ -63,7 +65,7 @@ func (r *ResumableWorkflowRunner) executeHttpFunction(
 
 		if err != nil {
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"expression": uri.RuntimeExpression.String(),
 			}).WithError(err).Error("Failed to evaluate runtime expression in URI")
 
@@ -71,7 +73,7 @@ func (r *ResumableWorkflowRunner) executeHttpFunction(
 
 		} else if newUrl == nil {
 
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(models.Fields{
 				"expression": uri.RuntimeExpression.String(),
 			}).Warn("Runtime expression in URI evaluated to nil, using empty string")
 

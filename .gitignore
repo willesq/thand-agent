@@ -18,6 +18,7 @@ __debug_bin*
 
 # Dependency directories (remove the comment below to include it)
 /vendor/
+/test/vendor/
 
 # Go workspace file
 go.work

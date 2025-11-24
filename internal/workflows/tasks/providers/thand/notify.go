@@ -93,6 +93,8 @@ func (t *thandTask) executeNotify(
 	notify NotifierImpl,
 ) (any, error) {
 
+	log := workflowTask.GetLogger()
+
 	// Caller with to: will either be a []string
 	recipients := notify.GetRecipients()
 
@@ -100,7 +102,7 @@ func (t *thandTask) executeNotify(
 		return nil, errors.New("notifier 'to' field cannot be empty")
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"recipients": recipients,
 		"count":      len(recipients),
 	}).Info("Preparing to send notifications")
@@ -118,7 +120,7 @@ func (t *thandTask) executeNotify(
 			Provider:  notify.GetProviderName(),
 		})
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"recipient": recipient,
 			"provider":  notify.GetProviderName(),
 		}).Debug("Prepared notification task")
@@ -135,7 +137,7 @@ func (t *thandTask) executeNotify(
 	}
 
 	if err != nil {
-		logrus.WithError(err).Error("Failed to execute notification tasks")
+		log.WithError(err).Error("Failed to execute notification tasks")
 		return nil, err
 	}
 
@@ -145,13 +147,13 @@ func (t *thandTask) executeNotify(
 
 	for _, result := range notifyResults {
 		if result.Error != nil {
-			logrus.WithError(result.Error).
+			log.WithError(result.Error).
 				WithField("recipient", result.Recipient).
 				Error("Notification failed")
 			hasErrors = true
 		} else {
 			successCount++
-			logrus.WithField("recipient", result.Recipient).
+			log.WithField("recipient", result.Recipient).
 				Info("Notification sent successfully")
 		}
 	}
@@ -161,7 +163,7 @@ func (t *thandTask) executeNotify(
 	}
 
 	if hasErrors {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"success": successCount,
 			"total":   len(notifyResults),
 		}).Warn("Some notifications failed")

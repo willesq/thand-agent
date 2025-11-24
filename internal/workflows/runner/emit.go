@@ -6,7 +6,6 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/workflow"
 )
@@ -20,7 +19,11 @@ func (r *ResumableWorkflowRunner) executeEmitTask(
 	input any,
 ) (any, error) {
 
-	logrus.Infof("Executing emit task: %s", taskName)
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
+		"task": taskName,
+	}).Info("Executing emit task")
 
 	workflowTask := r.GetWorkflowTask()
 
@@ -51,7 +54,7 @@ func (r *ResumableWorkflowRunner) executeEmitTask(
 			event,
 		)
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"taskName":    taskName,
 			"eventType":   event.Type(),
 			"eventSource": event.Source(),
@@ -62,7 +65,7 @@ func (r *ResumableWorkflowRunner) executeEmitTask(
 
 	} else {
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(models.Fields{
 			"taskName": taskName,
 		}).Info("Not a Temporal workflow, emit task is not supported")
 

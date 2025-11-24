@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
 )
 
 func (r *ResumableWorkflowRunner) executeAsyncFunction(
@@ -13,7 +13,9 @@ func (r *ResumableWorkflowRunner) executeAsyncFunction(
 	input any,
 ) (map[string]any, error) {
 
-	logrus.WithFields(logrus.Fields{
+	log := r.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task": taskName,
 		"call": call.Call,
 	}).Info("Executing AsyncAPI function call")
@@ -23,7 +25,7 @@ func (r *ResumableWorkflowRunner) executeAsyncFunction(
 	asyncCall := call.With
 
 	// For now, just log the async call details
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(models.Fields{
 		"asyncCall": asyncCall,
 	}).Info("AsyncAPI call details")
 

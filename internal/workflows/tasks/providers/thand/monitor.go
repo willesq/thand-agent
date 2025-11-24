@@ -5,7 +5,6 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	runner "github.com/thand-io/agent/internal/workflows/runner"
@@ -38,11 +37,13 @@ func (t *thandTask) executeMonitorTask(
 		return nil, fmt.Errorf("failed to parse monitor request: %w", err)
 	}
 
-	logrus.WithFields(logrus.Fields{
+	log := workflowTask.GetLogger()
+
+	log.WithFields(models.Fields{
 		"task_name": taskName,
 		"mode":      monitorReq.Mode,
 		"threshold": monitorReq.Threshold,
-	}).Infof("Executing Thand monitor task: %s", taskName)
+	}).Info("Executing Thand monitor task")
 
 	thandAlert, err := runner.ListenTaskHandler(workflowTask, taskName, &model.ListenTask{
 		Listen: model.ListenTaskConfiguration{
@@ -59,14 +60,14 @@ func (t *thandTask) executeMonitorTask(
 	}, input)
 
 	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
+		log.WithError(err).WithFields(models.Fields{
 			"taskName": taskName,
 		}).Error("Failed to listen for Thand alert")
 
 		return nil, err
 	}
 
-	logrus.Infof("Received Thand alert in monitor task: %s", taskName)
+	log.WithField("taskName", taskName).Info("Received Thand alert in monitor task")
 
 	var alertData map[string]any
 
@@ -77,7 +78,7 @@ func (t *thandTask) executeMonitorTask(
 		if level, exists := alertData["level"]; exists {
 
 			if levelStr, ok := level.(string); ok && levelStr == "critical" {
-				logrus.Warnf("Critical alert received in Thand monitor task: %s", taskName)
+				log.WithField("taskName", taskName).Warn("Critical alert received in Thand monitor task")
 				// Handle critical alert (e.g., escalate, notify, etc.)
 				return alertEvent, nil
 			}
