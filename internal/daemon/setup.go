@@ -23,14 +23,29 @@ func (s *Server) setupPage(c *gin.Context) {
 			"Request cannot be processed as the server has not been, or is missing configuration state.")
 	}
 
+	if s.Config == nil {
+		s.getErrorPage(c,
+			http.StatusInternalServerError,
+			"Server configuration is missing.")
+		return
+	}
+
 	// Check if the login server URL is still the default
 	defaultLoginEndpoint := s.Config.GetLoginServerUrl() == config.DefaultLoginServerEndpoint
 	defaultSecret := s.Config.Secret == config.DefaultServerSecret
 
-	// Check optional temporal is configured, correctly
-	defaultServicesTemporalHost := len(s.Config.Services.Temporal.Host) == 0
-	defaultServicestemporalPort := s.Config.Services.Temporal.Port <= 0
-	defaultServicesTemporalNamespace := len(s.Config.Services.Temporal.Namespace) == 0
+	defaultServicesTemporalHost := false
+	defaultServicestemporalPort := false
+	defaultServicesTemporalNamespace := false
+
+	if s.Config.Services.Temporal != nil {
+
+		// Check optional temporal is configured, correctly
+		defaultServicesTemporalHost = len(s.Config.Services.Temporal.Host) == 0
+		defaultServicestemporalPort = s.Config.Services.Temporal.Port <= 0
+		defaultServicesTemporalNamespace = len(s.Config.Services.Temporal.Namespace) == 0
+
+	}
 
 	getServices := s.Config.GetServices()
 
