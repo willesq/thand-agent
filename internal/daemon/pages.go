@@ -66,6 +66,8 @@ func (s *Server) getErrorPage(c *gin.Context, code int, message string, err ...e
 	} else {
 		c.JSON(code, errReponse)
 	}
+
+	c.Abort()
 }
 
 func (s *Server) renderHtml(c *gin.Context, template string, data any) {
