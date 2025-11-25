@@ -2,7 +2,6 @@ package environment
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"runtime"
@@ -103,14 +102,10 @@ func DetectSystemName() string {
 
 func DetectHostname() string {
 
-	logrus.Debug("detect hostname")
-
 	if isGCP() {
 		// Timeout context to avoid hanging for too long
 		timeoutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-
-		fmt.Println("get hostname")
 
 		// Try to get the hostname from metadata
 		hostname, err := metadata.HostnameWithContext(timeoutCtx)
@@ -118,10 +113,8 @@ func DetectHostname() string {
 		if err != nil {
 			logrus.WithError(err).Warning("Failed to detect gcp hostname")
 		} else if len(hostname) > 0 {
-			fmt.Println("hostname from metadata:", hostname)
 			return hostname
 		}
-		fmt.Println("no hostname from metadata")
 	}
 
 	// Check for container/pod names
