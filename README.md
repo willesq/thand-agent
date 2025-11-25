@@ -4,6 +4,8 @@ Thand is a distributed open-source agent for privileged access management (PAM) 
 
 [![Watch the Thand demo](https://img.youtube.com/vi/WLJ1Ab0zeno/mqdefault.jpg)](https://youtu.be/WLJ1Ab0zeno)
 
+**We're keen to understand different use cases in this space**. If it looks like you could make use of the Thand agent and would like some help getting it setup and configured for your environment, [let us know](https://forms.gle/dkYzfu1Nrs33HmNM9) and we'll setup some time to work with you.
+
 ## 🎯 What is Thand?
 
 Thand eliminates standing access to critical infrastructure and SaaS apps. Instead of permanent admin rights, users request access when needed, for only as long as needed. The Thand server is extensible, customisable and easy to deploy as a standalone service.
