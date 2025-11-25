@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"cloud.google.com/go/compute/metadata"
 	kms "cloud.google.com/go/kms/apiv1"
 	"cloud.google.com/go/kms/apiv1/kmspb"
 	"github.com/sirupsen/logrus"
@@ -46,10 +47,25 @@ func (g *gcpEncrypt) Initialize() error {
 	ctx := context.Background()
 
 	projectId, foundProjectId := g.config.GetString("project_id")
+
 	if !foundProjectId {
-		logrus.Errorln("project_id not found in config")
-		return fmt.Errorf("project_id not found in config")
+
+		// Try and figure out the project ID from the environment
+		if metadata.OnGCE() {
+			id, err := metadata.ProjectIDWithContext(context.Background())
+			if err != nil {
+				return fmt.Errorf("project_id not found in config and failed to get project_id from GCE metadata: %w", err)
+			}
+			projectId = id
+		} else {
+			return fmt.Errorf("project_id not found in config and not running on GCE")
+		}
 	}
+
+	if len(projectId) == 0 {
+		return fmt.Errorf("project_id must be specified in GCP provider configuration")
+	}
+
 	g.projectID = projectId
 
 	// Location is often required for GCP KMS, default to global but allow override

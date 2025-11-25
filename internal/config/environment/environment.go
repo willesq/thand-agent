@@ -10,6 +10,7 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/go-resty/resty/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -107,8 +108,11 @@ func DetectHostname() string {
 		defer cancel()
 
 		// Try to get the hostname from metadata
-		hostname, _ := metadata.HostnameWithContext(timeoutCtx)
-		if len(hostname) > 0 {
+		hostname, err := metadata.HostnameWithContext(timeoutCtx)
+
+		if err != nil {
+			logrus.WithError(err).Warning("Failed to detect gcp hostname")
+		} else if len(hostname) > 0 {
 			return hostname
 		}
 	}

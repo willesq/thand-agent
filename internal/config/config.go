@@ -24,6 +24,9 @@ import (
 	"github.com/thand-io/agent/internal/sessions"
 )
 
+const DefaultServerSecret = "changeme"
+const DefaultLoginServerEndpoint = "https://login.thand.io"
+
 var ErrNoActiveLoginSession = fmt.Errorf(
 	"you must login first. No valid session found to sync with login server")
 
@@ -138,6 +141,11 @@ func setupHomeConfigPath(v *viper.Viper) error {
 
 // bindEnvironmentVariables binds all environment variables to viper
 func bindEnvironmentVariables(v *viper.Viper) {
+
+	// Set base environment variables
+	v.BindEnv("login.endpoint", "THAND_LOGIN_ENDPOINT")
+	v.BindEnv("login.endpoint", "THAND_BASE_URL")
+
 	// Platform environment variables
 	v.BindEnv("environment.platform", "THAND_ENVIRONMENT_PLATFORM")
 
@@ -517,12 +525,12 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("environment.ephemeral", environment.IsEphemeralEnvironment())
 
 	// Environment config defaults
-	v.SetDefault("environment.config.timeout", "5s")    // Timeout for any config fetch operations
-	v.SetDefault("environment.config.key", "changeme")  // Default encryption key name
-	v.SetDefault("environment.config.salt", "changeme") // Default encryption salt
+	v.SetDefault("environment.config.timeout", "5s")             // Timeout for any config fetch operations
+	v.SetDefault("environment.config.key", DefaultServerSecret)  // Default encryption key name
+	v.SetDefault("environment.config.salt", DefaultServerSecret) // Default encryption salt
 
 	// Login server defaults
-	v.SetDefault("login.endpoint", "https://login.thand.io")
+	v.SetDefault("login.endpoint", DefaultLoginServerEndpoint)
 	v.SetDefault("login.base", "/")
 
 	// Server defaults
@@ -562,7 +570,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("oidc.scopes", []string{"openid", "profile", "email"})
 
 	// Session defaults
-	v.SetDefault("secret", "changeme")
+	v.SetDefault("secret", DefaultServerSecret)
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")

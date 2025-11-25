@@ -129,7 +129,6 @@ func CreateGcpConfig(gcpConfig *models.BasicConfig) (*GcpConfigurationProvider, 
 	if !foundProjectId {
 
 		// Try and figure out the project ID from the environment
-
 		if metadata.OnGCE() {
 			id, err := metadata.ProjectIDWithContext(context.Background())
 			if err != nil {

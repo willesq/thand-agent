@@ -8,16 +8,6 @@ roles:
       - gcp_simple_elevation
     inherits:
       - roles/viewer
-    permissions:
-      allow:
-        - compute.instances.get
-        - compute.instances.list
-        - storage.buckets.get
-        - storage.buckets.list
-        - storage.objects.get
-        - storage.objects.list
-        - cloudsql.instances.get
-        - cloudsql.instances.list
     providers:
       - gcp
     enabled: true
@@ -30,9 +20,6 @@ roles:
       - gcp_simple_elevation
     inherits:
       - roles/owner
-    permissions:
-      allow:
-        - "*"
     providers:
       - gcp
     enabled: true
@@ -45,12 +32,6 @@ roles:
       - gcp_simple_elevation
     inherits:
       - roles/secretmanager.admin
-    permissions:
-      allow:
-        - secretmanager.secrets.*
-        - secretmanager.versions.*
-        - cloudkms.cryptoKeys.get
-        - cloudkms.cryptoKeys.list
     providers:
       - gcp
     enabled: true
@@ -65,14 +46,6 @@ roles:
       - roles/cloudsql.admin
       - roles/spanner.admin
       - roles/datastore.owner
-    permissions:
-      allow:
-        - cloudsql.*
-        - spanner.*
-        - datastore.*
-        - firestore.*
-        - redis.*
-        - bigtable.*
     providers:
       - gcp
     enabled: true
@@ -85,12 +58,6 @@ roles:
       - gcp_email_approval
     inherits:
       - roles/storage.admin
-    permissions:
-      allow:
-        - storage.buckets.*
-        - storage.objects.*
-        - file.instances.*
-        - file.locations.*
     providers:
       - gcp
     enabled: true
@@ -103,15 +70,6 @@ roles:
       - gcp_email_approval
     inherits:
       - roles/compute.networkAdmin
-    permissions:
-      allow:
-        - compute.networks.*
-        - compute.subnetworks.*
-        - compute.firewalls.*
-        - compute.routes.*
-        - compute.routers.*
-        - compute.addresses.*
-        - dns.*
     providers:
       - gcp
     enabled: true
@@ -125,12 +83,6 @@ roles:
     inherits:
       - roles/iam.securityAdmin
       - roles/securitycenter.admin
-    permissions:
-      allow:
-        - iam.serviceAccounts.*
-        - iam.roles.*
-        - securitycenter.*
-        - cloudkms.*
     providers:
       - gcp
     enabled: true
@@ -144,14 +96,6 @@ roles:
     inherits:
       - roles/compute.admin
       - roles/container.admin
-    permissions:
-      allow:
-        - compute.instances.*
-        - compute.disks.*
-        - compute.images.*
-        - container.clusters.*
-        - run.services.*
-        - cloudfunctions.*
     providers:
       - gcp
     enabled: true
@@ -164,19 +108,6 @@ roles:
       - gcp_simple_elevation
     inherits:
       - roles/editor
-    permissions:
-      allow:
-        - compute.instances.*
-        - storage.buckets.*
-        - storage.objects.*
-        - cloudfunctions.*
-        - run.services.*
-        - pubsub.*
-        - logging.*
-        - monitoring.*
-      deny:
-        - iam.serviceAccounts.delete
-        - iam.roles.delete
     providers:
       - gcp
     enabled: true
@@ -190,11 +121,6 @@ roles:
     inherits:
       - roles/monitoring.admin
       - roles/logging.admin
-    permissions:
-      allow:
-        - monitoring.*
-        - logging.*
-        - cloudtrace.*
     providers:
       - gcp
     enabled: true
