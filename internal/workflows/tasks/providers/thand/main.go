@@ -107,6 +107,8 @@ func (t *thandTask) Execute(
 		return t.executeRevokeTask(workflowTask, taskName, &interpolatedTask)
 	case ThandMonitorTask:
 		return t.executeMonitorTask(workflowTask, taskName, &interpolatedTask, input)
+	case ThandFormTask:
+		return t.executeFormTask(workflowTask, taskName, &interpolatedTask)
 	default:
 		return nil, fmt.Errorf("unknown thand task type: %s", interpolatedTask.Thand)
 	}

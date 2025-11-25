@@ -26,6 +26,7 @@ This will run the web service that handles authentication and authorization requ
 
 		// Print out environment information
 		fmt.Printf("Environment Name: %s\n", cfg.Environment.Name)
+		fmt.Printf("Environment Hostname: %s\n", cfg.Environment.Hostname)
 		fmt.Printf("Environment Platform: %s\n", cfg.Environment.Platform)
 		fmt.Printf("Environment OS: %s\n", cfg.Environment.OperatingSystem)
 		fmt.Printf("Environment OS Version: %s\n", cfg.Environment.OperatingSystemVersion)

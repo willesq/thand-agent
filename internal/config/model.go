@@ -367,6 +367,8 @@ func (c *Config) GetServerAddress() string {
 	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
 }
 
+// GetLocalServerUrl returns the local server URL. This is the
+// local agent server URL used for agent to server communication.
 func (c *Config) GetLocalServerUrl() string {
 	hostname := c.Server.Host
 	if hostname == "0.0.0.0" {
@@ -671,6 +673,7 @@ func (r *Config) GetProviderPermission(permissionName string, providers ...strin
 type TemplateData struct {
 	Config      *Config
 	ServiceName string
+	Environment models.EnvironmentConfig
 	Provider    string `json:"provider,omitempty" yaml:"provider,omitempty"`
 	User        *models.User
 	Version     string

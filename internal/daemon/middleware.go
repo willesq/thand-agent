@@ -9,6 +9,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	sessionManager "github.com/thand-io/agent/internal/sessions"
 )
@@ -18,6 +19,46 @@ const (
 	SessionContextKey  = "session"
 	ProviderContextKey = "provider"
 )
+
+// SetupMiddleware this automatically detects and updates the server hostname
+// if its currently set to a default value or localhost
+func (s *Server) SetupMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		if !s.Config.IsServer() {
+
+			c.Next()
+			return
+		}
+
+		// Ok so we're running in server mode, check if the hostname
+		// has been configured
+
+		defaultLoginEndpoint := s.Config.GetLoginServerUrl() == config.DefaultLoginServerEndpoint
+		defaultSecret := s.Config.Secret == config.DefaultServerSecret
+		hasEncryption := s.Config.GetServices().HasEncryption()
+
+		// If any configuration is missing, show setup page
+		// Make sure all these are true
+		if !defaultLoginEndpoint && !defaultSecret && !hasEncryption {
+
+			// Server has been configured, continue
+
+			c.Next()
+			return
+		}
+
+		// The server hasn't been configured, so we need to return the
+		// setup page to allow configuration
+
+		logrus.Infoln("Server hostname or secret not configured, redirecting to setup page")
+
+		s.setupPage(c)
+
+		c.Abort()
+
+	}
+}
 
 // AuthMiddleware sets user context if authenticated, but doesn't require it
 func (s *Server) AuthMiddleware() gin.HandlerFunc {

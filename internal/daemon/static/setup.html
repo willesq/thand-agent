@@ -1,0 +1,450 @@
+{{template "head" .}}
+<!-- Load js-yaml for YAML generation -->
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<style>
+    .preview-box {
+        margin-top: 1rem;
+        padding: 1rem;
+        background-color: hsl(var(--muted));
+        border-radius: 0.375rem;
+        border: 1px solid hsl(var(--border));
+        overflow-x: auto;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 0.75rem;
+        color: hsl(var(--foreground));
+        white-space: pre;
+        max-height: 600px;
+    }
+    .config-status-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .config-status-item {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        background-color: hsl(var(--card));
+        border: 1px solid hsl(var(--border));
+        border-radius: 0.375rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .config-status-item:hover {
+        background-color: hsl(var(--muted));
+        border-color: hsl(var(--ring));
+    }
+    .config-status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .config-status-dot.configured {
+        background-color: #10b981;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    }
+    .config-status-dot.needs-config {
+        background-color: #ef4444;
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    }
+    .config-status-label {
+        font-size: 0.875rem;
+        color: hsl(var(--foreground));
+        font-family: monospace;
+    }
+    .config-status-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 8px;
+        padding: 0.75rem 1rem;
+        background-color: hsl(var(--card));
+        border: 1px solid hsl(var(--border));
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        font-size: 0.75rem;
+        color: hsl(var(--foreground));
+        white-space: nowrap;
+        z-index: 100;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s, visibility 0.2s;
+    }
+    .config-status-item:hover .config-status-tooltip {
+        opacity: 1;
+        visibility: visible;
+    }
+    .config-status-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: hsl(var(--border));
+    }
+    .tooltip-title {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: hsl(var(--foreground));
+    }
+    .tooltip-description {
+        color: hsl(var(--muted-foreground));
+        margin-bottom: 0.5rem;
+    }
+    .tooltip-subitem {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0;
+        font-family: monospace;
+        font-size: 0.7rem;
+    }
+    .tooltip-subitem-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .tooltip-subitem-dot.configured {
+        background-color: #10b981;
+    }
+    .tooltip-subitem-dot.needs-config {
+        background-color: #ef4444;
+    }
+</style>
+
+<main>
+    <div class="container" style="width: 100%;">
+        <div class="page-header">
+            <h1>Thand Setup</h1>
+            <p>You are seeing this page because your Thand instance is not yet configured. Please download and customize the configuration files below.</p>
+        </div>
+
+        <div class="form-section" style="margin-bottom: 2rem;">
+            <h3>Configuration Status</h3>
+            <div class="config-status-grid" id="config-status-grid">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <div class="two-column-layout" style="border: 0px; padding-left: 0px; padding-right: 0px;">
+            <!-- config.yaml -->
+            <div class="form-section">
+                <h3 style="display: flex; justify-content: space-between; align-items: center;">
+                    config.yaml
+                    <button class="button button-primary" onclick="downloadConfig()">Download</button>
+                </h3>
+                <pre id="config-preview" class="preview-box" style="max-height: 600px;"></pre>
+            </div>
+
+            <!-- .env (auto-generated) -->
+            <div class="form-section">
+                <h3 style="display: flex; justify-content: space-between; align-items: center;">
+                    .env
+                    <button class="button button-primary" onclick="downloadEnv()">Download</button>
+                </h3>
+                <pre id="env-preview" class="preview-box" style="max-height: 600px;"></pre>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // Configuration status from server
+    const configurationStatus = {
+        {{range $key, $configured := .Configuration}}
+        "{{$key}}": {{$configured}},
+        {{end}}
+    };
+
+    // Descriptions for each configuration item
+    const configDescriptions = {
+        "login.endpoint": {
+            title: "Login Endpoint",
+            description: "A Base URL needs to be set for your server.",
+            why: "Required for configuring various services to have a defined endpoint for external communication."
+        },
+        "secret": {
+            title: "Server Secret",
+            description: "A secure secret key used for signing tokens and encrypting data.",
+            why: "Critical for security. Using the default secret is insecure."
+        },
+        "services.temporal": {
+            title: "Temporal Workflow Engine",
+            description: "Temporal.io service for durable workflow execution.",
+            why: "Required for running approval workflows and scheduled tasks."
+        },
+        "services.vault": {
+            title: "Vault Secret Manager",
+            description: "HashiCorp Vault or compatible secret management service.",
+            why: "Used for secure credential storage and rotation."
+        },
+        "services.encrypt": {
+            title: "Encryption Service",
+            description: "Encryption service for sensitive data at rest.",
+            why: "Enables encryption of stored credentials and audit data."
+        },
+        "services.scheduler": {
+            title: "Job Scheduler",
+            description: "Background job scheduler for periodic tasks.",
+            why: "Handles scheduled credential rotations and cleanups."
+        },
+        "services.llm": {
+            title: "LLM Service",
+            description: "Large Language Model service for AI-powered features.",
+            why: "Enables AI-assisted elevation requests and policy analysis."
+        }
+    };
+
+    // Group configuration items by parent key
+    function groupConfiguration(config) {
+        const groups = {};
+        const standalone = {};
+        
+        for (const [key, value] of Object.entries(config)) {
+            const parts = key.split('.');
+            
+            // Check if this is a parent key (e.g., "services.temporal")
+            // by seeing if there are child keys (e.g., "services.temporal.host")
+            const hasChildren = Object.keys(config).some(k => 
+                k !== key && k.startsWith(key + '.')
+            );
+            
+            // Check if this key has a parent
+            const parentKey = parts.slice(0, -1).join('.');
+            const hasParent = parentKey && config.hasOwnProperty(parentKey);
+            
+            if (hasChildren) {
+                // This is a parent - collect its children
+                groups[key] = {
+                    configured: value,
+                    children: {}
+                };
+            } else if (hasParent) {
+                // This is a child - add to parent's children
+                if (groups[parentKey]) {
+                    groups[parentKey].children[key] = value;
+                }
+            } else {
+                // Standalone item (no parent, no children)
+                standalone[key] = value;
+            }
+        }
+        
+        return { groups, standalone };
+    }
+
+    function renderConfigurationStatus() {
+        const grid = document.getElementById('config-status-grid');
+        const { groups, standalone } = groupConfiguration(configurationStatus);
+        
+        // Render standalone items first
+        for (const [key, configured] of Object.entries(standalone)) {
+            grid.appendChild(createConfigItem(key, configured, null));
+        }
+        
+        // Render grouped items
+        for (const [key, data] of Object.entries(groups)) {
+            grid.appendChild(createConfigItem(key, data.configured, data.children));
+        }
+    }
+
+    function createConfigItem(key, configured, children) {
+        const item = document.createElement('div');
+        item.className = 'config-status-item';
+        
+        const desc = configDescriptions[key] || { 
+            title: key, 
+            description: 'Configuration setting', 
+            why: configured ? 'This setting is configured.' : 'This setting needs to be configured.'
+        };
+        
+        // Build tooltip content
+        let tooltipContent = `
+            <div class="tooltip-title">${desc.title}</div>
+            <div class="tooltip-description">${desc.description}</div>
+            <div class="tooltip-description" style="font-style: italic;">${desc.why}</div>
+        `;
+        
+        // Add children if any
+        if (children && Object.keys(children).length > 0) {
+            tooltipContent += '<div style="margin-top: 0.5rem; border-top: 1px solid hsl(var(--border)); padding-top: 0.5rem;">';
+            for (const [childKey, childConfigured] of Object.entries(children)) {
+                const childName = childKey.split('.').pop();
+                tooltipContent += `
+                    <div class="tooltip-subitem">
+                        <div class="tooltip-subitem-dot ${childConfigured ? 'configured' : 'needs-config'}"></div>
+                        <span>${childName}</span>
+                    </div>
+                `;
+            }
+            tooltipContent += '</div>';
+        }
+        
+        item.innerHTML = `
+            <div class="config-status-dot ${configured ? 'configured' : 'needs-config'}"></div>
+            <span class="config-status-label">${key}</span>
+            <div class="config-status-tooltip">${tooltipContent}</div>
+        `;
+        
+        return item;
+    }
+
+    // Create a random salt for default config (not secure, just placeholder)
+    function generateRandom(length = 16) {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let salt = '';
+        for (let i = 0; i < length; i++) {
+            salt += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return salt;
+    }
+
+    // Get the current base URL
+    const baseUrl = window.location.origin;
+
+    // Configuration object that mirrors config.example.yaml structure exactly
+    const config = {
+        login: {
+            endpoint: baseUrl,
+            path: "/"
+        },
+        secret: generateRandom(),
+        environment: {
+            platform: "{{ .Environment.Platform }}",
+            config: {
+                salt: generateRandom(),
+                password: generateRandom()
+            }
+        },
+        services: {
+            temporal: {
+                host: "us-central1.gcp.api.temporal.io",
+                port: 7233,
+                namespace: "thand",
+                mtls_pem: "",
+                api_key: ""
+            }
+        },
+        server: {
+            host: "0.0.0.0",
+            port: 8080,
+        },
+        providers: {},
+        roles: {},
+        workflows: {}
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        renderConfigurationStatus();
+        updatePreviews();
+    });
+
+    // Flatten nested object to env vars with THAND_ prefix
+    function flattenToEnvVars(obj, prefix = 'THAND') {
+        const envVars = [];
+        
+        function flatten(current, path) {
+            for (const key in current) {
+                const value = current[key];
+                const envKey = path ? `${path}_${key.toUpperCase()}` : `${prefix}_${key.toUpperCase()}`;
+                
+                if (value === null || value === undefined) {
+                    envVars.push({ key: envKey, value: '', commented: true });
+                } else if (Array.isArray(value)) {
+                    envVars.push({ key: envKey, value: value.join(','), commented: false });
+                } else if (typeof value === 'object' && Object.keys(value).length > 0) {
+                    flatten(value, envKey);
+                } else if (typeof value === 'object') {
+                    // Empty object, skip
+                    continue;
+                } else {
+                    const isEmpty = value === '' || value === 0;
+                    envVars.push({ key: envKey, value: String(value), commented: isEmpty });
+                }
+            }
+        }
+        
+        flatten(obj, prefix);
+        return envVars;
+    }
+
+    function getEnvContent() {
+        const envVars = flattenToEnvVars(config);
+        
+        const lines = [
+            '# Thand Agent Environment Configuration',
+            '# Auto-generated from config.yaml structure',
+            '# Generated on ' + new Date().toISOString().split('T')[0],
+            '#',
+            ''
+        ];
+        
+        let currentSection = '';
+        for (const { key, value, commented } of envVars) {
+            // Add section headers based on top-level keys
+            const section = key.split('_')[1];
+            if (section !== currentSection) {
+                currentSection = section;
+                lines.push(`# ${section.charAt(0) + section.slice(1).toLowerCase()} Configuration`);
+            }
+            
+            if (commented) {
+                lines.push(`# ${key}=${value}`);
+            } else {
+                lines.push(`${key}=${value}`);
+            }
+        }
+        
+        return lines.join('\n');
+    }
+
+    function getConfigContent() {
+        // Create a copy without oidc for yaml (oidc is env-only typically)
+        const yamlConfig = JSON.parse(JSON.stringify(config));
+        
+        const header = `# Thand Backend Configuration
+# Generated on ${new Date().toISOString().split('T')[0]}
+#
+
+`;
+        return header + jsyaml.dump(yamlConfig, { 
+            indent: 2, 
+            lineWidth: 80,
+            quotingType: '"',
+            forceQuotes: false,
+            noRefs: true
+        });
+    }
+
+    function updatePreviews() {
+        document.getElementById('env-preview').textContent = getEnvContent();
+        document.getElementById('config-preview').textContent = getConfigContent();
+    }
+
+    function downloadFile(filename, content) {
+        const element = document.createElement('a');
+        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+        element.setAttribute('download', filename);
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }
+
+    function downloadEnv() {
+        downloadFile('.env', getEnvContent());
+    }
+
+    function downloadConfig() {
+        downloadFile('config.yaml', getConfigContent());
+    }
+</script>
+{{ template "foot" . }}

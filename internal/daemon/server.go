@@ -135,6 +135,7 @@ func (s *Server) GetTemplateData(c *gin.Context) config.TemplateData {
 		Config:      s.Config,
 		ServiceName: serverName,
 		Provider:    foundProvider,
+		Environment: s.Config.Environment,
 		User:        foundUser,
 		Version:     s.GetVersion(),
 		Status:      "Online",
@@ -308,6 +309,9 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 
 	// Now enable auth
 	router.Use(s.AuthMiddleware())
+
+	// Enable hostname detection
+	router.Use(s.SetupMiddleware())
 
 	// Serve the landing page at root
 	router.GET("/", s.getIndexPage)
