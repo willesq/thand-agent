@@ -606,6 +606,10 @@ func (r *Config) GetWorkflowFromElevationRequest(
 }
 
 func (r *Config) GetProviderRole(roleName string, providers ...string) *models.ProviderRole {
+	return r.GetProviderRoleWithIdentity(nil, roleName, providers...)
+}
+
+func (r *Config) GetProviderRoleWithIdentity(identity *models.Identity, roleName string, providers ...string) *models.ProviderRole {
 
 	ctx := context.TODO()
 
@@ -614,6 +618,18 @@ func (r *Config) GetProviderRole(roleName string, providers ...string) *models.P
 		p, err := r.GetProviderByName(providerName)
 
 		if err != nil || p == nil {
+			continue
+		}
+
+		// Check provider-level permissions
+		// If identity is nil, pass nil user to HasPermission which handles it appropriately
+		var user *models.User
+
+		if identity != nil {
+			user = identity.GetUser()
+		}
+
+		if !p.HasPermission(user) {
 			continue
 		}
 

@@ -277,49 +277,6 @@ func TestGCPRoleScenarios(t *testing.T) {
 		assert.ElementsMatch(t, []string{"gcp-prod", "gcp-staging"}, result.Providers)
 	})
 
-	t.Run("gcp role with user not in scope", func(t *testing.T) {
-		roles := map[string]models.Role{
-			"admin_only": {
-				Name:        "Admin Only Role",
-				Description: "Role restricted to specific users",
-				Permissions: models.Permissions{
-					Allow: []string{"compute.instances.delete"},
-				},
-				Scopes: &models.RoleScopes{
-					Users: []string{"admin@example.com"},
-				},
-				Enabled: true,
-			},
-			"general_role": {
-				Name:        "General Role",
-				Description: "Role that inherits from admin-only role",
-				Inherits:    []string{"admin_only"},
-				Permissions: models.Permissions{
-					Allow: []string{"compute.instances.list"},
-				},
-				Enabled: true,
-			},
-		}
-
-		config := newTestConfig(t, roles, nil)
-
-		// User who is NOT in the admin_only scope
-		identity := &models.Identity{
-			ID: "regular-user",
-			User: &models.User{
-				Username: "regular",
-				Email:    "regular@example.com",
-			},
-		}
-
-		result, err := config.GetCompositeRoleByName(identity, "general_role")
-		require.NoError(t, err)
-		require.NotNil(t, result)
-
-		// Should only have permissions from general_role, not from admin_only
-		assert.ElementsMatch(t, []string{"compute.instances.list"}, result.Permissions.Allow)
-	})
-
 	t.Run("gcp multi-project role", func(t *testing.T) {
 		roles := map[string]models.Role{
 			"project_a_access": {

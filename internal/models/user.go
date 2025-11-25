@@ -74,6 +74,20 @@ func (u *User) GetLastName() string {
 	return ""
 }
 
+func (u *User) GetGroups() []string {
+	return u.Groups
+}
+
+func (u *User) GetDomain() string {
+	if len(u.Email) > 0 {
+		atIdx := strings.LastIndex(u.Email, "@")
+		if atIdx != -1 && atIdx < len(u.Email)-1 {
+			return u.Email[atIdx+1:]
+		}
+	}
+	return ""
+}
+
 func (u *User) AsMap() map[string]any {
 	// Convert User struct to a map[string]any
 	mapUser, err := common.ConvertInterfaceToMap(u)

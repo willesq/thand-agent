@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,49 @@ func (r *Role) HasPermission(user *User) bool {
 		return false
 	}
 
+	if r.Scopes == nil {
+		logrus.Debugln("Role.HasPermission: no scopes defined, allowing access")
+		return true
+	}
+
+	// Check user scopes (case-insensitive)
+	if len(r.Scopes.Users) > 0 {
+		for _, allowedUser := range r.Scopes.Users {
+			if strings.EqualFold(allowedUser, user.Username) ||
+				strings.EqualFold(allowedUser, user.ID) ||
+				strings.EqualFold(allowedUser, user.Email) {
+				return true
+			}
+		}
+	}
+
+	// Check group scopes (case-insensitive)
+	if len(r.Scopes.Groups) > 0 {
+		for _, userGroup := range user.Groups {
+			for _, allowedGroup := range r.Scopes.Groups {
+				if strings.EqualFold(userGroup, allowedGroup) {
+					return true
+				}
+			}
+		}
+	}
+
+	// Check domain scopes (case-insensitive)
+	if len(r.Scopes.Domains) > 0 {
+		userDomain := user.GetDomain()
+		for _, allowedDomain := range r.Scopes.Domains {
+			if strings.EqualFold(userDomain, allowedDomain) {
+				return true
+			}
+		}
+	}
+
+	// If scopes are defined but no match found, role doesn't apply
+	if len(r.Scopes.Users) > 0 || len(r.Scopes.Groups) > 0 || len(r.Scopes.Domains) > 0 {
+		return false
+	}
+
+	// No scopes defined means open to all users
 	return true
 }
 
