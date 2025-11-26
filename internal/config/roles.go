@@ -345,7 +345,9 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 	if identity.IsUser() && len(role.Scopes.Groups) > 0 {
 		userGroups := identity.GetUser().GetGroups()
 		for _, userGroup := range userGroups {
-			if slices.Contains(role.Scopes.Groups, userGroup) {
+			if slices.ContainsFunc(role.Scopes.Groups, func(allowedGroup string) bool {
+				return strings.EqualFold(allowedGroup, userGroup)
+			}) {
 				return true
 			}
 		}
@@ -361,7 +363,7 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 	}
 
 	// If scopes are defined but no match found, role doesn't apply
-	if len(role.Scopes.Users) > 0 || len(role.Scopes.Groups) > 0 {
+	if len(role.Scopes.Users) > 0 || len(role.Scopes.Groups) > 0 || len(role.Scopes.Domains) > 0 {
 		return false
 	}
 
