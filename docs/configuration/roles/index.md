@@ -1063,7 +1063,7 @@ correct-role:
 
 ## Workflow Integration
 
-Roles integrate with [workflows](../workflows/) to define approval processes, time limits, and other governance controls.
+Roles integrate with [workflows](../configuration/workflows/) to define approval processes, time limits, and other governance controls.
 
 ### Basic Workflow Assignment
 

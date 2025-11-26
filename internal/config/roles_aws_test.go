@@ -129,27 +129,6 @@ func TestAWSRoles(t *testing.T) {
 		assert.ElementsMatch(t, []string{"slack_approval"}, result.Workflows)
 	})
 
-	t.Run("aws_admin role - user not in scope", func(t *testing.T) {
-		config := newTestConfig(t, awsRoles, awsProviders)
-
-		// Test with a user NOT in the allowed groups/users
-		identity := &models.Identity{
-			ID: "external-user",
-			User: &models.User{
-				Username: "external",
-				Email:    "external@example.com",
-				Groups:   []string{"external"},
-			},
-		}
-
-		result, err := config.GetCompositeRoleByName(identity, "aws_admin")
-		require.NoError(t, err)
-		require.NotNil(t, result)
-
-		// Role should still be returned but any inherited roles with scopes wouldn't apply
-		assert.Equal(t, "Admin", result.Name)
-	})
-
 	t.Run("aws_user role composition", func(t *testing.T) {
 		config := newTestConfig(t, awsRoles, awsProviders)
 

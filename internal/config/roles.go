@@ -213,8 +213,6 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 
 		// Check if the prefix is a matching provider
 		if providerName, roleName, isProvider := c.parseRoleSpec(inheritedRoleName); isProvider {
-			// Use that exact provider to lookup the role
-			providerRole = c.GetProviderRole(roleName, providerName)
 
 			// Check to make sure that the found provider role is in the base provider
 			if !slices.Contains(baseRole.Providers, providerName) {
@@ -226,11 +224,26 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 				continue
 			}
 
+			// Use that exact provider to lookup the role
+			providerRole = c.GetProviderRoleWithIdentity(identity, roleName, providerName)
+
+			// If we identified this as a provider:role format but didn't get a role back,
+			// skip it (could be due to identity not having permission on the provider,
+			// or the role not existing in the provider)
+			if providerRole == nil {
+				logrus.WithFields(logrus.Fields{
+					"provider":       providerName,
+					"role":           roleName,
+					"inherited_role": inheritedRoleName,
+				}).Debugln("Provider role not accessible or not found, skipping")
+				continue
+			}
+
 		}
 
 		// If not found as explicit provider role, check against baseRole's providers
 		if providerRole == nil {
-			providerRole = c.GetProviderRole(inheritedRoleName, baseRole.Providers...)
+			providerRole = c.GetProviderRoleWithIdentity(identity, inheritedRoleName, baseRole.Providers...)
 		}
 
 		if providerRole != nil {
@@ -307,10 +320,12 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 
 	// Check user scopes
 	if identity.IsUser() && len(role.Scopes.Users) > 0 {
-		userIdentity := identity.GetUser().GetIdentity()
+		userIdentity := identity.GetUser()
 		for _, allowedUser := range role.Scopes.Users {
-			if allowedUser == userIdentity || allowedUser == identity.GetUser().Email ||
-				allowedUser == identity.GetUser().Username || allowedUser == identity.GetUser().ID {
+			if strings.EqualFold(allowedUser, userIdentity.GetIdentity()) ||
+				strings.EqualFold(allowedUser, userIdentity.Email) ||
+				strings.EqualFold(allowedUser, userIdentity.Username) ||
+				strings.EqualFold(allowedUser, userIdentity.ID) {
 				return true
 			}
 		}
@@ -318,9 +333,9 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 
 	// Check group scopes
 	if identity.IsGroup() && len(role.Scopes.Groups) > 0 {
-		groupName := identity.GetGroup().Name
+		groupName := identity.GetGroup().GetName()
 		for _, allowedGroup := range role.Scopes.Groups {
-			if allowedGroup == groupName || allowedGroup == identity.GetGroup().ID {
+			if strings.EqualFold(allowedGroup, groupName) || strings.EqualFold(allowedGroup, identity.GetGroup().GetID()) {
 				return true
 			}
 		}
@@ -328,16 +343,27 @@ func (c *Config) isRoleApplicableToIdentity(role *models.Role, identity *models.
 
 	// Check if user belongs to allowed groups
 	if identity.IsUser() && len(role.Scopes.Groups) > 0 {
-		userGroups := identity.GetUser().Groups
+		userGroups := identity.GetUser().GetGroups()
 		for _, userGroup := range userGroups {
-			if slices.Contains(role.Scopes.Groups, userGroup) {
+			if slices.ContainsFunc(role.Scopes.Groups, func(allowedGroup string) bool {
+				return strings.EqualFold(allowedGroup, userGroup)
+			}) {
+				return true
+			}
+		}
+	}
+
+	if identity.IsUser() && len(role.Scopes.Domains) > 0 {
+		userDomain := identity.GetUser().GetDomain()
+		for _, allowedDomain := range role.Scopes.Domains {
+			if strings.EqualFold(allowedDomain, userDomain) {
 				return true
 			}
 		}
 	}
 
 	// If scopes are defined but no match found, role doesn't apply
-	if len(role.Scopes.Users) > 0 || len(role.Scopes.Groups) > 0 {
+	if len(role.Scopes.Users) > 0 || len(role.Scopes.Groups) > 0 || len(role.Scopes.Domains) > 0 {
 		return false
 	}
 
