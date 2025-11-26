@@ -332,6 +332,10 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 		router.GET("/execution/:id/cancel", s.cancelRunningWorkflow)       // Graceful cancellation
 		router.GET("/execution/:id/terminate", s.terminateRunningWorkflow) // Forceful termination
 
+		// Form routes for workflow task forms
+		router.GET("/form/:id", s.getFormPage)
+		router.POST("/form/:id", s.submitForm)
+
 		router.GET("/workflow/:name", s.getWorkflowByName)
 
 	} else if s.Config.IsAgent() || s.Config.IsClient() {
@@ -427,6 +431,10 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			api.GET("/execution/:id/cancel", s.cancelRunningWorkflow)
 			api.GET("/execution/:id/terminate", s.terminateRunningWorkflow)
 			api.GET("/execution/:id/signal", s.signalRunningWorkflow)
+
+			// Form API endpoints
+			api.GET("/form/:id", s.getFormPage)
+			api.POST("/form/:id", s.submitForm)
 
 		}
 	}

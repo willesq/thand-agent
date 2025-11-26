@@ -1,0 +1,24 @@
+{{if .Message}}
+<p style="margin: 0 0 16px 0; font-size: 15px; color: #334155;">{{.Message}}</p>
+{{end}}
+
+<div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1e293b;">
+        {{if .Title}}{{.Title}}{{else}}Form Required{{end}}
+    </h2>
+    
+    {{if .Description}}
+    <p style="margin: 0 0 16px 0; font-size: 14px; color: #475569;">{{.Description}}</p>
+    {{end}}
+</div>
+
+<div style="text-align: center; margin: 32px 0;">
+    <a href="{{.FormURL}}" 
+       style="display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 16px;">
+        {{if .SubmitLabel}}{{.SubmitLabel}}{{else}}Open Form{{end}}
+    </a>
+</div>
+
+<p style="margin: 24px 0 0 0; font-size: 13px; color: #94a3b8; text-align: center;">
+    Please complete the form to continue.
+</p>

@@ -1,0 +1,886 @@
+{{template "header" .}}
+    <main x-data="formApp()" x-init="init()">
+        <div class="container" style="max-width: 800px;">
+            <!-- Loading State -->
+            <div x-show="loading" style="text-align: center; padding: 2rem;">
+                <h1>Loading Form...</h1>
+                <div class="status-dot connecting" style="width: 2rem; height: 2rem; margin: 1rem auto;"></div>
+            </div>
+            
+            <!-- Form Content -->
+            <div x-show="!loading && !submitted && !polling">
+                <!-- Page Header -->
+                <div class="page-header" style="margin-bottom: 2rem;">
+                    <h1 x-text="formTitle"></h1>
+                    <p style="color: hsl(var(--muted-foreground));">Workflow: <span x-text="workflowName"></span></p>
+                </div>
+                
+                <!-- Form Container -->
+                <form @submit.prevent="submitForm()" class="form-container" :class="{ 'form-disabled': formDisabled }">
+                    <!-- Dynamic Blocks -->
+                    <template x-for="(block, blockIndex) in blocks" :key="block.block_id || blockIndex">
+                        <div class="form-block" :data-block-type="block.type">
+                            
+                            <!-- Header Block -->
+                            <template x-if="block.type === 'header'">
+                                <div class="block-header">
+                                    <h2 x-text="block.text?.text || ''"></h2>
+                                </div>
+                            </template>
+                            
+                            <!-- Section Block -->
+                            <template x-if="block.type === 'section'">
+                                <div class="block-section">
+                                    <div class="section-content">
+                                        <div x-show="block.text" class="section-text" :class="{ 'markdown': block.text?.type === 'mrkdwn' }" x-html="formatText(block.text)"></div>
+                                        <template x-if="block.fields && block.fields.length > 0">
+                                            <div class="section-fields">
+                                                <template x-for="(field, fieldIndex) in block.fields" :key="fieldIndex">
+                                                    <div class="section-field" x-html="formatText(field)"></div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <template x-if="block.accessory">
+                                        <div class="section-accessory">
+                                            <!-- Button accessory with URL (link) -->
+                                            <a x-show="block.accessory.type === 'button' && block.accessory.url"
+                                               :href="block.accessory.url" 
+                                               :class="block.accessory.style === 'primary' ? 'button button-primary' : (block.accessory.style === 'danger' ? 'button button-danger' : 'button button-secondary')"
+                                               target="_blank" 
+                                               rel="noopener"
+                                               x-text="block.accessory.text?.text || 'Button'"></a>
+                                            
+                                            <!-- Button accessory without URL (action button) -->
+                                            <button x-show="block.accessory.type === 'button' && !block.accessory.url"
+                                                    type="button" 
+                                                    :class="block.accessory.style === 'primary' ? 'button button-primary' : (block.accessory.style === 'danger' ? 'button button-danger' : 'button button-secondary')"
+                                                    :disabled="submitting || formDisabled"
+                                                    @click="submitWithAction(block.accessory.action_id, block.accessory.value || '')"
+                                                    x-text="block.accessory.text?.text || 'Button'"></button>
+                                            
+                                            <!-- Image accessory -->
+                                            <img x-show="block.accessory.type === 'image'"
+                                                 :src="block.accessory.image_url" 
+                                                 :alt="block.accessory.alt_text || ''" 
+                                                 class="element-image" />
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            
+                            <!-- Divider Block -->
+                            <template x-if="block.type === 'divider'">
+                                <hr class="block-divider" />
+                            </template>
+                            
+                            <!-- Image Block -->
+                            <template x-if="block.type === 'image'">
+                                <div class="block-image">
+                                    <template x-if="block.title">
+                                        <div class="image-title" x-text="block.title?.text || ''"></div>
+                                    </template>
+                                    <img :src="block.image_url" :alt="block.alt_text || 'Image'" class="block-image-img" />
+                                </div>
+                            </template>
+                            
+                            <!-- Context Block -->
+                            <template x-if="block.type === 'context'">
+                                <div class="block-context">
+                                    <template x-for="(elem, elemIndex) in block.elements" :key="elemIndex">
+                                        <span class="context-element">
+                                            <template x-if="elem.type === 'image'">
+                                                <img :src="elem.image_url" :alt="elem.alt_text || ''" class="context-image" />
+                                            </template>
+                                            <template x-if="elem.type === 'plain_text' || elem.type === 'mrkdwn'">
+                                                <span x-html="formatText(elem.text ? elem : elem)"></span>
+                                            </template>
+                                        </span>
+                                    </template>
+                                </div>
+                            </template>
+                            
+                            <!-- Input Block -->
+                            <template x-if="block.type === 'input'">
+                                <div class="block-input">
+                                    <label class="input-label" :for="block.element?.action_id">
+                                        <span x-text="block.label?.text || 'Input'"></span>
+                                        <span x-show="!block.optional" class="required-indicator">*</span>
+                                    </label>
+                                    <template x-if="block.hint">
+                                        <div class="input-hint" x-text="block.hint?.text || ''"></div>
+                                    </template>
+                                    
+                                    <!-- Plain Text Input -->
+                                    <template x-if="block.element?.type === 'plain_text_input'">
+                                        <div>
+                                            <template x-if="block.element?.multiline">
+                                                <textarea 
+                                                    class="form-textarea"
+                                                    :id="block.element?.action_id"
+                                                    :name="block.element?.action_id"
+                                                    :placeholder="block.element?.placeholder?.text || ''"
+                                                    :minlength="block.element?.min_length || null"
+                                                    :maxlength="block.element?.max_length || null"
+                                                    :required="!block.optional"
+                                                    x-model="formValues[block.element?.action_id]"
+                                                    @input="validateField(block.element?.action_id, block)"
+                                                    rows="4"
+                                                ></textarea>
+                                            </template>
+                                            <template x-if="!block.element?.multiline">
+                                                <input 
+                                                    type="text" 
+                                                    class="form-input"
+                                                    :id="block.element?.action_id"
+                                                    :name="block.element?.action_id"
+                                                    :placeholder="block.element?.placeholder?.text || ''"
+                                                    :minlength="block.element?.min_length || null"
+                                                    :maxlength="block.element?.max_length || null"
+                                                    :required="!block.optional"
+                                                    x-model="formValues[block.element?.action_id]"
+                                                    @input="validateField(block.element?.action_id, block)"
+                                                />
+                                            </template>
+                                        </div>
+                                    </template>
+                                    
+                                    <!-- Email Input -->
+                                    <template x-if="block.element?.type === 'email_text_input'">
+                                        <input 
+                                            type="email" 
+                                            class="form-input"
+                                            :id="block.element?.action_id"
+                                            :name="block.element?.action_id"
+                                            :placeholder="block.element?.placeholder?.text || 'email@example.com'"
+                                            :required="!block.optional"
+                                            x-model="formValues[block.element?.action_id]"
+                                            @input="validateField(block.element?.action_id, block)"
+                                        />
+                                    </template>
+                                    
+                                    <!-- URL Input -->
+                                    <template x-if="block.element?.type === 'url_text_input'">
+                                        <input 
+                                            type="url" 
+                                            class="form-input"
+                                            :id="block.element?.action_id"
+                                            :name="block.element?.action_id"
+                                            :placeholder="block.element?.placeholder?.text || 'https://'"
+                                            :required="!block.optional"
+                                            x-model="formValues[block.element?.action_id]"
+                                            @input="validateField(block.element?.action_id, block)"
+                                        />
+                                    </template>
+                                    
+                                    <!-- Number Input -->
+                                    <template x-if="block.element?.type === 'number_input'">
+                                        <input 
+                                            type="number" 
+                                            class="form-input"
+                                            :id="block.element?.action_id"
+                                            :name="block.element?.action_id"
+                                            :placeholder="block.element?.placeholder?.text || ''"
+                                            :step="block.element?.is_decimal_allowed ? 'any' : '1'"
+                                            :min="block.element?.min_value || null"
+                                            :max="block.element?.max_value || null"
+                                            :required="!block.optional"
+                                            x-model="formValues[block.element?.action_id]"
+                                            @input="validateField(block.element?.action_id, block)"
+                                        />
+                                    </template>
+                                    
+                                    <!-- Date Picker -->
+                                    <template x-if="block.element?.type === 'datepicker'">
+                                        <input 
+                                            type="date" 
+                                            class="form-input"
+                                            :id="block.element?.action_id"
+                                            :name="block.element?.action_id"
+                                            :required="!block.optional"
+                                            x-model="formValues[block.element?.action_id]"
+                                            @input="validateField(block.element?.action_id, block)"
+                                        />
+                                    </template>
+                                    
+                                    <!-- Time Picker -->
+                                    <template x-if="block.element?.type === 'timepicker'">
+                                        <input 
+                                            type="time" 
+                                            class="form-input"
+                                            :id="block.element?.action_id"
+                                            :name="block.element?.action_id"
+                                            :required="!block.optional"
+                                            x-model="formValues[block.element?.action_id]"
+                                            @input="validateField(block.element?.action_id, block)"
+                                        />
+                                    </template>
+                                    
+                                    <!-- Static Select -->
+                                    <template x-if="block.element?.type === 'static_select'">
+                                        <select 
+                                            class="form-select"
+                                            :id="block.element?.action_id"
+                                            :name="block.element?.action_id"
+                                            :required="!block.optional"
+                                            x-model="formValues[block.element?.action_id]"
+                                            @change="validateField(block.element?.action_id, block)"
+                                        >
+                                            <option value="" x-text="block.element?.placeholder?.text || 'Select an option'"></option>
+                                            <template x-if="block.element?.options">
+                                                <template x-for="(opt, optIndex) in block.element?.options" :key="optIndex">
+                                                    <option :value="opt.value" x-text="opt.text?.text || opt.value"></option>
+                                                </template>
+                                            </template>
+                                            <template x-if="block.element?.option_groups">
+                                                <template x-for="(grp, grpIndex) in block.element?.option_groups" :key="grpIndex">
+                                                    <optgroup :label="grp.label?.text || ''">
+                                                        <template x-for="(opt, optIndex) in grp.options" :key="optIndex">
+                                                            <option :value="opt.value" x-text="opt.text?.text || opt.value"></option>
+                                                        </template>
+                                                    </optgroup>
+                                                </template>
+                                            </template>
+                                        </select>
+                                    </template>
+                                    
+                                    <!-- Multi-Select -->
+                                    <template x-if="block.element?.type === 'multi_static_select'">
+                                        <select 
+                                            class="form-select"
+                                            :id="block.element?.action_id"
+                                            :name="block.element?.action_id"
+                                            :required="!block.optional"
+                                            multiple
+                                            x-model="formValues[block.element?.action_id]"
+                                            @change="validateField(block.element?.action_id, block)"
+                                        >
+                                            <template x-for="(opt, optIndex) in block.element?.options" :key="optIndex">
+                                                <option :value="opt.value" x-text="opt.text?.text || opt.value"></option>
+                                            </template>
+                                        </select>
+                                    </template>
+                                    
+                                    <!-- Radio Buttons -->
+                                    <template x-if="block.element?.type === 'radio_buttons'">
+                                        <div class="radio-group">
+                                            <template x-for="(opt, optIndex) in block.element?.options" :key="optIndex">
+                                                <label class="radio-label">
+                                                    <input 
+                                                        type="radio" 
+                                                        :name="block.element?.action_id"
+                                                        :value="opt.value"
+                                                        :required="!block.optional && optIndex === 0"
+                                                        x-model="formValues[block.element?.action_id]"
+                                                        @change="validateField(block.element?.action_id, block)"
+                                                    />
+                                                    <span class="radio-text" x-text="opt.text?.text || opt.value"></span>
+                                                    <template x-if="opt.description">
+                                                        <span class="radio-description" x-text="opt.description?.text || ''"></span>
+                                                    </template>
+                                                </label>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    
+                                    <!-- Checkboxes -->
+                                    <template x-if="block.element?.type === 'checkboxes'">
+                                        <div class="checkbox-group">
+                                            <template x-for="(opt, optIndex) in block.element?.options" :key="optIndex">
+                                                <label class="checkbox-label">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        :name="block.element?.action_id + '[]'"
+                                                        :value="opt.value"
+                                                        @change="handleCheckboxChange(block.element?.action_id, opt.value, $event)"
+                                                    />
+                                                    <span class="checkbox-text" x-text="opt.text?.text || opt.value"></span>
+                                                    <template x-if="opt.description">
+                                                        <span class="checkbox-description" x-text="opt.description?.text || ''"></span>
+                                                    </template>
+                                                </label>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    
+                                    <!-- Field Error -->
+                                    <template x-if="fieldErrors[block.element?.action_id]">
+                                        <div class="field-error" x-text="fieldErrors[block.element?.action_id]"></div>
+                                    </template>
+                                </div>
+                            </template>
+                            
+                            <!-- Actions Block -->
+                            <template x-if="block.type === 'actions'">
+                                <div class="block-actions">
+                                    <template x-for="(elem, elemIndex) in block.elements" :key="elemIndex">
+                                        <div class="action-element">
+                                            <!-- Button with URL (link) -->
+                                            <a x-show="elem.type === 'button' && elem.url"
+                                               :href="elem.url" 
+                                               :class="elem.style === 'primary' ? 'button button-primary' : (elem.style === 'danger' ? 'button button-danger' : 'button button-secondary')"
+                                               target="_blank" 
+                                               rel="noopener"
+                                               x-text="elem.text?.text || 'Button'"></a>
+                                            
+                                            <!-- Button without URL (action button) -->
+                                            <button x-show="elem.type === 'button' && !elem.url"
+                                                    type="button" 
+                                                    :class="elem.style === 'primary' ? 'button button-primary' : (elem.style === 'danger' ? 'button button-danger' : 'button button-secondary')"
+                                                    :disabled="submitting || formDisabled"
+                                                    @click="submitWithAction(elem.action_id, elem.value || '')"
+                                                    x-text="elem.text?.text || 'Button'"></button>
+                                            
+                                            <!-- Image element -->
+                                            <img x-show="elem.type === 'image'"
+                                                 :src="elem.image_url" 
+                                                 :alt="elem.alt_text || ''" 
+                                                 class="element-image" />
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    
+                    <!-- Form Error Message -->
+                    <template x-if="formError">
+                        <div class="form-error-message">
+                            <strong>Error:</strong> <span x-text="formError"></span>
+                        </div>
+                    </template>
+                    
+                    <!-- Submit Button (only show if no actions blocks with buttons) -->
+                    <div class="form-submit" x-show="!hasActionButtons">
+                        <button type="submit" class="button button-primary" :disabled="submitting || formDisabled">
+                            <span x-show="!submitting" x-text="submitLabel"></span>
+                            <span x-show="submitting">Submitting...</span>
+                        </button>
+                        <a :href="'/execution/' + workflowId" class="button button-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Success State (shown while still polling in background) -->
+            <div x-show="submitted && !formError" style="text-align: center; padding: 2rem;">
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="width: 4rem; height: 4rem; background-color: #10b98115; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                </div>
+                <h2 style="margin-bottom: 0.5rem;">Form Submitted Successfully</h2>
+                <p style="color: hsl(var(--muted-foreground)); margin-bottom: 1.5rem;">Your response has been recorded and the workflow will continue.</p>
+                
+                <!-- Background polling indicator -->
+                <div x-show="polling" style="margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: hsl(var(--muted-foreground)); font-size: 0.875rem;">
+                        <div class="status-dot connecting" style="width: 0.75rem; height: 0.75rem;"></div>
+                        <span x-text="pollingMessage"></span>
+                    </div>
+                </div>
+                
+                <a :href="'/execution/' + workflowId" class="button button-primary">View Workflow Status</a>
+            </div>
+
+            <!-- Initial Polling/Loading State (before showing success) -->
+            <div x-show="polling && !submitted" style="text-align: center; padding: 2rem;">
+                <div style="margin-bottom: 1.5rem;">
+                    <div class="status-dot connecting" style="width: 3rem; height: 3rem; margin: 0 auto;"></div>
+                </div>
+                <h2 style="margin-bottom: 0.5rem;">Processing...</h2>
+                <p style="color: hsl(var(--muted-foreground)); margin-bottom: 1.5rem;" x-text="pollingMessage"></p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    function formApp() {
+        return {
+            loading: true,
+            submitting: false,
+            submitted: false,
+            polling: false,
+            pollingMessage: 'Waiting for workflow to continue...',
+            formDisabled: false,
+            formError: null,
+            fieldErrors: {},
+            pollInterval: null,
+            pollCount: 0,
+            maxSuccessPollSeconds: 30, // Maximum seconds to poll after success (polls every second)
+            successPollCount: 0, // Track how long we've been polling after success
+            originalTask: '',
+            hasActionButtons: false,
+            
+            workflowId: '{{.WorkflowID}}',
+            workflowName: '{{.WorkflowName}}',
+            taskName: '{{.TaskName}}',
+            formTitle: '{{.FormTitle}}',
+            submitLabel: '{{.SubmitLabel}}',
+            apiBasePath: '{{.Config.GetApiBasePath}}',
+            
+            blocks: [],
+            formValues: {},
+            
+            init() {
+                try {
+                    const blocksData = `{{.BlocksJSON}}`;
+                    this.blocks = JSON.parse(blocksData);
+                    this.originalTask = this.taskName;
+                    
+                    // Initialize form values with initial values from blocks
+                    this.blocks.forEach(block => {
+                        if (block.type === 'input' && block.element) {
+                            const actionId = block.element.action_id;
+                            if (block.element.initial_value) {
+                                this.formValues[actionId] = block.element.initial_value;
+                            } else if (block.element.initial_date) {
+                                this.formValues[actionId] = block.element.initial_date;
+                            } else if (block.element.initial_time) {
+                                this.formValues[actionId] = block.element.initial_time;
+                            } else if (block.element.initial_option) {
+                                this.formValues[actionId] = block.element.initial_option.value;
+                            } else if (block.element.initial_options) {
+                                this.formValues[actionId] = block.element.initial_options.map(o => o.value);
+                            } else if (block.element.type === 'checkboxes') {
+                                this.formValues[actionId] = [];
+                            } else {
+                                this.formValues[actionId] = '';
+                            }
+                        }
+                    });
+                    
+                    // Check if there are action buttons (to hide default submit button)
+                    this.hasActionButtons = this.blocks.some(block => 
+                        block.type === 'actions' && 
+                        block.elements?.some(elem => elem.type === 'button' && !elem.url)
+                    );
+                } catch (e) {
+                    console.error('Failed to parse blocks:', e);
+                    this.formError = 'Failed to load form data';
+                }
+                
+                this.loading = false;
+            },
+            
+            // Unified submission method - handles both button clicks and form submit
+            async submitWithAction(actionId = null, actionValue = null) {
+                // Prevent double submission
+                if (this.submitting || this.formDisabled) {
+                    return;
+                }
+                
+                this.formError = null;
+                this.formDisabled = true;
+                this.submitting = true;
+                
+                // Build values object
+                const values = {};
+                
+                // Add form field values
+                for (const [key, value] of Object.entries(this.formValues)) {
+                    if (Array.isArray(value)) {
+                        values[key] = value.join(',');
+                    } else {
+                        values[key] = value;
+                    }
+                }
+                
+                // Add action info if this was a button click
+                if (actionId) {
+                    values[actionId] = actionValue || actionId;
+                    values['_action'] = actionId;
+                    values['_action_value'] = actionValue || actionId;
+                }
+                
+                const payload = {
+                    workflow_id: this.workflowId,
+                    task_name: this.taskName,
+                    values: values
+                };
+                
+                try {
+                    const response = await fetch(`${this.apiBasePath}/form/${this.workflowId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Start polling for workflow state
+                        this.startPolling();
+                    } else {
+                        this.formError = result.message || 'Failed to submit form';
+                        this.formDisabled = false;
+                        this.submitting = false;
+                        
+                        // Map field errors if any
+                        if (result.errors && result.errors.length > 0) {
+                            result.errors.forEach(err => {
+                                this.fieldErrors[err.field] = err.message;
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Form submission error:', error);
+                    this.formError = 'Failed to submit form. Please try again.';
+                    this.formDisabled = false;
+                    this.submitting = false;
+                }
+            },
+            
+            // Form submit handler (for default submit button)
+            async submitForm() {
+                // Validate all fields first
+                if (!this.validateAllFields()) {
+                    this.formError = 'Please fix the errors above before submitting';
+                    return;
+                }
+                
+                // Use unified submission without action
+                await this.submitWithAction(null, null);
+            },
+            
+            startPolling() {
+                this.polling = true;
+                this.submitting = false;
+                this.pollCount = 0;
+                this.pollingMessage = 'Waiting for workflow to continue...';
+                
+                this.pollInterval = setInterval(() => {
+                    this.checkWorkflowState();
+                }, 1000); // Poll every second
+            },
+            
+            async checkWorkflowState() {
+                this.pollCount++;
+                
+                // Track time since showing success
+                if (this.submitted) {
+                    this.successPollCount++;
+                    // Stop polling 30 seconds after showing success
+                    if (this.successPollCount > this.maxSuccessPollSeconds) {
+                        this.stopPolling();
+                        return;
+                    }
+                    this.pollingMessage = `Checking for next form... (${this.successPollCount}s)`;
+                }
+                
+                // Safety limit - stop after 2 minutes regardless
+                if (this.pollCount > 120) {
+                    this.stopPolling();
+                    this.submitted = true;
+                    return;
+                }
+                
+                try {
+                    const fetchUrl = `${this.apiBasePath}/execution/${this.workflowId}`;
+                    console.log('Polling - fetching:', fetchUrl);
+                    
+                    const response = await fetch(fetchUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    
+                    console.log('Polling - response status:', response.status, response.statusText);
+                    
+                    if (!response.ok) {
+                        console.log('Polling - response not ok, status:', response.status);
+                        // Workflow might have ended - show success but keep polling
+                        if (!this.submitted) {
+                            this.submitted = true;
+                            this.successPollCount = 0;
+                        }
+                        return;
+                    }
+                    
+                    const data = await response.json();
+                    const execution = data.execution;
+                    const workflowDsl = data.workflow;
+                    
+                    // Check if workflow is still running
+                    if (execution.status.toLowerCase() !== 'running') {
+                        // Show success but keep polling in case workflow restarts or there's a delay
+                        if (!this.submitted) {
+                            this.submitted = true;
+                            this.successPollCount = 0;
+                        }
+                        return;
+                    }
+                    
+                    // Check if task has changed
+                    const currentTask = execution.task;
+                    console.log('Polling - currentTask:', currentTask, 'originalTask:', this.originalTask);
+                    console.log('Polling - workflowDsl:', workflowDsl);
+                    console.log('Polling - workflowDsl.do:', workflowDsl?.do);
+                    
+                    if (currentTask && currentTask !== this.originalTask) {
+                        // Check if the new task is a form task
+                        console.log('Task changed! Checking if form task...');
+                        const isFormTask = this.isFormTask(currentTask, workflowDsl);
+                        console.log('isFormTask result:', isFormTask);
+                        if (isFormTask) {
+                            // Reload the page to show the new form
+                            console.log('Reloading page for new form...');
+                            this.stopPolling();
+                            window.location.reload();
+                            return;
+                        } else {
+                            // Task changed but not a form - show success, keep polling for next form
+                            if (!this.submitted) {
+                                this.submitted = true;
+                                this.successPollCount = 0;
+                            }
+                        }
+                    } else {
+                        // Task hasn't changed yet
+                        if (!this.submitted) {
+                            this.pollingMessage = `Waiting for workflow to continue... (${this.pollCount}s)`;
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('Polling error:', error);
+                    console.error('Polling error name:', error.name);
+                    console.error('Polling error message:', error.message);
+                    console.error('apiBasePath:', this.apiBasePath);
+                    console.error('workflowId:', this.workflowId);
+                    // Continue polling on error - don't stop
+                }
+            },
+            
+            // Get the thand task subtype (form, validate, monitor, notify, approvals, authorize)
+            // Matches execution.html getThandTaskType logic
+            getThandTaskType(taskDef) {
+                if (!taskDef) return null;
+                
+                // Check if thand is a simple string value (e.g., thand: "form")
+                if (typeof taskDef.thand === 'string') {
+                    return taskDef.thand;
+                }
+                
+                // Check if thand is an object with task property
+                if (taskDef.thand && typeof taskDef.thand === 'object') {
+                    if (taskDef.thand.with && taskDef.thand.with.task) {
+                        return taskDef.thand.with.task;
+                    }
+                    if (taskDef.thand.task) {
+                        return taskDef.thand.task;
+                    }
+                }
+                
+                return null;
+            },
+            
+            // Find a task definition by name in the workflow DSL
+            findTaskDefinition(taskName, workflowDsl) {
+                console.log('findTaskDefinition called with taskName:', taskName);
+                console.log('findTaskDefinition workflowDsl:', workflowDsl);
+                
+                if (!workflowDsl || !workflowDsl.do) {
+                    console.log('findTaskDefinition: No workflowDsl or workflowDsl.do');
+                    return null;
+                }
+                
+                console.log('findTaskDefinition: workflowDsl.do has', workflowDsl.do.length, 'steps');
+                
+                // Recursively search for the task in the workflow definition
+                const findTask = (steps, depth = 0) => {
+                    if (!steps || !Array.isArray(steps)) {
+                        console.log('findTask depth', depth, ': steps is not an array');
+                        return null;
+                    }
+                    
+                    console.log('findTask depth', depth, ': searching', steps.length, 'steps');
+                    
+                    for (let i = 0; i < steps.length; i++) {
+                        const step = steps[i];
+                        if (!step || typeof step !== 'object') {
+                            console.log('findTask depth', depth, 'step', i, ': skipping invalid step');
+                            continue;
+                        }
+                        
+                        const keys = Object.keys(step);
+                        console.log('findTask depth', depth, 'step', i, ': keys are', keys);
+                        
+                        for (const [name, taskDef] of Object.entries(step)) {
+                            console.log('findTask depth', depth, ': checking task', name, 'against', taskName);
+                            if (name === taskName) {
+                                console.log('findTask: FOUND task', taskName, 'taskDef:', taskDef);
+                                return taskDef;
+                            }
+                            // Check nested steps (switch, etc.)
+                            if (taskDef && taskDef.switch) {
+                                for (const switchCase of taskDef.switch) {
+                                    if (switchCase.then) {
+                                        const found = findTask(switchCase.then, depth + 1);
+                                        if (found) return found;
+                                    }
+                                }
+                            }
+                            if (taskDef && taskDef.do) {
+                                const found = findTask(taskDef.do, depth + 1);
+                                if (found) return found;
+                            }
+                            // Check for sub-tasks
+                            if (taskDef && taskDef.for && taskDef.for.do) {
+                                const found = findTask(taskDef.for.do, depth + 1);
+                                if (found) return found;
+                            }
+                            if (taskDef && taskDef.try) {
+                                const found = findTask(taskDef.try, depth + 1);
+                                if (found) return found;
+                            }
+                        }
+                    }
+                    console.log('findTask depth', depth, ': task not found in this level');
+                    return null;
+                };
+                
+                const result = findTask(workflowDsl.do);
+                console.log('findTaskDefinition result:', result);
+                return result;
+            },
+            
+            isFormTask(taskName, workflowDsl) {
+                const taskDef = this.findTaskDefinition(taskName, workflowDsl);
+                if (!taskDef) {
+                    console.log('isFormTask: Could not find task', taskName, 'in workflow');
+                    return false;
+                }
+                
+                const thandType = this.getThandTaskType(taskDef);
+                console.log('isFormTask:', taskName, 'thandType:', thandType, 'taskDef:', taskDef);
+                return thandType === 'form';
+            },
+            
+            stopPolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                }
+                this.polling = false;
+            },
+            
+            formatText(textObj) {
+                if (!textObj) return '';
+                const text = textObj.text || '';
+                
+                if (textObj.type === 'mrkdwn') {
+                    // Simple markdown conversion
+                    return text
+                        .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+                        .replace(/_([^_]+)_/g, '<em>$1</em>')
+                        .replace(/~([^~]+)~/g, '<del>$1</del>')
+                        .replace(/`([^`]+)`/g, '<code>$1</code>')
+                        .replace(/<(https?:\/\/[^|>]+)\|([^>]+)>/g, '<a href="$1" target="_blank" rel="noopener">$2</a>')
+                        .replace(/<(https?:\/\/[^>]+)>/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+                        .replace(/\n/g, '<br>');
+                }
+                
+                return this.escapeHtml(text);
+            },
+            
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            },
+            
+            handleCheckboxChange(actionId, value, event) {
+                if (!this.formValues[actionId]) {
+                    this.formValues[actionId] = [];
+                }
+                
+                if (event.target.checked) {
+                    if (!this.formValues[actionId].includes(value)) {
+                        this.formValues[actionId].push(value);
+                    }
+                } else {
+                    this.formValues[actionId] = this.formValues[actionId].filter(v => v !== value);
+                }
+            },
+            
+            validateField(actionId, block) {
+                if (!block || !block.element) return;
+                
+                const value = this.formValues[actionId];
+                const elem = block.element;
+                
+                // Clear existing error
+                delete this.fieldErrors[actionId];
+                
+                // Check required
+                if (!block.optional && (!value || (Array.isArray(value) && value.length === 0))) {
+                    this.fieldErrors[actionId] = `${block.label?.text || 'This field'} is required`;
+                    return;
+                }
+                
+                // Skip if empty and optional
+                if (!value || value === '') return;
+                
+                // Type-specific validation
+                switch (elem.type) {
+                    case 'plain_text_input':
+                        if (elem.min_length && value.length < elem.min_length) {
+                            this.fieldErrors[actionId] = `Minimum length is ${elem.min_length} characters`;
+                        } else if (elem.max_length && value.length > elem.max_length) {
+                            this.fieldErrors[actionId] = `Maximum length is ${elem.max_length} characters`;
+                        }
+                        break;
+                        
+                    case 'email_text_input':
+                        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        if (!emailRegex.test(value)) {
+                            this.fieldErrors[actionId] = 'Please enter a valid email address';
+                        }
+                        break;
+                        
+                    case 'url_text_input':
+                        try {
+                            new URL(value);
+                        } catch {
+                            this.fieldErrors[actionId] = 'Please enter a valid URL';
+                        }
+                        break;
+                        
+                    case 'number_input':
+                        const num = parseFloat(value);
+                        if (isNaN(num)) {
+                            this.fieldErrors[actionId] = 'Please enter a valid number';
+                        } else if (!elem.is_decimal_allowed && !Number.isInteger(num)) {
+                            this.fieldErrors[actionId] = 'Please enter a whole number';
+                        } else if (elem.min_value && num < parseFloat(elem.min_value)) {
+                            this.fieldErrors[actionId] = `Minimum value is ${elem.min_value}`;
+                        } else if (elem.max_value && num > parseFloat(elem.max_value)) {
+                            this.fieldErrors[actionId] = `Maximum value is ${elem.max_value}`;
+                        }
+                        break;
+                }
+            },
+            
+            validateAllFields() {
+                this.fieldErrors = {};
+                
+                this.blocks.forEach(block => {
+                    if (block.type === 'input' && block.element) {
+                        this.validateField(block.element.action_id, block);
+                    }
+                });
+                
+                return Object.keys(this.fieldErrors).length === 0;
+            }
+        };
+    }
+    </script>
+
+{{template "footer" .}}
