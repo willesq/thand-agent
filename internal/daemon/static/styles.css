@@ -285,6 +285,18 @@ main {
     background-color: #ef4444;
 }
 
+.status-dot.healthy {
+    background-color: #22c55e;
+}
+
+.status-dot.degraded {
+    background-color: #eab308;
+}
+
+.status-dot.unhealthy {
+    background-color: #ef4444;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }

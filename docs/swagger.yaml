@@ -231,6 +231,8 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/github_com_thand-io_agent_internal_config.Config'
+      environment:
+        $ref: '#/definitions/models.EnvironmentConfig'
       executions:
         items:
           $ref: '#/definitions/models.WorkflowExecutionInfo'

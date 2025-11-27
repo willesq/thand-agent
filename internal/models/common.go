@@ -155,6 +155,14 @@ func (pc *BasicConfig) GetString(key string) (string, bool) {
 	return "", false
 }
 
+func (pc *BasicConfig) HasString(key string) bool {
+	if pc == nil {
+		return false
+	}
+	_, ok := (*pc)[key]
+	return ok
+}
+
 func (pc *BasicConfig) GetInt(key string) (int, bool) {
 	if pc == nil {
 		return 0, false
