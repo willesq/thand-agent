@@ -142,15 +142,18 @@ func (m *SessionManager) GetLoginServer(loginServer string) (*LoginServer, error
 	return &server, nil
 }
 
-func (m *SessionManager) AwaitRefresh(loginServer string) *LoginServer {
+func (m *SessionManager) AwaitRefresh(ctx context.Context, loginServer string) *LoginServer {
 
 	logrus.WithFields(logrus.Fields{
 		"loginServer": loginServer,
 	}).Debugln("Awaiting refresh for login server")
 
-	// provide a context deadline to try and reload the sessions
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// Add a timeout to the provided context if it doesn't have a deadline
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+	}
 
 	lastLoginServer, _ := m.GetLoginServer(loginServer)
 
@@ -187,11 +190,14 @@ func (m *SessionManager) AwaitRefresh(loginServer string) *LoginServer {
 
 }
 
-func (m *SessionManager) AwaitProviderRefresh(loginServer string, provider string) error {
+func (m *SessionManager) AwaitProviderRefresh(ctx context.Context, loginServer string, provider string) error {
 
-	// provide a context deadline to try and reload the sessions
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// Add a timeout to the provided context if it doesn't have a deadline
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+	}
 
 	lastTimestamp := m.GetLastTimestamp(loginServer, provider)
 

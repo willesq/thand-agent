@@ -3,12 +3,15 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
+	"github.com/go-resty/resty/v2"
+	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/spf13/cobra"
 	"github.com/thand-io/agent/internal/common"
-	"github.com/thand-io/agent/internal/models"
 )
 
 // Session manager to let users from the command line add and remove sessions
@@ -224,45 +227,18 @@ func createNewSession() error {
 	fmt.Println(infoStyle.Render("Please complete the authentication in your browser"))
 	fmt.Println()
 
-	// Get provider implementation
-	providerImpl, err := cfg.GetProviderByName(selectedProvider)
-	if err != nil {
-		return fmt.Errorf("provider not found: %w", err)
-	}
-
-	localCallbackUrl := cfg.GetLocalServerUrl()
-	client := common.GetClientIdentifier()
-
-	// TODO FIX ME
-	// Start the authentication flow by getting the authorization URL
-	authResponse, err := providerImpl.GetClient().AuthorizeSession(context.Background(), &models.AuthorizeUser{
-		Scopes: []string{"email", "profile"},
-		State: models.EncodingWrapper{
-			Type: models.ENCODED_AUTH,
-			Data: models.NewAuthWrapper(localCallbackUrl, client, selectedProvider),
-		}.Encode(),
-		RedirectUri: cfg.GetAuthCallbackUrl(selectedProvider),
-	})
+	err = kickStart(
+		selectedProvider,
+	)
 
 	if err != nil {
 		return fmt.Errorf("failed to start authorization: %w", err)
 	}
 
-	if len(authResponse.Url) > 0 {
-		err := openBrowser(authResponse.Url)
-
-		if err != nil {
-			fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
-			fmt.Println(authResponse.Url)
-			fmt.Println()
-		}
-
-		fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
-	}
-
 	// Wait for the session to be created (polling)
 	fmt.Println(infoStyle.Render("Waiting for session to be created..."))
 	newSession := sessionManager.AwaitProviderRefresh(
+		context.Background(),
 		cfg.GetLoginServerHostname(),
 		selectedProvider,
 	)
@@ -429,45 +405,20 @@ func refreshSession() error {
 	fmt.Println(infoStyle.Render("Please complete the authentication in your browser"))
 	fmt.Println()
 
-	// Get provider implementation
-	providerImpl, err := cfg.GetProviderByName(selectedProvider)
-	if err != nil {
-		return fmt.Errorf("provider not found: %w", err)
-	}
+	// So we should not be doing anything here other than
+	// hitting the /authorize endpoint again
 
-	localCallbackUrl := cfg.GetLocalServerUrl()
-	client := common.GetClientIdentifier()
-
-	// Start the authentication flow
-	// TODO FIX ME
-	authResponse, err := providerImpl.GetClient().AuthorizeSession(context.Background(), &models.AuthorizeUser{
-		Scopes: []string{"email", "profile"},
-		State: models.EncodingWrapper{
-			Type: models.ENCODED_AUTH,
-			Data: models.NewAuthWrapper(localCallbackUrl, client, selectedProvider),
-		}.Encode(),
-		RedirectUri: cfg.GetAuthCallbackUrl(selectedProvider),
-	})
+	err = kickStart(
+		selectedProvider,
+	)
 
 	if err != nil {
-		return fmt.Errorf("failed to start authorization: %w", err)
-	}
-
-	if len(authResponse.Url) > 0 {
-		err := openBrowser(authResponse.Url)
-
-		if err != nil {
-			fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
-			fmt.Println(authResponse.Url)
-			fmt.Println()
-		}
-
-		fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
+		return fmt.Errorf("failed to start re-authorization: %w", err)
 	}
 
 	// Wait for the session to be refreshed
 	fmt.Println(infoStyle.Render("Waiting for session to be refreshed..."))
-	refreshedSession := sessionManager.AwaitProviderRefresh(cfg.GetLoginServerHostname(), selectedProvider)
+	refreshedSession := sessionManager.AwaitProviderRefresh(context.Background(), cfg.GetLoginServerHostname(), selectedProvider)
 
 	if refreshedSession == nil {
 		return fmt.Errorf("authentication timed out or failed")
@@ -530,4 +481,78 @@ func formatDuration(d time.Duration) string {
 		return "1 minute"
 	}
 	return fmt.Sprintf("%d minutes", minutes)
+}
+
+// kickStart initiates the authorization process for a given provider
+func kickStart(
+	selectedProvider string,
+) error {
+
+	localCallbackUrl := cfg.GetLocalServerUrl()
+	loginServerUrl := fmt.Sprintf(
+		"%s/auth/request/%s",
+		cfg.DiscoverLoginServerApiUrl(),
+		selectedProvider,
+	)
+
+	clientIdentifier := common.GetClientIdentifier()
+
+	client := resty.New()
+	client.SetRedirectPolicy(handleProviderAuthRedirect())
+
+	_, err := common.InvokeHttpRequestWithClient(
+		client,
+		&model.HTTPArguments{
+			Method: http.MethodGet,
+			Endpoint: &model.Endpoint{
+				EndpointConfig: &model.EndpointConfiguration{
+					URI: &model.LiteralUri{Value: loginServerUrl},
+				},
+			},
+			Headers: map[string]string{
+				"X-Client": clientIdentifier,
+			},
+			Query: map[string]any{
+				"callback": localCallbackUrl,
+				"code":     createAuthCode(),
+				"provider": strings.ToLower(selectedProvider),
+			},
+		},
+	)
+
+	if err != nil {
+
+		// Check if it's a resty error with response auto redirect is disabled
+		return fmt.Errorf("failed to invoke kickstart request: %w", err)
+	}
+
+	return nil
+
+}
+
+func handleProviderAuthRedirect() resty.RedirectPolicy {
+	return resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
+
+		// Prevent automatic redirects to capture the Location header
+		if req.URL.Host != via[0].URL.Host {
+
+			authUrl := req.URL.String()
+
+			err := openBrowser(authUrl)
+			if err != nil {
+				return fmt.Errorf("failed to open browser: %w", err)
+			}
+
+			if err != nil {
+				fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
+				fmt.Println(authUrl)
+				fmt.Println()
+			}
+
+			fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
+			return nil
+		}
+
+		return fmt.Errorf("invalid redirect request")
+	})
 }

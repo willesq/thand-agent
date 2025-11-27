@@ -1,10 +1,15 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"net/url"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/thand-io/agent/internal/models"
 )
 
 var loginCmd = &cobra.Command{
@@ -28,11 +33,30 @@ var loginCmd = &cobra.Command{
 
 func runLogin(cmd *cobra.Command, args []string) error {
 
+	// Set up signal handling for graceful cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		fmt.Println("\nLogin cancelled.")
+		cancel()
+	}()
+
 	hostname := cfg.GetLoginServerHostname()
 	fmt.Println("Login server hostname:", hostname)
 
+	// Prepare callback URL with local server endpoint
+
+	if !cfg.GetServices().HasEncryption() {
+		return fmt.Errorf("encryption service is not configured")
+	}
+
 	callbackUrl := url.Values{
 		"callback": {cfg.GetLocalServerUrl()},
+		"code":     {createAuthCode()},
 	}
 
 	// Use the configured login server if no override provided
@@ -50,10 +74,15 @@ func runLogin(cmd *cobra.Command, args []string) error {
 
 	// Wait for the session to be established (using empty provider for general login)
 	session := sessionManager.AwaitRefresh(
+		ctx,
 		cfg.GetLoginServerHostname(),
 	)
 
 	if session == nil {
+		// Check if context was cancelled
+		if ctx.Err() != nil {
+			return fmt.Errorf("login cancelled")
+		}
 		return fmt.Errorf("authentication failed or timed out")
 	}
 
@@ -68,4 +97,17 @@ func runLogin(cmd *cobra.Command, args []string) error {
 func init() {
 	// Add the command to the root
 	rootCmd.AddCommand(loginCmd)
+}
+
+func createAuthCode() string {
+	code := models.EncodingWrapper{
+		Type: models.ENCODED_SESSION_CODE,
+		Data: models.NewCodeWrapper(
+			cfg.GetLocalServerUrl(),
+		),
+	}.EncodeAndEncrypt(
+		cfg.GetServices().GetEncryption(),
+	)
+
+	return code
 }

@@ -25,6 +25,16 @@ import (
 //	@Router			/sessions [post]
 func (s *Server) postSession(c *gin.Context) {
 
+	// This is an un-authenticated endpoint to create a session
+	// but only allowed in agent mode. The code provided must match
+	// the code we issued when starting the agent. This will prevent
+	// unauthorised session creation.
+
+	if !s.Config.IsAgent() && !s.Config.IsClient() {
+		s.getErrorPage(c, http.StatusBadRequest, "Session creation can only be called in agent mode")
+		return
+	}
+
 	// Get the post JSON Body as a Session create request
 	// which is a struct with fields for session creation
 	var sessionCreateRequest models.SessionCreateRequest
@@ -33,13 +43,41 @@ func (s *Server) postSession(c *gin.Context) {
 		return
 	}
 
+	// Validate the code we sent matches the expected code
+	if len(sessionCreateRequest.Code) == 0 {
+		s.getErrorPage(c, http.StatusBadRequest, "Session code is required")
+		return
+	}
+
+	// We need to decrypt the code to check we issued id.
+	if !s.Config.GetServices().HasEncryption() {
+		s.getErrorPage(c, http.StatusInternalServerError, "Encryption service is not configured")
+		return
+	}
+
+	sessionCode := sessionCreateRequest.Code
+
+	// If the code decrypts then we're all good.
+	_, err := models.EncodingWrapper{
+		Type: models.ENCODED_SESSION_CODE,
+	}.DecodeAndDecrypt(
+		sessionCode,
+		s.Config.GetServices().GetEncryption(),
+	)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusBadRequest, "Failed to decrypt session code", err)
+		return
+	}
+
 	sessionToken := sessionCreateRequest.Session
 
 	// The session token is an encoded local session
-	// The payload is encrypted
+	// The payload is encrypted - however, the decode
+	// call does not require decryption as the data is
+	// already encrypted within the session token.
 	sessionData, err := models.EncodingWrapper{
 		Type: models.ENCODED_SESSION_LOCAL,
-		Data: sessionToken,
 	}.Decode(sessionToken)
 
 	if err != nil {

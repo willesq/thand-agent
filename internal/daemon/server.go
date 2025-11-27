@@ -26,6 +26,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -349,7 +350,29 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 				return
 			}
 
-			ctx.Redirect(http.StatusTemporaryRedirect, loginServer+"/auth?callback="+callbackUrl)
+			if !s.Config.GetServices().HasEncryption() {
+				s.getErrorPage(ctx,
+					http.StatusInternalServerError,
+					"Encryption service not configured",
+					fmt.Errorf("encryption service must be configured to create session codes"))
+				return
+			}
+
+			// Create a code to identify the session after authentication
+			// This code is encrypted and can only be used by the agent
+			sessionCode := models.EncodingWrapper{
+				Type: models.ENCODED_SESSION_CODE,
+				Data: "te",
+			}.EncodeAndEncrypt(
+				s.Config.GetServices().GetEncryption(),
+			)
+
+			params := url.Values{
+				"callback": {callbackUrl},
+				"code":     {sessionCode},
+			}
+
+			ctx.Redirect(http.StatusTemporaryRedirect, loginServer+"/auth?"+params.Encode())
 		})
 	}
 

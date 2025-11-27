@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -199,6 +200,7 @@ func authenticateUser(request *models.ElevateRequest) error {
 
 	callbackUrl := url.Values{
 		"callback": {cfg.GetLocalServerUrl()},
+		"code":     {createAuthCode()},
 	}
 
 	if len(request.Authenticator) > 0 {
@@ -220,7 +222,7 @@ func authenticateUser(request *models.ElevateRequest) error {
 	if len(request.Authenticator) > 0 {
 
 		if err := sessionManager.AwaitProviderRefresh(
-			cfg.GetLoginServerHostname(), request.Authenticator); err != nil {
+			context.Background(), cfg.GetLoginServerHostname(), request.Authenticator); err != nil {
 			return fmt.Errorf("failed to await provider refresh: %w", err)
 		}
 
@@ -238,7 +240,7 @@ func authenticateUser(request *models.ElevateRequest) error {
 		// If no auth provider is specified then we just wait for any
 		// valid session to be created
 		sessionHandler := sessionManager.AwaitRefresh(
-			cfg.GetLoginServerHostname())
+			context.Background(), cfg.GetLoginServerHostname())
 
 		foundProvider, session, err := sessionHandler.GetFirstActiveSession()
 
