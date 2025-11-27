@@ -34,13 +34,13 @@ func (s *Server) SetupMiddleware() gin.HandlerFunc {
 		// Ok so we're running in server mode, check if the hostname
 		// has been configured
 
-		defaultLoginEndpoint := s.Config.GetLoginServerUrl() == config.DefaultLoginServerEndpoint
-		defaultSecret := s.Config.Secret == config.DefaultServerSecret
-		hasEncryption := s.Config.GetServices().HasEncryption()
+		notDefaultLoginEndpoint := s.Config.GetLoginServerUrl() != config.DefaultLoginServerEndpoint
+		notDefaultSecret := s.Config.Secret != config.DefaultServerSecret
+		hasEncryptionService := s.Config.GetServices().HasEncryption()
 
 		// If any configuration is missing, show setup page
 		// Make sure all these are true
-		if !defaultLoginEndpoint && !defaultSecret && hasEncryption {
+		if notDefaultLoginEndpoint && notDefaultSecret && hasEncryptionService {
 
 			// Server has been configured, continue
 
