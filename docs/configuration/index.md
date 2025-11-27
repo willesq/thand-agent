@@ -28,15 +28,20 @@ Configuration is loaded in this order (later sources override earlier ones):
 ## Basic Configuration Structure
 
 ```yaml
-# Server connection
-server:
-  url: "https://thand.example.com"
-  timeout: 30s
-  
-# Agent settings  
-agent:
-  listen_port: 8080
-  session_timeout: "1h"
+# Server connection (required)
+login:
+  endpoint: "https://thand.example.com"
+
+secret: changeme
+
+# Temporal (recommended)
+services:
+  temporal:
+    host: "us-central1.gcp.api.temporal.io"
+    port: 7233
+    namespace: thand
+    api_key: "changeme"
+
 
 ```
 
@@ -47,9 +52,16 @@ agent:
 All configuration options can be set via environment variables using the `THAND_` prefix:
 
 ```bash
-export THAND_SERVER_URL="https://thand.example.com"
-export THAND_AGENT_LISTEN_PORT="8080"
-export THAND_LOGGING_LEVEL="debug"
+export THAND_LOGIN_ENDPOINT="https://thand.example.com"
+export THAND_SECRET="changeme"
+
+# Temporal (recommended)
+
+export THAND_SERVICES_TEMPORAL_HOST="us-central1.gcp.api.temporal.io"
+export THAND_SERVICES_TEMPORAL_PORT=7233
+export THAND_SERVICES_TEMPORAL_NAMESPACE="thand"
+export THAND_SERVICES_TEMPORAL_MTLS_PEM=""
+export THAND_SERVICES_TEMPORAL_API_KEY=""
 ```
 
 Nested configuration uses underscores:
