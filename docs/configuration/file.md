@@ -46,16 +46,14 @@ Core environment settings that define the runtime context and platform.
 | `environment.arch` | string | Auto-detected | System architecture: `amd64`, `arm64` |
 | `environment.ephemeral` | boolean | `false` | Whether running in ephemeral environment |
 
-### Environment Config
+### Local Environment Config
 
 Platform-specific configuration settings:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `environment.config.timeout` | duration | `5s` | Timeout for config fetch operations |
-| `environment.config.key` | string | `changeme` | Default encryption key name |
+| `environment.config.password` | string | `changeme` | Default encryption password |
 | `environment.config.salt` | string | `changeme` | Default encryption salt |
-| `environment.config.api_key` | string | - | API key for environment operations |
 
 #### AWS-Specific Config
 

@@ -2080,6 +2080,9 @@ const docTemplate = `{
                 "config": {
                     "$ref": "#/definitions/github_com_thand-io_agent_internal_config.Config"
                 },
+                "environment": {
+                    "$ref": "#/definitions/models.EnvironmentConfig"
+                },
                 "executions": {
                     "type": "array",
                     "items": {

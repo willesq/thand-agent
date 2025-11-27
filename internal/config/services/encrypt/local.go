@@ -42,6 +42,9 @@ func deriveKey(password string, salt string) []byte {
 
 func (l *localVault) Initialize() error {
 
+	// TOOD(hugh): Come up with a better way to have a final default secret that isn't
+	// changeme. See the client.go - this will try and create a better default based on
+	// the environment config identifier if none is provided.
 	masterPassword := l.config.GetStringWithDefault("password", common.DefaultServerSecret)
 	salt := l.config.GetStringWithDefault("salt", common.DefaultServerSecret) // Use hostname as default salt
 
