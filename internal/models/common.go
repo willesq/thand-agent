@@ -159,10 +159,8 @@ func (pc *BasicConfig) HasString(key string) bool {
 	if pc == nil {
 		return false
 	}
-	if _, ok := (*pc)[key]; ok {
-		return ok
-	}
-	return false
+	_, ok := (*pc)[key]
+	return ok
 }
 
 func (pc *BasicConfig) GetInt(key string) (int, bool) {

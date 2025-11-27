@@ -43,8 +43,9 @@ func deriveKey(password string, salt string) []byte {
 func (l *localVault) Initialize() error {
 
 	masterPassword := l.config.GetStringWithDefault("password", common.DefaultServerSecret)
-	salt := l.config.GetStringWithDefault("salt", common.DefaultLoginServerEndpoint)
+	salt := l.config.GetStringWithDefault("salt", common.DefaultServerSecret) // Use hostname as default salt
 
+	// Warn if using default secrets
 	if strings.EqualFold(masterPassword, common.DefaultServerSecret) ||
 		strings.EqualFold(salt, common.DefaultServerSecret) {
 		logrus.Warningln("local encryption service configured with default secrets. See https://docs.thand.io/configuration/file.html#encryption-service")

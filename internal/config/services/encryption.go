@@ -40,7 +40,7 @@ func (e *localClient) configureEncryption() models.EncryptionImpl {
 		// better alternative than the default
 
 		if !configValues.HasString("salt") {
-			configValues.SetKeyWithValue("salt", e.GetEnvironmentConfig().Hostname)
+			configValues.SetKeyWithValue("salt", e.GetEnvironmentConfig().GetIdentifier())
 		}
 
 		if !configValues.HasString("password") && len(e.GetSecret()) > 0 {
