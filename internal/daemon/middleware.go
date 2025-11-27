@@ -40,7 +40,7 @@ func (s *Server) SetupMiddleware() gin.HandlerFunc {
 
 		// If any configuration is missing, show setup page
 		// Make sure all these are true
-		if !defaultLoginEndpoint && !defaultSecret && !hasEncryption {
+		if !defaultLoginEndpoint && !defaultSecret && hasEncryption {
 
 			// Server has been configured, continue
 
