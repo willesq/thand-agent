@@ -187,8 +187,5 @@ func (e *localClient) GetScheduler() models.SchedulerImpl {
 }
 
 func (e *localClient) HasScheduler() bool {
-	if e.HasTemporal() {
-		return true
-	}
 	return e.scheduler != nil
 }
