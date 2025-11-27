@@ -24,9 +24,6 @@ import (
 	"github.com/thand-io/agent/internal/sessions"
 )
 
-const DefaultServerSecret = "changeme"
-const DefaultLoginServerEndpoint = "https://login.thand.io"
-
 var ErrNoActiveLoginSession = fmt.Errorf(
 	"you must login first. No valid session found to sync with login server")
 
@@ -525,12 +522,12 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("environment.ephemeral", environment.IsEphemeralEnvironment())
 
 	// Environment config defaults
-	v.SetDefault("environment.config.timeout", "5s")             // Timeout for any config fetch operations
-	v.SetDefault("environment.config.key", DefaultServerSecret)  // Default encryption key name
-	v.SetDefault("environment.config.salt", DefaultServerSecret) // Default encryption salt
+	v.SetDefault("environment.config.timeout", "5s")                    // Timeout for any config fetch operations
+	v.SetDefault("environment.config.key", common.DefaultServerSecret)  // Default encryption key name
+	v.SetDefault("environment.config.salt", common.DefaultServerSecret) // Default encryption salt
 
 	// Login server defaults
-	v.SetDefault("login.endpoint", DefaultLoginServerEndpoint)
+	v.SetDefault("login.endpoint", common.DefaultLoginServerEndpoint)
 	v.SetDefault("login.base", "/")
 
 	// Server defaults
@@ -570,7 +567,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("oidc.scopes", []string{"openid", "profile", "email"})
 
 	// Session defaults
-	v.SetDefault("secret", DefaultServerSecret)
+	v.SetDefault("secret", common.DefaultServerSecret)
 
 	// Logging defaults
 	v.SetDefault("logging.level", "info")

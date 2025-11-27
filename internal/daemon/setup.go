@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 )
 
@@ -31,8 +32,8 @@ func (s *Server) setupPage(c *gin.Context) {
 	}
 
 	// Check if the login server URL is still the default
-	defaultLoginEndpoint := s.Config.GetLoginServerUrl() == config.DefaultLoginServerEndpoint
-	defaultSecret := s.Config.Secret == config.DefaultServerSecret
+	defaultLoginEndpoint := s.Config.GetLoginServerUrl() == common.DefaultLoginServerEndpoint
+	defaultSecret := s.Config.Secret == common.DefaultServerSecret
 
 	defaultServicesTemporalHost := false
 	defaultServicestemporalPort := false

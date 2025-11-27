@@ -103,7 +103,11 @@ func (c *Config) GetProviders() ProviderConfig {
 func (c *Config) GetServices() models.ServicesClientImpl {
 
 	c.initializeServiceClientOnce.Do(func() {
-		newClient := services.NewServicesClient(&c.Environment, &c.Services)
+		newClient := services.NewServicesClient(
+			&c.Environment,
+			&c.Services,
+			&c.Secret,
+		)
 		err := newClient.Initialize()
 		if err != nil {
 			logrus.WithError(err).Fatalf("Failed to initialize services client: %v", err)

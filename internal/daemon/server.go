@@ -42,7 +42,7 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/manager"
-	"go.temporal.io/sdk/client"
+	"go.temporal.io/api/workflowservice/v1"
 )
 
 //go:embed static/*
@@ -448,8 +448,13 @@ func (s *Server) healthHandler(c *gin.Context) {
 	services := s.Config.GetServices()
 
 	if services.HasTemporal() {
-		_, err := services.GetTemporal().GetClient().CheckHealth(
-			c.Request.Context(), &client.CheckHealthRequest{})
+
+		// Use count rather than health check as temporal cloud
+		// does not support external health checks
+		_, err := services.GetTemporal().GetClient().CountWorkflow(
+			c.Request.Context(),
+			&workflowservice.CountWorkflowExecutionsRequest{},
+		)
 		if err != nil {
 
 			logrus.WithError(err).Error("Temporal service health check failed")

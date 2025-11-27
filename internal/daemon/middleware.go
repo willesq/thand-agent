@@ -9,7 +9,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/config"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	sessionManager "github.com/thand-io/agent/internal/sessions"
 )
@@ -34,8 +34,8 @@ func (s *Server) SetupMiddleware() gin.HandlerFunc {
 		// Ok so we're running in server mode, check if the hostname
 		// has been configured
 
-		notDefaultLoginEndpoint := s.Config.GetLoginServerUrl() != config.DefaultLoginServerEndpoint
-		notDefaultSecret := s.Config.Secret != config.DefaultServerSecret
+		notDefaultLoginEndpoint := s.Config.GetLoginServerUrl() != common.DefaultLoginServerEndpoint
+		notDefaultSecret := s.Config.Secret != common.DefaultServerSecret
 		hasEncryptionService := s.Config.GetServices().HasEncryption()
 
 		// If any configuration is missing, show setup page

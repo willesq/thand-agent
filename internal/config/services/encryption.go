@@ -35,6 +35,18 @@ func (e *localClient) configureEncryption() models.EncryptionImpl {
 	case string(models.Local):
 		fallthrough
 	default:
+
+		// Do we have our password and salt? If not try and provide a
+		// better alternative than the default
+
+		if !configValues.HasString("salt") {
+			configValues.SetKeyWithValue("salt", e.GetEnvironmentConfig().Hostname)
+		}
+
+		if !configValues.HasString("password") && len(e.GetSecret()) > 0 {
+			configValues.SetKeyWithValue("password", e.GetSecret())
+		}
+
 		localEncrypt := encrypt.NewLocalEncryptionFromConfig(configValues)
 		return localEncrypt
 	}

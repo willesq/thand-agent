@@ -10,8 +10,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -40,8 +42,13 @@ func deriveKey(password string, salt string) []byte {
 
 func (l *localVault) Initialize() error {
 
-	masterPassword := l.config.GetStringWithDefault("password", "changeme")
-	salt := l.config.GetStringWithDefault("salt", "changeme")
+	masterPassword := l.config.GetStringWithDefault("password", common.DefaultServerSecret)
+	salt := l.config.GetStringWithDefault("salt", common.DefaultLoginServerEndpoint)
+
+	if strings.EqualFold(masterPassword, common.DefaultServerSecret) ||
+		strings.EqualFold(salt, common.DefaultServerSecret) {
+		logrus.Warningln("local encryption service configured with default secrets. See https://docs.thand.io/configuration/file.html#encryption-service")
+	}
 
 	l.key = deriveKey(masterPassword, salt)
 
