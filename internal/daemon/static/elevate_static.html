@@ -43,6 +43,7 @@
                     <!-- Role Select -->
                     <select name="role" 
                             x-model="selectedRole" 
+                            @change="evaluateRole()"
                             required 
                             class="form-select" 
                             :disabled="!selectedProvider || loadingRoles" 
@@ -76,6 +77,98 @@
                         <span x-show="!loading">Request Elevation</span>
                         <span x-show="loading">Submitting...</span>
                     </button>
+
+                    <!-- Divider -->
+                    <hr x-show="selectedRole && (evaluatedRole || roles[selectedRole])" style="margin: 1.5rem 0; border: none; border-top: 1px solid var(--border-color, #e0e0e0);">
+
+                    <!-- Role Summary Section -->
+                    <div x-show="selectedRole && (evaluatedRole || roles[selectedRole])" class="role-summary" style="text-align: left;">
+                        <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">
+                            <span x-text="evaluatedRole ? 'Evaluated Role Summary' : 'Role Summary'"></span>
+                            <span x-show="loadingEvaluatedRole" style="font-size: 0.8rem; color: var(--text-muted, #666); font-weight: normal;"> (loading...)</span>
+                        </h3>
+                        
+                        <!-- Info about evaluation -->
+                        <p x-show="!evaluatedRole && selectedRole" style="font-size: 0.8rem; color: var(--text-muted, #666); margin-bottom: 1rem; font-style: italic;">
+                            Select exactly one identity to see the fully evaluated role with resolved inheritance.
+                        </p>
+
+                        <!-- Use evaluatedRole if available, otherwise fall back to base role -->
+                        <template x-if="(evaluatedRole || roles[selectedRole])">
+                            <div>
+                                <!-- Inherits -->
+                                <template x-if="(evaluatedRole?.inherits?.length > 0) || (!evaluatedRole && roles[selectedRole]?.inherits?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">📥</span>Inherits
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="item in (evaluatedRole?.inherits || roles[selectedRole]?.inherits || [])" :key="item">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="item" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Permissions -->
+                                <template x-if="(evaluatedRole?.permissions?.allow?.length > 0) || (!evaluatedRole && roles[selectedRole]?.permissions?.allow?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">🔑</span>Permissions
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="perm in (evaluatedRole?.permissions?.allow || roles[selectedRole]?.permissions?.allow || [])" :key="perm">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="perm" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Resources -->
+                                <template x-if="(evaluatedRole?.resources?.allow?.length > 0) || (!evaluatedRole && roles[selectedRole]?.resources?.allow?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">📦</span>Resources
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="res in (evaluatedRole?.resources?.allow || roles[selectedRole]?.resources?.allow || [])" :key="res">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="res" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Groups -->
+                                <template x-if="(evaluatedRole?.groups?.allow?.length > 0) || (!evaluatedRole && roles[selectedRole]?.groups?.allow?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">👥</span>Groups
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="grp in (evaluatedRole?.groups?.allow || roles[selectedRole]?.groups?.allow || [])" :key="grp">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="grp" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Empty State -->
+                                <template x-if="!hasRoleDetails()">
+                                    <p style="font-size: 0.875rem; color: var(--text-muted, #666); font-style: italic;">
+                                        No additional details available for this role.
+                                    </p>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </div>
         </form>
@@ -217,6 +310,8 @@
                 roles: {},
                 selectedProvider: '',
                 selectedRole: '',
+                evaluatedRole: null,
+                loadingEvaluatedRole: false,
                 duration: 'PT1M',
                 reason: '',
                 loading: false,
@@ -246,6 +341,90 @@
                 init() {
                     this.parseUrlParams();
                     this.loadProviders();
+                    
+                    // Watch for identity selection changes via Choices.js events
+                    this.setupIdentityChangeListener();
+                },
+
+                /**
+                 * Set up listener for identity selection changes
+                 */
+                setupIdentityChangeListener() {
+                    const identitySelect = document.getElementById('elevate-identities');
+                    if (identitySelect) {
+                        identitySelect.addEventListener('change', () => {
+                            this.onIdentityChange();
+                        });
+                    }
+                },
+
+                /**
+                 * Handle identity selection change
+                 */
+                onIdentityChange() {
+                    // Re-evaluate the role when identity selection changes
+                    if (this.selectedRole) {
+                        this.evaluateRole();
+                    }
+                },
+
+                /**
+                 * Evaluate the composite role for the selected identity
+                 */
+                async evaluateRole() {
+                    if (!this.selectedRole || !identityChoicesInstance) {
+                        this.evaluatedRole = null;
+                        return;
+                    }
+
+                    const selectedIdentities = identityChoicesInstance.getValue();
+                    
+                    // Only evaluate if exactly one identity is selected
+                    if (selectedIdentities.length !== 1) {
+                        this.evaluatedRole = null;
+                        return;
+                    }
+
+                    const identityId = selectedIdentities[0].value;
+                    this.loadingEvaluatedRole = true;
+
+                    try {
+                        const response = await fetch(`${this.apiBasePath}/roles/evaluate`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                role: this.selectedRole,
+                                identity: identityId,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        this.evaluatedRole = data.role || null;
+                    } catch (error) {
+                        console.error('Error evaluating role:', error);
+                        this.evaluatedRole = null;
+                    } finally {
+                        this.loadingEvaluatedRole = false;
+                    }
+                },
+
+                /**
+                 * Check if the current role (evaluated or base) has any details to display
+                 */
+                hasRoleDetails() {
+                    const role = this.evaluatedRole || this.roles[this.selectedRole];
+                    if (!role) return false;
+                    
+                    return (role.inherits?.length > 0) ||
+                           (role.permissions?.allow?.length > 0) ||
+                           (role.resources?.allow?.length > 0) ||
+                           (role.groups?.allow?.length > 0);
                 },
 
                 /**
@@ -307,6 +486,7 @@
                  */
                 async onProviderChange() {
                     this.selectedRole = '';
+                    this.evaluatedRole = null;
                     this.roles = {};
                     
                     if (this.selectedProvider) {
@@ -352,6 +532,7 @@
                     // Try exact key match first
                     if (this.roles[roleToSelect]) {
                         this.selectedRole = roleToSelect;
+                        this.evaluateRole();
                         return;
                     }
                     
@@ -363,6 +544,7 @@
                     
                     if (roleKey) {
                         this.selectedRole = roleKey;
+                        this.evaluateRole();
                     }
                 }
             };
