@@ -1430,6 +1430,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/roles/evaluate": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Evaluate a role against an identity to get the composite role with all inherited permissions resolved",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "roles"
+                ],
+                "summary": "Evaluate composite role",
+                "parameters": [
+                    {
+                        "description": "Role evaluation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/daemon.EvaluateRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Evaluated composite role",
+                        "schema": {
+                            "$ref": "#/definitions/daemon.EvaluateRoleResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Role or identity not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/session/{provider}": {
             "get": {
                 "description": "Retrieve session information for a specific provider",
@@ -2060,6 +2127,36 @@ const docTemplate = `{
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "daemon.EvaluateRoleRequest": {
+            "type": "object",
+            "required": [
+                "identity",
+                "role"
+            ],
+            "properties": {
+                "identity": {
+                    "description": "Identity ID to evaluate against",
+                    "type": "string"
+                },
+                "role": {
+                    "description": "Role name to evaluate",
+                    "type": "string"
+                }
+            }
+        },
+        "daemon.EvaluateRoleResponse": {
+            "type": "object",
+            "properties": {
+                "role": {
+                    "description": "The evaluated composite role",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Role"
+                        }
+                    ]
                 }
             }
         },
@@ -3625,10 +3722,15 @@ const docTemplate = `{
         "models.SessionCreateRequest": {
             "type": "object",
             "required": [
+                "code",
                 "provider",
                 "session"
             ],
             "properties": {
+                "code": {
+                    "description": "Verification code",
+                    "type": "string"
+                },
                 "provider": {
                     "description": "Provider ID",
                     "type": "string"
@@ -3704,6 +3806,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "output": {},
+                "providers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "reason": {
                     "type": "string"
                 },
