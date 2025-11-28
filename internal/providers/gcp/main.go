@@ -30,15 +30,20 @@ var DefaultStage = "GA"
 type gcpProvider struct {
 	*models.BaseProvider
 
-	client           *GcpConfigurationProvider
-	iamClient        *iam.Service
-	crmClient        *cloudresourcemanager.Service
+	client    *GcpConfigurationProvider
+	iamClient *iam.Service
+	crmClient *cloudresourcemanager.Service
+
 	permissions      []models.ProviderPermission
 	permissionsIndex bleve.Index
 	permissionsMap   map[string]*models.ProviderPermission
-	roles            []models.ProviderRole
-	rolesIndex       bleve.Index
-	rolesMap         map[string]*models.ProviderRole
+
+	roles      []models.ProviderRole
+	rolesIndex bleve.Index
+	rolesMap   map[string]*models.ProviderRole
+
+	identities    []models.Identity
+	identitiesMap map[string]*models.Identity
 
 	indexMu sync.RWMutex
 }
@@ -48,6 +53,7 @@ func (p *gcpProvider) Initialize(provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
 		provider,
 		models.ProviderCapabilityRBAC,
+		models.ProviderCapabilityIdentities,
 	)
 
 	ctx := context.Background()
@@ -104,6 +110,9 @@ func (p *gcpProvider) Initialize(provider models.Provider) error {
 		return fmt.Errorf("failed to create Resource Manager client: %w", err)
 	}
 	p.crmClient = crmService
+
+	// Initialize identities map
+	p.identitiesMap = make(map[string]*models.Identity)
 
 	return nil
 }
