@@ -14,6 +14,80 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// Hard limits for roles configuration to prevent resource exhaustion
+const (
+	// MaxPermissions is the maximum number of permissions (allow + deny) per role
+	MaxPermissions = 500
+
+	// MaxResources is the maximum number of resources (allow + deny) per role
+	MaxResources = 100
+
+	// MaxGroups is the maximum number of groups (allow + deny) per role
+	MaxGroups = 50
+
+	// MaxScopes is the maximum number of scopes (users + groups + domains) per role
+	MaxScopes = 50
+
+	// MaxInherits is the maximum number of roles that can be inherited
+	MaxInherits = 50
+
+	// MaxProviders is the maximum number of providers per role
+	MaxProviders = 5
+
+	// MaxWorkflows is the maximum number of workflows per role
+	MaxWorkflows = 5
+
+	// MaxInheritanceDepth is the maximum depth of role inheritance chain
+	MaxInheritanceDepth = 10
+)
+
+// validateRoleLimits validates that a role does not exceed configured limits.
+// Returns an error describing the first limit violation found.
+func validateRoleLimits(roleKey string, role *models.Role) error {
+	// Check permissions limit
+	permCount := len(role.Permissions.Allow) + len(role.Permissions.Deny)
+	if permCount > MaxPermissions {
+		return fmt.Errorf("role '%s' exceeds maximum permissions limit: %d > %d", roleKey, permCount, MaxPermissions)
+	}
+
+	// Check resources limit
+	resCount := len(role.Resources.Allow) + len(role.Resources.Deny)
+	if resCount > MaxResources {
+		return fmt.Errorf("role '%s' exceeds maximum resources limit: %d > %d", roleKey, resCount, MaxResources)
+	}
+
+	// Check groups limit
+	groupCount := len(role.Groups.Allow) + len(role.Groups.Deny)
+	if groupCount > MaxGroups {
+		return fmt.Errorf("role '%s' exceeds maximum groups limit: %d > %d", roleKey, groupCount, MaxGroups)
+	}
+
+	// Check scopes limit
+	if role.Scopes != nil {
+		scopeCount := len(role.Scopes.Users) + len(role.Scopes.Groups) + len(role.Scopes.Domains)
+		if scopeCount > MaxScopes {
+			return fmt.Errorf("role '%s' exceeds maximum scopes limit: %d > %d", roleKey, scopeCount, MaxScopes)
+		}
+	}
+
+	// Check inherits limit
+	if len(role.Inherits) > MaxInherits {
+		return fmt.Errorf("role '%s' exceeds maximum inherits limit: %d > %d", roleKey, len(role.Inherits), MaxInherits)
+	}
+
+	// Check providers limit
+	if len(role.Providers) > MaxProviders {
+		return fmt.Errorf("role '%s' exceeds maximum providers limit: %d > %d", roleKey, len(role.Providers), MaxProviders)
+	}
+
+	// Check workflows limit
+	if len(role.Workflows) > MaxWorkflows {
+		return fmt.Errorf("role '%s' exceeds maximum workflows limit: %d > %d", roleKey, len(role.Workflows), MaxWorkflows)
+	}
+
+	return nil
+}
+
 // LoadRoles loads roles from a file or URL
 func (c *Config) LoadRoles() (map[string]models.Role, error) {
 	vaultData, err := c.loadRolesVaultData()
@@ -74,6 +148,11 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 			if len(r.Name) == 0 {
 				r.Name = roleKey
 			}
+			// Validate role limits
+			if err := validateRoleLimits(roleKey, &r); err != nil {
+				logrus.WithError(err).Warnln("Role exceeds limits, skipping:", roleKey)
+				continue
+			}
 			defs[roleKey] = r
 		}
 	}
@@ -128,7 +207,7 @@ func (c *Config) GetCompositeRole(identity *models.Identity, baseRole *models.Ro
 }
 
 func (c *Config) GetCompositeRoleByName(identity *models.Identity, roleName string) (*models.Role, error) {
-	if roleName == "" {
+	if len(roleName) == 0 {
 		return nil, fmt.Errorf("cannot resolve composite role: role name is empty")
 	}
 	baseRole, err := c.GetRoleByName(roleName)
@@ -150,12 +229,20 @@ func (c *Config) resolveCompositeRoleByName(identity *models.Identity, roleName 
 // It uses a visited map to detect cycles and prevent infinite recursion.
 // The algorithm ensures parent roles take precedence over child roles in conflicts.
 func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *models.Role, visited map[string]bool) (*models.Role, error) {
-	if baseRole.Name == "" {
+
+	if len(baseRole.Name) == 0 {
 		return nil, fmt.Errorf("cannot resolve role with empty name")
 	}
+
 	if visited[baseRole.Name] {
 		return nil, fmt.Errorf("cyclic inheritance detected in role: %s", baseRole.Name)
 	}
+
+	// Check inheritance depth limit
+	if len(visited) >= MaxInheritanceDepth {
+		return nil, fmt.Errorf("role '%s' exceeds maximum inheritance depth: %d", baseRole.Name, MaxInheritanceDepth)
+	}
+
 	visited[baseRole.Name] = true
 	defer delete(visited, baseRole.Name)
 
@@ -182,7 +269,7 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 
 		if isProviderPrefixed {
 			// Must match one of the base role's providers
-			if !containsString(baseRole.Providers, providerName) {
+			if !slices.Contains(baseRole.Providers, providerName) {
 				log.WithFields(logrus.Fields{
 					"inherited_role": inheritedRoleName,
 					"provider":       providerName,
@@ -238,6 +325,11 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 
 	compositeRole.Inherits = remainingInherits
 	c.resolvePermissionConflicts(&compositeRole)
+
+	// Validate composite role limits after merging
+	if err := validateRoleLimits(compositeRole.Name, &compositeRole); err != nil {
+		return nil, fmt.Errorf("composite role exceeds limits: %w", err)
+	}
 
 	return &compositeRole, nil
 }
@@ -601,6 +693,13 @@ func condenseActions(permissions []string) []string {
 		return nil
 	}
 
+	// Enforce upper bound to prevent resource exhaustion
+	if len(permissions) > MaxPermissions {
+		logrus.Errorf("condenseActions: permissions slice length %d exceeds maximum %d; returning nil",
+			len(permissions), MaxPermissions)
+		return nil
+	}
+
 	// Pre-allocate with reasonable capacity
 	atomic := make([]string, 0, len(permissions)/2)           // Non-condensable permissions
 	byResource := make(map[string][]string, len(permissions)) // resource -> actions
@@ -686,15 +785,4 @@ func mapKeys(m map[string]bool) []string {
 	}
 	sort.Strings(result)
 	return result
-}
-
-// containsString checks if a slice contains a string (case-sensitive).
-// This is a simple helper to avoid importing slices for basic contains checks.
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
 }
