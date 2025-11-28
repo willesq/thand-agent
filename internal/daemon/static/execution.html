@@ -56,8 +56,13 @@
                             </div>
                         </div>
                         
-                        <!-- Cancel Button -->
-                        <div>
+                        <!-- Action Buttons -->
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button @click="copyRequestUrl()" 
+                                    style="padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; border: 1px solid; transition: all 0.2s ease; background-color: hsl(var(--secondary)); border-color: hsl(var(--border)); color: hsl(var(--foreground)); cursor: pointer;"
+                                    title="Copy request URL to clipboard">
+                                <span x-text="copyButtonText">Copy Request</span>
+                            </button>
                             <button @click="cancelWorkflow()" 
                                     :disabled="isWorkflowComplete()"
                                     style="padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; border: 1px solid; transition: all 0.2s ease;"
@@ -69,7 +74,7 @@
                                         'opacity': isWorkflowComplete() ? '0.5' : '1'
                                     }"
                                     :title="isWorkflowComplete() ? 'Cannot cancel completed workflow' : 'Cancel workflow execution'">
-                                Cancel Workflow
+                                Cancel Request
                             </button>
                         </div>
                     </div>
@@ -344,7 +349,7 @@
                                     
                                     <div style="margin-top: 1rem;">
                                         <a href="/" class="button button-primary" style="margin-right: 0.5rem;">Back to Home</a>
-                                        <a href="/elevate" class="button button-secondary">Try Again</a>
+                                        <a :href="getRetryUrl()" class="button button-secondary">Try Again</a>
                                     </div>
                                     
                                     <!-- Execution Context JSON -->
@@ -406,6 +411,7 @@
                 execution: null,
                 workflow: null,
                 refreshInterval: null,
+                copyButtonText: 'Copy Request',
                 
                 // Task type colors mapping
                 taskColors: {
@@ -810,6 +816,93 @@
                         lines.push(this.formatNestedCause(cause.cause, indent + 1));
                     }
                     return lines.join('\n');
+                },
+                
+                // Get retry URL with workflow configuration parameters
+                getRetryUrl() {
+                    const baseUrl = '/elevate/static';
+                    const params = new URLSearchParams();
+                    
+                    // Get provider from execution input (first provider if multiple)
+                    if (this.execution?.providers && this.execution.providers.length > 0) {
+                        params.set('provider', this.execution.providers);
+                    }
+
+                    // Get identity from execution
+                    if (this.execution?.identities && this.execution.identities.length > 0) {
+                        params.set('identity', this.execution.identities);
+                    }
+                    
+                    // Get role name from execution
+                    if (this.execution?.role) {
+                        params.set('role', this.execution.role);
+                    }
+                    
+                    // Get reason from execution
+                    if (this.execution?.reason) {
+                        params.set('reason', this.execution.reason);
+                    }
+                    
+                    // Get duration - convert seconds to ISO 8601 duration format if needed
+                    if (this.execution?.input?.duration) {
+                        // If duration is already in ISO format (starts with PT), use it directly
+                        params.set('duration', this.execution.input.duration);
+                    } else if (this.execution?.duration) {
+                        // Convert seconds to ISO 8601 duration format
+                        params.set('duration', this.secondsToIsoDuration(this.execution.duration));
+                    }
+                    
+                    const queryString = params.toString();
+                    return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+                },
+                
+                // Convert seconds to ISO 8601 duration format
+                secondsToIsoDuration(seconds) {
+                    if (!seconds || seconds <= 0) return 'PT1H'; // Default to 1 hour
+                    
+                    const hours = Math.floor(seconds / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    const secs = seconds % 60;
+                    
+                    let duration = 'PT';
+                    if (hours > 0) duration += `${hours}H`;
+                    if (minutes > 0) duration += `${minutes}M`;
+                    if (secs > 0 && hours === 0 && minutes === 0) duration += `${secs}S`;
+                    
+                    return duration === 'PT' ? 'PT1H' : duration;
+                },
+                
+                // Copy request URL to clipboard
+                async copyRequestUrl() {
+                    const url = window.location.origin + this.getRetryUrl();
+                    
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        this.copyButtonText = 'Copied!';
+                        setTimeout(() => {
+                            this.copyButtonText = 'Copy Request';
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy URL:', err);
+                        // Fallback for older browsers
+                        const textArea = document.createElement('textarea');
+                        textArea.value = url;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        try {
+                            document.execCommand('copy');
+                            this.copyButtonText = 'Copied!';
+                            setTimeout(() => {
+                                this.copyButtonText = 'Copy Request';
+                            }, 2000);
+                        } catch (e) {
+                            this.copyButtonText = 'Failed';
+                            setTimeout(() => {
+                                this.copyButtonText = 'Copy Request';
+                            }, 2000);
+                        }
+                        document.body.removeChild(textArea);
+                    }
                 },
                 
                 // Cancel workflow method
