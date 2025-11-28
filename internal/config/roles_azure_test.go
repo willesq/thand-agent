@@ -99,8 +99,8 @@ func TestAzureRoles(t *testing.T) {
 		// The inherited role should be removed from Inherits list after being merged
 		assert.Empty(t, result.Inherits)
 
-		// Verify resources
-		assert.ElementsMatch(t, []string{"azure:*"}, result.Resources.Allow)
+		// Verify resources - azure:* becomes * since azure matches allowed providers
+		assert.ElementsMatch(t, []string{"*"}, result.Resources.Allow)
 
 		// Verify providers
 		assert.ElementsMatch(t, []string{"azure-prod"}, result.Providers)

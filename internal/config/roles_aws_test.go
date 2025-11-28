@@ -119,8 +119,8 @@ func TestAWSRoles(t *testing.T) {
 		// Verify permissions
 		assert.ElementsMatch(t, []string{"ec2:*", "s3:*", "rds:*", "*"}, result.Permissions.Allow)
 
-		// Verify resources
-		assert.ElementsMatch(t, []string{"aws:*"}, result.Resources.Allow)
+		// Verify resources - aws:* becomes * since aws matches allowed providers
+		assert.ElementsMatch(t, []string{"*"}, result.Resources.Allow)
 
 		// Verify providers
 		assert.ElementsMatch(t, []string{"aws-prod", "aws-dev", "aws-thand-dev"}, result.Providers)

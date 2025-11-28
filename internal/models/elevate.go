@@ -101,8 +101,15 @@ type ElevateRequestInternal struct {
 	AuthorizedAt *time.Time `json:"authorized_at,omitempty"`
 }
 
+// ElevateDynamicRequestScopes represents the nested scopes structure for dynamic elevation
+type ElevateDynamicRequestScopes struct {
+	Groups  []string `form:"groups" json:"groups"`
+	Users   []string `form:"users" json:"users"`
+	Domains []string `form:"domains" json:"domains"`
+}
+
 type ElevateDynamicRequest struct {
-	Authenticator string   `form:"authenticator" json:"authenticator" binding:"required"`
+	Authenticator string   `form:"authenticator" json:"authenticator"` // If not provided, use the users default auth context
 	Workflow      string   `form:"workflow" json:"workflow" binding:"required"`
 	Reason        string   `form:"reason" json:"reason" binding:"required"`
 	Duration      string   `form:"duration" json:"duration" binding:"required"` // Duration in ISO 8601 format
@@ -110,9 +117,11 @@ type ElevateDynamicRequest struct {
 	Providers     []string `form:"providers" json:"providers" binding:"required"`
 	Inherits      []string `form:"inherits" json:"inherits"`
 	Permissions   []string `form:"permissions" json:"permissions"` // Comma-separated permissions
+	Groups        []string `form:"groups" json:"groups"`           // Comma-separated groups
 	Resources     []string `form:"resources" json:"resources"`     // Comma-separated resources
-	Groups        []string `form:"groups" json:"groups"`
-	Users         []string `form:"users" json:"users"`
+
+	// Scopes - nested structure supporting both form bracket notation and JSON
+	Scopes ElevateDynamicRequestScopes `form:"scopes" json:"scopes"`
 }
 
 type ElevateLLMRequest struct {
