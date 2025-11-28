@@ -82,7 +82,7 @@ func (p *oktaProvider) createCustomAdminRole(ctx context.Context, role *models.R
 	}
 
 	// Extract the role ID from the response
-	if createdRole.ID == "" {
+	if len(createdRole.ID) == 0 {
 		return nil, fmt.Errorf("failed to extract role ID from response")
 	}
 

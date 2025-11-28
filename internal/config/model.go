@@ -298,7 +298,7 @@ type RoleConfig struct {
 func (r *RoleConfig) GetRoleByName(name string) (*models.Role, error) {
 	if role, exists := r.Definitions[name]; exists {
 		// Ensure the role has a name (use the key if not set)
-		if role.Name == "" {
+		if len(role.Name) == 0 {
 			role.Name = name
 		}
 		return &role, nil
