@@ -412,6 +412,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 
 			// Server endpoints
 			api.GET("/roles", s.getRoles)
+			api.POST("/roles/evaluate", s.postEvaluateRole)
 			api.GET("/workflows", s.getWorkflows)
 			api.GET("/providers", s.getProviders)
 

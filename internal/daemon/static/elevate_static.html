@@ -1,5 +1,5 @@
 {{template "header" .}}
-<!-- Choices.js CSS and JS -->
+<!-- Choices.js JS (CSS loaded in head.html) -->
 <script src="https://cdn.jsdelivr.net/npm/choices.js@10.2.0/public/assets/scripts/choices.min.js"></script>
 
 <main>
@@ -8,50 +8,193 @@
             <h1>Static Elevation Request</h1>
             <p>Request temporary elevated privileges for a specific role and reason. Only providers with RBAC support are available for elevation.</p>
         </div>
-        <form action="{{.Config.GetApiBasePath}}/elevate" method="GET" class="mt-2 text-left">
-        
+
+        <form action="{{.Config.GetApiBasePath}}/elevate" method="GET" class="mt-2 text-left" id="elevate-form">
             <div class="form-section" style="max-width: 600px; margin: 0 auto;">
+                
+                <!-- Identity Selection (managed by Choices.js, outside Alpine scope) -->
                 <h3>Select Identities to Assign Role</h3>
                 <div class="choice-wrapper">
-                    <select name="identities" id="identities" multiple>
-                        <!-- Options will be populated dynamically -->
+                    <select name="identities" id="elevate-identities" multiple>
+                        <!-- Options populated dynamically via Choices.js -->
                     </select>
                     <div class="choice-help">
                         Select which users or groups will receive this role. Your current identity is selected by default.
                     </div>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 1rem; margin: auto;">
-                    <select name="provider" id="provider" required class="form-select">
+                <!-- Provider, Role, Duration, Reason (managed by Alpine.js) -->
+                <div style="display: flex; flex-direction: column; gap: 1rem; margin: auto;" 
+                     x-data="elevateForm()" 
+                     x-init="init()">
+                    
+                    <!-- Provider Select -->
+                    <select name="provider" 
+                            x-model="selectedProvider" 
+                            @change="onProviderChange()" 
+                            required 
+                            class="form-select">
                         <option value="">Select a Provider</option>
+                        <template x-for="(provider, key) in providers" :key="key">
+                            <option :value="key" x-text="provider.name || key"></option>
+                        </template>
                     </select>
-                    <select name="role" id="role" required disabled class="form-select" style="opacity: 0.5;">
-                        <option value="">Select a Provider First</option>
+
+                    <!-- Role Select -->
+                    <select name="role" 
+                            x-model="selectedRole" 
+                            @change="evaluateRole()"
+                            required 
+                            class="form-select" 
+                            :disabled="!selectedProvider || loadingRoles" 
+                            :style="{ opacity: (!selectedProvider || loadingRoles) ? '0.5' : '1' }">
+                        <option value="" x-show="!selectedProvider">Select a Provider First</option>
+                        <option value="" x-show="selectedProvider && loadingRoles">Loading roles...</option>
+                        <option value="" x-show="selectedProvider && !loadingRoles && Object.keys(roles).length === 0">No roles available</option>
+                        <option value="" x-show="selectedProvider && !loadingRoles && Object.keys(roles).length > 0">Select a Role</option>
+                        <template x-for="(role, key) in roles" :key="key">
+                            <option :value="key" x-text="role.name || key"></option>
+                        </template>
                     </select>
-                    <select name="duration" required class="form-select">
-                        <option value="PT1M">1 Minute</option>
-                        <option value="PT5M">5 Minutes</option>
-                        <option value="PT15M">15 Minutes</option>
-                        <option value="PT30M">30 Minutes</option>
-                        <option value="PT1H">1 Hour</option>
-                        <option value="PT4H">4 Hours</option>
-                        <option value="PT8H">8 Hours</option>
+
+                    <!-- Duration Select -->
+                    <select name="duration" x-model="duration" required class="form-select">
+                        <template x-for="opt in durationOptions" :key="opt.value">
+                            <option :value="opt.value" x-text="opt.label"></option>
+                        </template>
                     </select>
-                    <textarea name="reason" placeholder="Reason for elevation" rows="3" required class="form-textarea"></textarea>
-                    <button type="submit" class="button button-primary">Request Elevation</button>
+
+                    <!-- Reason Textarea -->
+                    <textarea name="reason" 
+                              x-model="reason" 
+                              placeholder="Reason for elevation" 
+                              rows="3" 
+                              required 
+                              class="form-textarea"></textarea>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="button button-primary" :disabled="loading">
+                        <span x-show="!loading">Request Elevation</span>
+                        <span x-show="loading">Submitting...</span>
+                    </button>
+
+                    <!-- Divider -->
+                    <hr x-show="selectedRole && (evaluatedRole || roles[selectedRole])" style="margin: 1.5rem 0; border: none; border-top: 1px solid var(--border-color, #e0e0e0);">
+
+                    <!-- Role Summary Section -->
+                    <div x-show="selectedRole && (evaluatedRole || roles[selectedRole])" class="role-summary" style="text-align: left;">
+                        <h3 style="margin-bottom: 1rem; font-size: 1.1rem;">
+                            <span x-text="evaluatedRole ? 'Evaluated Role Summary' : 'Role Summary'"></span>
+                            <span x-show="loadingEvaluatedRole" style="font-size: 0.8rem; color: var(--text-muted, #666); font-weight: normal;"> (loading...)</span>
+                        </h3>
+                        
+                        <!-- Info about evaluation -->
+                        <p x-show="!evaluatedRole && selectedRole" style="font-size: 0.8rem; color: var(--text-muted, #666); margin-bottom: 1rem; font-style: italic;">
+                            Select exactly one identity to see the fully evaluated role with resolved inheritance.
+                        </p>
+
+                        <!-- Use evaluatedRole if available, otherwise fall back to base role -->
+                        <template x-if="(evaluatedRole || roles[selectedRole])">
+                            <div>
+                                <!-- Inherits -->
+                                <template x-if="(evaluatedRole?.inherits?.length > 0) || (!evaluatedRole && roles[selectedRole]?.inherits?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">📥</span>Inherits
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="item in (evaluatedRole?.inherits || roles[selectedRole]?.inherits || [])" :key="item">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="item" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Permissions -->
+                                <template x-if="(evaluatedRole?.permissions?.allow?.length > 0) || (!evaluatedRole && roles[selectedRole]?.permissions?.allow?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">🔑</span>Permissions
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="perm in (evaluatedRole?.permissions?.allow || roles[selectedRole]?.permissions?.allow || [])" :key="perm">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="perm" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Resources -->
+                                <template x-if="(evaluatedRole?.resources?.allow?.length > 0) || (!evaluatedRole && roles[selectedRole]?.resources?.allow?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">📦</span>Resources
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="res in (evaluatedRole?.resources?.allow || roles[selectedRole]?.resources?.allow || [])" :key="res">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="res" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Groups -->
+                                <template x-if="(evaluatedRole?.groups?.allow?.length > 0) || (!evaluatedRole && roles[selectedRole]?.groups?.allow?.length > 0)">
+                                    <div class="summary-section" style="margin-bottom: 1rem;">
+                                        <h4 style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted, #666);">
+                                            <span style="margin-right: 0.5rem;">👥</span>Groups
+                                        </h4>
+                                        <ul style="margin: 0; padding-left: 1.5rem; list-style-type: disc;">
+                                            <template x-for="grp in (evaluatedRole?.groups?.allow || roles[selectedRole]?.groups?.allow || [])" :key="grp">
+                                                <li style="font-size: 0.875rem; margin-bottom: 0.25rem;">
+                                                    <code x-text="grp" style="background: var(--code-bg, #f5f5f5); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem;"></code>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </div>
+                                </template>
+
+                                <!-- Empty State -->
+                                <template x-if="!hasRoleDetails()">
+                                    <p style="font-size: 0.875rem; color: var(--text-muted, #666); font-style: italic;">
+                                        No additional details available for this role.
+                                    </p>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </div>
         </form>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const roleSelect = document.getElementById('role');
-            const providerSelect = document.getElementById('provider');
-            let identityChoices = null;
+    (function() {
+        'use strict';
 
-            // Initialize Choices.js for identity selection
-            identityChoices = new Choices('#identities', {
+        // Constants
+        const API_BASE_PATH = '{{.Config.GetApiBasePath}}';
+        const CURRENT_USER_EMAIL = '{{if .User}}{{.User.Email}}{{end}}';
+
+        // Choices.js instance (kept outside Alpine to avoid reactivity issues)
+        let identityChoicesInstance = null;
+
+        /**
+         * Initialize the identity selector using Choices.js
+         * This runs on DOMContentLoaded to ensure it executes before Alpine.js
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const prefilledIdentities = urlParams.getAll('identity');
+
+            // Initialize Choices.js for identity multi-select
+            identityChoicesInstance = new Choices('#elevate-identities', {
                 removeItemButton: true,
                 searchEnabled: true,
                 placeholder: true,
@@ -62,135 +205,351 @@
                 searchFields: ['label', 'value'],
             });
 
-            // Load identities with current user pre-selected
-            loadIdentities();
+            // Fetch and populate identities
+            fetchIdentities(prefilledIdentities);
 
-            function loadIdentities() {
-                // Use template value for current user and fetch available identities
-                fetch('{{.Config.GetApiBasePath}}/identities')
-                .then(response => response.json())
-                .then(identitiesData => {
-                    const identities = [];
-                    const currentUserEmail = '{{if .User}}{{.User.Email}}{{end}}';
-                    
-                    // Add other available identities from the API
-                    if (identitiesData && identitiesData.identities) {
-                        identitiesData.identities.forEach(identity => {
+            // Set up form validation
+            setupFormValidation();
+        });
 
-                            const label = identity.label ? 
-                                `${identity.label} (${identity.id})` : 
-                                (identity.label || identity.id);
-
-                            let type = 'unknown';
-
-                            if (identity.user) {
-                                type = 'user';
-                            } else if (identity.group) {
-                                type = 'group';
-                            }
-
-                            identities.push({
-                                id: identity.id,
-                                value: identity.id,
-                                label: `${label}`,
-                                customProperties: { type },
-                            });
-                        });
+        /**
+         * Fetch identities from the API and populate the Choices.js selector
+         * @param {string[]} prefilledIdentities - Identity IDs to pre-select from URL params
+         */
+        function fetchIdentities(prefilledIdentities) {
+            fetch(`${API_BASE_PATH}/identities`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
+                    return response.json();
+                })
+                .then(data => {
+                    const choices = parseIdentitiesResponse(data);
                     
-                    identityChoices.setChoices(identities, 'value', 'label', true);
-                    
-                    // Pre-select current user if available
-                    if (currentUserEmail) {
-                        identityChoices.setChoiceByValue(currentUserEmail);
+                    if (choices.length > 0) {
+                        identityChoicesInstance.setChoices(choices, 'value', 'label', true);
+                        preselectIdentities(prefilledIdentities);
                     }
                 })
                 .catch(error => {
                     console.error('Error loading identities:', error);
                 });
+        }
+
+        /**
+         * Parse the identities API response into Choices.js format
+         * @param {Object} data - API response data
+         * @returns {Array} Formatted choices array
+         */
+        function parseIdentitiesResponse(data) {
+            const choices = [];
+            
+            if (data && data.identities && Array.isArray(data.identities)) {
+                data.identities.forEach(identity => {
+                    const label = identity.label 
+                        ? `${identity.label} (${identity.id})` 
+                        : identity.id;
+
+                    const type = identity.user ? 'user' : (identity.group ? 'group' : 'unknown');
+
+                    choices.push({
+                        value: identity.id,
+                        label: label,
+                        customProperties: { type },
+                    });
+                });
             }
+            
+            return choices;
+        }
 
-            // Fetch only providers with RBAC capability (those that support elevation)
-            fetch('{{.Config.GetApiBasePath}}/providers?capability=rbac')
-                .then(response => response.json())
-                .then(data => {
-                    const providers = data.providers;
-                    for (const providerKey in providers) {
-                        if (providers.hasOwnProperty(providerKey)) {
-                            const option = document.createElement('option');
-                            option.value = providerKey;
-                            option.textContent = providers[providerKey].name || providerKey;
-                            providerSelect.appendChild(option);
-                        }
-                    }
-                })
-                .catch(error => console.error('Error fetching RBAC providers:', error));
+        /**
+         * Pre-select identities based on URL params or current user
+         * @param {string[]} prefilledIdentities - Identity IDs from URL params
+         */
+        function preselectIdentities(prefilledIdentities) {
+            if (prefilledIdentities.length > 0) {
+                // Pre-select identities from URL params
+                prefilledIdentities.forEach(identity => {
+                    identityChoicesInstance.setChoiceByValue(identity);
+                });
+            } else if (CURRENT_USER_EMAIL) {
+                // Fall back to pre-selecting current user
+                identityChoicesInstance.setChoiceByValue(CURRENT_USER_EMAIL);
+            }
+        }
 
-            // Handle provider selection change
-            providerSelect.addEventListener('change', function() {
-                const selectedProvider = this.value;
+        /**
+         * Set up form validation to ensure at least one identity is selected
+         */
+        function setupFormValidation() {
+            const form = document.getElementById('elevate-form');
+            
+            form.addEventListener('submit', function(event) {
+                const selectedIdentities = identityChoicesInstance 
+                    ? identityChoicesInstance.getValue() 
+                    : [];
                 
-                // Clear existing role options
-                roleSelect.innerHTML = '<option value="">Select a Role</option>';
-                
-                if (selectedProvider) {
-                    // Enable role select
-                    roleSelect.disabled = false;
-                    roleSelect.style.opacity = '1';
-                    
-                    // Fetch roles filtered by the selected provider
-                    fetch(`{{.Config.GetApiBasePath}}/roles?provider=${selectedProvider}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            const roles = data.roles;
-                            let hasRoles = false;
-                            
-                            for (const roleKey in roles) {
-                                if (roles.hasOwnProperty(roleKey)) {
-                                    const role = roles[roleKey];
-                                    const option = document.createElement('option');
-                                    option.value = roleKey;
-                                    option.textContent = role.name || roleKey;
-                                    roleSelect.appendChild(option);
-                                    hasRoles = true;
-                                }
-                            }
-                            
-                            // If no roles found for this provider, show message
-                            if (!hasRoles) {
-                                const option = document.createElement('option');
-                                option.value = '';
-                                option.textContent = 'No roles available for this provider';
-                                option.disabled = true;
-                                roleSelect.appendChild(option);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error fetching roles for provider:', error);
-                            const option = document.createElement('option');
-                            option.value = '';
-                            option.textContent = 'Error loading roles';
-                            option.disabled = true;
-                            roleSelect.appendChild(option);
-                        });
-                } else {
-                    // Disable role select if no provider selected
-                    roleSelect.disabled = true;
-                    roleSelect.style.opacity = '0.5';
-                    roleSelect.innerHTML = '<option value="">Select a Provider First</option>';
-                }
-            });
-
-            // Add form validation
-            document.querySelector('form').addEventListener('submit', function(e) {
-                const selectedIdentities = identityChoices.getValue();
                 if (selectedIdentities.length === 0) {
-                    e.preventDefault();
+                    event.preventDefault();
                     alert('Please select at least one identity to assign the role to');
                     return false;
                 }
             });
-        });
+        }
+
+        /**
+         * Alpine.js component for the elevation form
+         * Handles provider/role selection with dynamic loading
+         */
+        window.elevateForm = function() {
+            return {
+                // Reactive state
+                providers: {},
+                roles: {},
+                selectedProvider: '',
+                selectedRole: '',
+                evaluatedRole: null,
+                loadingEvaluatedRole: false,
+                duration: 'PT1M',
+                reason: '',
+                loading: false,
+                loadingRoles: false,
+                
+                // Configuration
+                apiBasePath: API_BASE_PATH,
+                
+                // URL params for pre-filling
+                prefilledProviders: [],
+                prefilledRoles: [],
+
+                // Duration options
+                durationOptions: [
+                    { value: 'PT1M', label: '1 Minute' },
+                    { value: 'PT5M', label: '5 Minutes' },
+                    { value: 'PT15M', label: '15 Minutes' },
+                    { value: 'PT30M', label: '30 Minutes' },
+                    { value: 'PT1H', label: '1 Hour' },
+                    { value: 'PT4H', label: '4 Hours' },
+                    { value: 'PT8H', label: '8 Hours' },
+                ],
+
+                /**
+                 * Initialize the Alpine component
+                 */
+                init() {
+                    this.parseUrlParams();
+                    this.loadProviders();
+                    
+                    // Watch for identity selection changes via Choices.js events
+                    this.setupIdentityChangeListener();
+                },
+
+                /**
+                 * Set up listener for identity selection changes
+                 */
+                setupIdentityChangeListener() {
+                    const identitySelect = document.getElementById('elevate-identities');
+                    if (identitySelect) {
+                        identitySelect.addEventListener('change', () => {
+                            this.onIdentityChange();
+                        });
+                    }
+                },
+
+                /**
+                 * Handle identity selection change
+                 */
+                onIdentityChange() {
+                    // Re-evaluate the role when identity selection changes
+                    if (this.selectedRole) {
+                        this.evaluateRole();
+                    }
+                },
+
+                /**
+                 * Evaluate the composite role for the selected identity
+                 */
+                async evaluateRole() {
+                    if (!this.selectedRole || !identityChoicesInstance) {
+                        this.evaluatedRole = null;
+                        return;
+                    }
+
+                    const selectedIdentities = identityChoicesInstance.getValue();
+                    
+                    // Only evaluate if exactly one identity is selected
+                    if (selectedIdentities.length !== 1) {
+                        this.evaluatedRole = null;
+                        return;
+                    }
+
+                    const identityId = selectedIdentities[0].value;
+                    this.loadingEvaluatedRole = true;
+
+                    try {
+                        const response = await fetch(`${this.apiBasePath}/roles/evaluate`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                role: this.selectedRole,
+                                identity: identityId,
+                            }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        this.evaluatedRole = data.role || null;
+                    } catch (error) {
+                        console.error('Error evaluating role:', error);
+                        this.evaluatedRole = null;
+                    } finally {
+                        this.loadingEvaluatedRole = false;
+                    }
+                },
+
+                /**
+                 * Check if the current role (evaluated or base) has any details to display
+                 */
+                hasRoleDetails() {
+                    const role = this.evaluatedRole || this.roles[this.selectedRole];
+                    if (!role) return false;
+                    
+                    return (role.inherits?.length > 0) ||
+                           (role.permissions?.allow?.length > 0) ||
+                           (role.resources?.allow?.length > 0) ||
+                           (role.groups?.allow?.length > 0);
+                },
+
+                /**
+                 * Parse URL query parameters for form pre-filling
+                 */
+                parseUrlParams() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    
+                    this.prefilledProviders = urlParams.getAll('provider');
+                    this.prefilledRoles = urlParams.getAll('role');
+                    
+                    const prefilledReason = urlParams.get('reason');
+                    const prefilledDuration = urlParams.get('duration');
+
+                    if (prefilledReason) {
+                        this.reason = prefilledReason;
+                    }
+
+                    if (prefilledDuration) {
+                        const isValidDuration = this.durationOptions.some(opt => opt.value === prefilledDuration);
+                        if (isValidDuration) {
+                            // Use $nextTick to ensure options are rendered before setting value
+                            this.$nextTick(() => {
+                                this.duration = prefilledDuration;
+                            });
+                        }
+                    }
+                },
+
+                /**
+                 * Load available providers from the API
+                 */
+                async loadProviders() {
+                    try {
+                        const response = await fetch(`${this.apiBasePath}/providers?capability=rbac`);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        this.providers = data.providers || {};
+
+                        // Pre-select provider from URL params if valid
+                        if (this.prefilledProviders.length > 0) {
+                            const providerToSelect = this.prefilledProviders[0];
+                            if (this.providers[providerToSelect]) {
+                                this.selectedProvider = providerToSelect;
+                                await this.loadRoles();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error fetching providers:', error);
+                    }
+                },
+
+                /**
+                 * Handle provider selection change
+                 */
+                async onProviderChange() {
+                    this.selectedRole = '';
+                    this.evaluatedRole = null;
+                    this.roles = {};
+                    
+                    if (this.selectedProvider) {
+                        await this.loadRoles();
+                    }
+                },
+
+                /**
+                 * Load roles for the selected provider
+                 */
+                async loadRoles() {
+                    if (!this.selectedProvider) return;
+                    
+                    this.loadingRoles = true;
+                    
+                    try {
+                        const response = await fetch(`${this.apiBasePath}/roles?provider=${encodeURIComponent(this.selectedProvider)}`);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        this.roles = data.roles || {};
+
+                        this.preselectRole();
+                    } catch (error) {
+                        console.error('Error fetching roles:', error);
+                    } finally {
+                        this.loadingRoles = false;
+                    }
+                },
+
+                /**
+                 * Pre-select role from URL params
+                 * Matches by key first, then by name (case-insensitive)
+                 */
+                preselectRole() {
+                    if (this.prefilledRoles.length === 0) return;
+                    
+                    const roleToSelect = this.prefilledRoles[0];
+                    
+                    // Try exact key match first
+                    if (this.roles[roleToSelect]) {
+                        this.selectedRole = roleToSelect;
+                        this.evaluateRole();
+                        return;
+                    }
+                    
+                    // Try case-insensitive name match
+                    const roleKey = Object.keys(this.roles).find(key => {
+                        const role = this.roles[key];
+                        return role.name && role.name.toLowerCase() === roleToSelect.toLowerCase();
+                    });
+                    
+                    if (roleKey) {
+                        this.selectedRole = roleKey;
+                        this.evaluateRole();
+                    }
+                }
+            };
+        };
+    })();
     </script>
 </main>
 {{template "footer" .}}

@@ -456,6 +456,13 @@ func workflowExecutionInfo(
 		}
 	}
 
+	if providersAttr, exists := searchAttributes["providers"]; exists && providersAttr != nil {
+		var providersValue []string
+		if err := dataConverter.FromPayload(providersAttr, &providersValue); err == nil {
+			response.Providers = providersValue
+		}
+	}
+
 	return &response
 
 }
