@@ -825,12 +825,16 @@
                     
                     // Get provider from execution input (first provider if multiple)
                     if (this.execution?.providers && this.execution.providers.length > 0) {
-                        params.set('provider', this.execution.providers);
+                        this.execution.providers.forEach(provider => {
+                            params.append('provider', provider);
+                        });
                     }
 
                     // Get identity from execution
                     if (this.execution?.identities && this.execution.identities.length > 0) {
-                        params.set('identity', this.execution.identities);
+                        this.execution.identities.forEach(identity => {
+                            params.append('identity', identity);
+                        });
                     }
                     
                     // Get role name from execution
@@ -867,7 +871,7 @@
                     let duration = 'PT';
                     if (hours > 0) duration += `${hours}H`;
                     if (minutes > 0) duration += `${minutes}M`;
-                    if (secs > 0 && hours === 0 && minutes === 0) duration += `${secs}S`;
+                    if (secs > 0) duration += `${secs}S`;
                     
                     return duration === 'PT' ? 'PT1H' : duration;
                 },
