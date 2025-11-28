@@ -58,7 +58,9 @@ Thand roles can **inherit** from other roles and provider roles to leverage exis
 
 Thand Agent features intelligent permission merging that:
 - **Consolidates condensed actions**: `k8s:pods:get,list` + `k8s:pods:create,update` = `k8s:pods:create,get,list,update`
-- **Resolves Allow/Deny conflicts**: Deny permissions remove conflicting actions from Allow permissions
+- **Preserves GCP-style permissions**: Permissions with dots in the action (e.g., `gcp:compute.instances.get`) are treated atomically and not condensed
+- **Resolves Allow/Deny conflicts**: Parent permissions take precedence - Parent Allow overrides Child Deny, Parent Deny overrides Child Allow
+- **Filters by provider**: Inherited permissions with provider prefixes are automatically filtered to match the role's configured providers, and **matching prefixes are stripped** from the output
 - **Handles complex inheritance**: Multi-level role inheritance with proper conflict resolution
 - **Supports provider-specific naming**: AWS ARNs, GCP service accounts, Azure resource IDs with complex naming patterns
 
@@ -270,16 +272,26 @@ permissions:
 ```
 
 #### GCP Permissions
+
+{: .important}
+**GCP permissions are atomic**: Unlike AWS or Kubernetes permissions, GCP permissions contain dots in the action portion (e.g., `compute.instances.get`). These are detected automatically and treated as atomic - they are never condensed with other permissions.
+
 ```yaml
 permissions:
   allow:
-    - "compute.instances.get,list,start,stop"
-    - "storage.buckets.list,get"
-    - "iam.serviceAccounts.get,list"
+    # GCP permissions are NOT condensed - each is kept separate
+    - "gcp-prod:compute.instances.get"
+    - "gcp-prod:compute.instances.list"
+    - "gcp-prod:compute.instances.start"
+    - "gcp-prod:storage.buckets.list"
+    - "gcp-prod:iam.serviceAccounts.get"
   deny:
-    - "compute.instances.delete"
-    - "storage.buckets.delete"
+    - "gcp-prod:compute.instances.delete"
+    - "gcp-prod:storage.buckets.delete"
 ```
+
+{: .note}
+The system automatically detects GCP-style permissions by checking if the last segment (after the final colon) contains a dot. If it does, the permission is treated as atomic.
 
 #### Kubernetes Permissions
 ```yaml
@@ -296,7 +308,7 @@ permissions:
 
 ### Allow/Deny Conflict Resolution
 
-When the same action appears in both `allow` and `deny` lists, the system resolves conflicts intelligently:
+When the same action appears in both `allow` and `deny` lists, the system resolves conflicts using clear precedence rules.
 
 #### Single Role Conflicts
 ```yaml
@@ -313,28 +325,40 @@ role:
 # deny: []  (deny removed since conflict was resolved)
 ```
 
-#### Inheritance Conflicts
+#### Inheritance Conflicts (Parent Wins)
+
+In inheritance chains, the **parent role (the one doing the inheriting) takes precedence** over child roles (the inherited ones):
+
+- **Parent Allow overrides Child Deny**: If parent allows an action that child denied, the action is allowed
+- **Parent Deny overrides Child Allow**: If parent denies an action that child allowed, the action is denied
+
 ```yaml
-# In inheritance, parent permissions take precedence
-parent-role:
+# Child role (the inherited role)
+child-role:
   permissions:
-    allow: ["ec2:StartInstances"]
+    allow: ["ec2:StartInstances", "ec2:DescribeInstances"]
     deny: ["ec2:TerminateInstances"]
 
-child-role:
-  inherits: [parent-role]
+# Parent role (the role doing the inheriting)
+parent-role:
+  inherits: [child-role]
   permissions:
-    allow: ["ec2:TerminateInstances"]  # Conflicts with parent deny
-    deny: ["ec2:StartInstances"]      # Conflicts with parent allow
+    allow: ["ec2:TerminateInstances"]  # Overrides child's deny
+    deny: ["ec2:StartInstances"]       # Overrides child's allow
 
-# Resolves to (parent wins):
-# allow: ["ec2:StartInstances"]      (parent allow preserved)
-# deny: ["ec2:TerminateInstances"]   (parent deny preserved)
+# Final resolved permissions:
+# allow: ["ec2:DescribeInstances", "ec2:TerminateInstances"]  
+#        (child's allow minus parent's deny, plus parent's allow)
+# deny: ["ec2:StartInstances"]  
+#       (parent's deny, child's deny removed by parent's allow)
 ```
+
+{: .important}
+This allows you to build restrictive roles that inherit permissive ones, or permissive roles that override restrictions from inherited roles.
 
 ### Wildcard Permissions
 
-Support for wildcard patterns varies by provider:
+Support for wildcard patterns varies by provider. Wildcards automatically subsume more specific permissions:
 
 ```yaml
 permissions:
@@ -350,6 +374,25 @@ permissions:
     # Azure wildcards
     - "Microsoft.Compute/*"      # All compute actions
 ```
+
+#### Wildcard Subsumption
+
+When wildcards are present, more specific permissions under that wildcard are automatically removed (subsumed):
+
+```yaml
+permissions:
+  allow:
+    - "ec2:*"                    # Wildcard
+    - "ec2:DescribeInstances"    # Will be removed (subsumed by ec2:*)
+    - "ec2:StartInstances"       # Will be removed (subsumed by ec2:*)
+    - "s3:GetObject"             # Kept (not under ec2:*)
+
+# After condensing, becomes:
+# allow: ["ec2:*", "s3:GetObject"]
+```
+
+{: .note}
+A wildcard does NOT subsume itself. For example, `ec2:*` is kept even when other `ec2:*` wildcards exist. Only more specific permissions (like `ec2:DescribeInstances`) are subsumed.
 
 ---
 
@@ -520,12 +563,13 @@ Role inheritance is a powerful feature that allows roles to build upon each othe
 
 When a role inherits from other roles:
 
-1. **Permission Expansion**: Condensed actions are expanded to individual permissions
-2. **Intelligent Merging**: All `allow` and `deny` permissions from inherited roles are combined at the action level
-3. **Resource Merging**: All resource `allow` and `deny` rules are combined
-4. **Conflict Resolution**: Allow/Deny conflicts are resolved with parent permissions taking precedence
-5. **Action Condensing**: Final permissions are condensed back for clean output
-6. **Scope Validation**: Inherited roles must be applicable to the requesting identity
+1. **Provider Filtering**: Inherited permissions/resources/groups with provider prefixes are filtered to only include those matching the parent role's `providers` list. **Matching prefixes are stripped** from the output.
+2. **Permission Expansion**: Condensed actions (e.g., `k8s:pods:get,list`) are expanded to individual permissions for merging
+3. **GCP Permission Detection**: Permissions with dots in the action (e.g., `compute.instances.get`) are detected and kept atomic
+4. **Intelligent Merging**: All `allow` and `deny` lists are combined with proper conflict resolution
+5. **Conflict Resolution**: Parent Allow overrides Child Deny, Parent Deny overrides Child Allow
+6. **Action Condensing**: Final condensable permissions are re-condensed for clean output (GCP-style permissions remain atomic)
+7. **Scope Validation**: Inherited roles must be applicable to the requesting identity
 
 ### Inheritance Types
 
@@ -670,14 +714,15 @@ roles:
 
 The inheritance system resolves permissions in this order:
 
-1. **Parse Inheritance**: Extract provider prefixes and role names
-2. **Scope Validation**: Ensure each inherited role is applicable to the requesting identity
-3. **Recursive Resolution**: Resolve inheritance chains (A inherits B inherits C)
-4. **Permission Expansion**: Expand all condensed actions to individual permissions
-5. **Intelligent Merging**: Combine permissions from all inheritance levels
-6. **Conflict Resolution**: Apply Allow/Deny conflict resolution rules
-7. **Action Condensing**: Condense related actions back for clean output
-8. **Final Cleanup**: Remove redundant or conflicting permissions
+1. **Parse Inheritance**: Extract provider prefixes and role names (first colon is the delimiter)
+2. **Provider Filtering**: Filter inherited items by the parent role's `providers` list
+3. **Scope Validation**: Ensure each inherited role is applicable to the requesting identity
+4. **Recursive Resolution**: Resolve inheritance chains (A inherits B inherits C)
+5. **Permission Expansion**: Expand condensable actions to individual permissions (GCP-style permissions with dots are kept atomic)
+6. **Intelligent Merging**: Combine permissions from all inheritance levels
+7. **Conflict Resolution**: Apply Parent-over-Child conflict resolution (Parent Allow overrides Child Deny, Parent Deny overrides Child Allow)
+8. **Action Condensing**: Condense related actions back for clean output (GCP-style permissions remain atomic)
+9. **Wildcard Subsumption**: Remove permissions subsumed by wildcards (e.g., `ec2:*` subsumes `ec2:DescribeInstances`)
 
 ### Provider-Specific Inheritance Syntax
 
@@ -697,6 +742,56 @@ inherits:
 - Everything before first colon = provider name
 - Everything after first colon = role identifier
 - Handles complex identifiers like AWS ARNs with multiple colons correctly
+- Provider name is validated against configured providers
+
+### Provider Filtering and Prefix Stripping
+
+When permissions, resources, or groups have provider prefixes, they are automatically filtered based on the role's `providers` list. **Matching prefixes are stripped** from the output:
+
+```yaml
+# Base role with provider-prefixed permissions and resources
+base-cloud-role:
+  permissions:
+    allow:
+      - "aws-prod:ec2:DescribeInstances"
+      - "gcp-prod:compute.instances.get"
+      - "azure-prod:Microsoft.Compute/virtualMachines/read"
+  resources:
+    allow:
+      - "aws:*"      # Provider engine type prefix
+      - "gcp:*"      # Provider engine type prefix
+      - "azure:*"    # Provider engine type prefix
+
+# Role that only uses AWS providers
+aws-only-role:
+  inherits: [base-cloud-role]
+  providers: [aws-prod, aws-dev]  # Only AWS providers
+  # Resulting permissions (prefix stripped):
+  #   - "ec2:DescribeInstances"  (was "aws-prod:ec2:DescribeInstances")
+  # Resulting resources (prefix stripped):
+  #   - "*"  (was "aws:*" - "aws" matches aws-prod's engine type)
+  # GCP and Azure items are filtered out completely
+
+# Role that uses multiple providers
+multi-cloud-role:
+  inherits: [base-cloud-role]
+  providers: [aws-prod, gcp-prod]  # AWS and GCP
+  # Resulting permissions (prefixes stripped):
+  #   - "ec2:DescribeInstances"      (was "aws-prod:ec2:DescribeInstances")
+  #   - "compute.instances.get"      (was "gcp-prod:compute.instances.get")
+  # Resulting resources (prefixes stripped):
+  #   - "*"  (from both "aws:*" and "gcp:*")
+  # Azure items are filtered out completely
+```
+
+**How prefix matching works:**
+- **Exact provider name match**: `aws-prod:permission` matches providers list containing `aws-prod`
+- **Engine type match**: `aws:*` matches any provider with engine type `aws` (e.g., `aws-prod`, `aws-dev`)
+- When a prefix matches, it is **removed** from the output
+- Items without a provider prefix are always included as-is
+
+{: .note}
+Provider prefixes are stripped when they match, leaving clean permission/resource strings without provider annotations. This allows the same base role to be used across different provider configurations.
 
 ### Inheritance Validation
 
@@ -2032,6 +2127,51 @@ permissions:
   allow:
     - "k8s:pods:get,list"      # No trailing comma
     - "k8s:services:create,delete,get,list,update"  # Properly formatted
+```
+
+#### 7. GCP Permissions Being Condensed
+
+**Error:** GCP permissions appear to be merged incorrectly
+
+**Cause:** The system correctly detects GCP-style permissions (with dots in the action) and treats them atomically. If you see unexpected behavior, check that your permissions follow the correct format.
+
+**Expected Behavior:**
+```yaml
+permissions:
+  allow:
+    # These GCP-style permissions are NEVER condensed
+    - "gcp-prod:compute.instances.get"
+    - "gcp-prod:compute.instances.list"
+    - "gcp-prod:compute.instances.start"
+    # They remain as separate entries, not merged like:
+    # - "gcp-prod:compute.instances:get,list,start"  # This is NOT how GCP works
+
+    # These AWS/K8s permissions CAN be condensed
+    - "ec2:DescribeInstances,StartInstances"   # Condensable (no dots in action)
+    - "k8s:pods:get,list,watch"                # Condensable (no dots in action)
+```
+
+**Detection Rule:** If the last segment (after the final colon) contains a dot, the permission is treated as atomic and never condensed.
+
+#### 8. Provider Filtering Not Working
+
+**Error:** Inherited permissions from other providers are showing up
+
+**Cause:** Provider prefixes must exactly match entries in the role's `providers` list
+
+**Solutions:**
+```yaml
+# ❌ Incorrect - provider prefix doesn't match providers list
+my-role:
+  providers: [aws-production]  # Note: "aws-production"
+  inherits: [base-role]        # base-role has "aws-prod:ec2:*"
+  # "aws-prod" != "aws-production", so permission is filtered out
+
+# ✅ Correct - provider prefixes match
+my-role:
+  providers: [aws-prod]        # Matches the prefix
+  inherits: [base-role]        # base-role has "aws-prod:ec2:*"
+  # "aws-prod" == "aws-prod", so permission is included
 ```
 
 ### Debugging Tools and Techniques

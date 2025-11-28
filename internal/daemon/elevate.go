@@ -92,6 +92,19 @@ func (s *Server) postElevate(c *gin.Context) {
 			s.getErrorPage(c, http.StatusBadRequest, "Invalid form data", err)
 			return
 		}
+
+		// Manually parse bracket notation for scopes since Gin doesn't support nested form binding
+		// Form fields: scopes[groups], scopes[users], scopes[domains]
+		if values, ok := c.GetPostFormArray("scopes[groups]"); ok {
+			dynamicRequest.Scopes.Groups = values
+		}
+		if values, ok := c.GetPostFormArray("scopes[users]"); ok {
+			dynamicRequest.Scopes.Users = values
+		}
+		if values, ok := c.GetPostFormArray("scopes[domains]"); ok {
+			dynamicRequest.Scopes.Domains = values
+		}
+
 		s.handleDynamicRequest(c, dynamicRequest)
 		return
 	} else if strings.Contains(contentType, "application/json") {
@@ -153,9 +166,6 @@ func (s *Server) handleDynamicRequest(c *gin.Context, dynamicRequest models.Elev
 		return
 	}
 
-	// TODO: Convert ElevateDynamicRequest to ElevateRequest
-	// For now, let's create a basic ElevateRequest to integrate with existing workflow
-
 	// Create a dynamic role based on the request
 	dynamicRole := &models.Role{
 		Name:        "dynamic-role-" + time.Now().Format("20060102-150405"),
@@ -166,15 +176,22 @@ func (s *Server) handleDynamicRequest(c *gin.Context, dynamicRequest models.Elev
 		},
 		Inherits:  dynamicRequest.Inherits,
 		Providers: dynamicRequest.Providers,
-		Enabled:   true,
+		Groups: models.Groups{
+			Allow: dynamicRequest.Groups,
+		},
 		Resources: models.Resources{
-			// TODO: Add resource constraints based on Groups/Users if needed
+			Allow: dynamicRequest.Resources,
 		},
 		Scopes: &models.RoleScopes{
-			Groups: dynamicRequest.Groups,
-			Users:  dynamicRequest.Users,
+			Groups:  dynamicRequest.Scopes.Groups,
+			Users:   dynamicRequest.Scopes.Users,
+			Domains: dynamicRequest.Scopes.Domains,
 		},
+		Enabled: true,
 	}
+
+	// TODO: Convert ElevateDynamicRequest to ElevateRequest
+	// For now, let's create a basic ElevateRequest to integrate with existing workflow
 
 	// Convert to standard ElevateRequest
 	elevateRequest := models.ElevateRequest{

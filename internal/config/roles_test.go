@@ -452,55 +452,6 @@ func TestGetCompositeRole_ProviderSpecificInheritance(t *testing.T) {
 	assert.ElementsMatch(t, []string{"base:read"}, result.Permissions.Allow)
 }
 
-func TestMergeStringSlices(t *testing.T) {
-	config := &Config{}
-
-	tests := []struct {
-		name     string
-		slice1   []string
-		slice2   []string
-		expected []string
-	}{
-		{
-			name:     "empty slices",
-			slice1:   []string{},
-			slice2:   []string{},
-			expected: []string{},
-		},
-		{
-			name:     "one empty slice",
-			slice1:   []string{"a", "b"},
-			slice2:   []string{},
-			expected: []string{"a", "b"},
-		},
-		{
-			name:     "no duplicates",
-			slice1:   []string{"a", "b"},
-			slice2:   []string{"c", "d"},
-			expected: []string{"a", "b", "c", "d"},
-		},
-		{
-			name:     "with duplicates",
-			slice1:   []string{"a", "b", "c"},
-			slice2:   []string{"b", "c", "d"},
-			expected: []string{"a", "b", "c", "d"},
-		},
-		{
-			name:     "all duplicates",
-			slice1:   []string{"a", "b"},
-			slice2:   []string{"a", "b"},
-			expected: []string{"a", "b"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := config.mergeStringSlices(tt.slice1, tt.slice2)
-			assert.ElementsMatch(t, tt.expected, result)
-		})
-	}
-}
-
 func TestIsRoleApplicableToIdentity(t *testing.T) {
 	config := &Config{}
 

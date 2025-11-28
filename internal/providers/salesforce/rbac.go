@@ -166,7 +166,7 @@ func (p *salesForceProvider) RevokeRole(
 
 	// Get the profile to revert to from metadata
 	priorProfileId, ok := metadata.Metadata[MetadataPriorProfileKey].(string)
-	if !ok || priorProfileId == "" {
+	if !ok || len(priorProfileId) == 0 {
 		// If no prior profile stored, use a default profile
 		defaultProfiles := []string{"Standard User", "Minimum Access - Salesforce"}
 
@@ -184,7 +184,7 @@ func (p *salesForceProvider) RevokeRole(
 			}
 		}
 
-		if priorProfileId == "" {
+		if len(priorProfileId) == 0 {
 			return nil, fmt.Errorf("no suitable default profile found in Salesforce (tried: %s)", strings.Join(defaultProfiles, ", "))
 		}
 	}
