@@ -29,12 +29,12 @@ func NewAuthWrapper(
 	}
 }
 
-// Only to be used agent/cleint side. The code is to provde
+// Only to be used agent/client side. The code is to provide
 // what client request was made to create the session.
 type CodeWrapper struct {
 	Version     int       `json:"version,omitempty"`
-	LoginServer string    `json:"code"`
-	ExpiresAt   time.Time `json:"created_at"`
+	LoginServer string    `json:"login_server"`
+	ExpiresAt   time.Time `json:"expires_at"`
 }
 
 func NewCodeWrapper(loginServer string) CodeWrapper {

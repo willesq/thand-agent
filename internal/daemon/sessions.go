@@ -49,7 +49,7 @@ func (s *Server) postSession(c *gin.Context) {
 		return
 	}
 
-	// We need to decrypt the code to check we issued id.
+	// We need to decrypt the code to check we issued it.
 	if !s.Config.GetServices().HasEncryption() {
 		s.getErrorPage(c, http.StatusInternalServerError, "Encryption service is not configured")
 		return
