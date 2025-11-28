@@ -16,7 +16,7 @@
                 provider: '{{.Auth.Provider}}',
                 code: '{{.Auth.Code}}',
                 session: '{{.Session.GetEncodedLocalSession}}',
-                command: 'thand session register --login-server {{.LoginServer}} --provider {{.Auth.Provider}}',
+                command: 'thand sessions register --login-server {{.LoginServer}} --provider {{.Auth.Provider}}',
 
                 async init() {
                     await this.registerSession();
@@ -102,6 +102,56 @@
         }
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Reusable Templates -->
+    <template id="session-token-template">
+        <div class="auth-code-section">
+            <h3>Session Token</h3>
+            <div class="code-display">
+                <span x-text="session" style="word-break: break-all;"></span>
+                <button class="copy-button" @click="copySession()">
+                    <template x-if="!sessionCopied">
+                        <span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy
+                        </span>
+                    </template>
+                    <template x-if="sessionCopied">
+                        <span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>
+                            Copied!
+                        </span>
+                    </template>
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <template id="manual-instructions-template">
+        <div class="manual-instructions">
+            <h4>Manual Session Registration</h4>
+            <p>Run this command in your terminal:</p>
+            <div class="code-block">
+                <code>thand sessions register --login-server {{.LoginServer}} --provider {{.Auth.Provider}}</code>
+                <button class="copy-button" @click="copyCommand()">
+                    <template x-if="!commandCopied">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </template>
+                    <template x-if="commandCopied">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>
+                    </template>
+                </button>
+            </div>
+            <p class="status-details" style="margin-top: 0.5rem;">You will be prompted to enter the session token shown above.</p>
+        </div>
+    </template>
+
     <main x-data="authCallback()" x-init="init()">
         <div class="container">
             <div class="page-header">
@@ -150,49 +200,8 @@
 
                     <!-- Session Token Section (shown when Show Command is clicked) -->
                     <div x-show="showCommand" x-cloak style="margin-top: 1rem;">
-                        <div class="auth-code-section">
-                            <h3>Session Token</h3>
-                            <div class="code-display">
-                                <span x-text="session" style="word-break: break-all;"></span>
-                                <button class="copy-button" @click="copySession()">
-                                    <template x-if="!sessionCopied">
-                                        <span>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
-                                            </svg>
-                                            Copy
-                                        </span>
-                                    </template>
-                                    <template x-if="sessionCopied">
-                                        <span>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>
-                                            Copied!
-                                        </span>
-                                    </template>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="manual-instructions">
-                            <h4>Manual Session Registration</h4>
-                            <p>Run this command in your terminal:</p>
-                            <div class="code-block">
-                                <code>thand session register --login-server {{.LoginServer}} --provider {{.Provider}}</code>
-                                <button class="copy-button" @click="copyCommand()">
-                                    <template x-if="!commandCopied">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
-                                        </svg>
-                                    </template>
-                                    <template x-if="commandCopied">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>
-                                    </template>
-                                </button>
-                            </div>
-                            <p class="status-details" style="margin-top: 0.5rem;">You will be prompted to enter the session token shown above.</p>
-                        </div>
+                        <div x-html="document.getElementById('session-token-template').innerHTML"></div>
+                        <div x-html="document.getElementById('manual-instructions-template').innerHTML"></div>
                     </div>
                 </div>
             </div>
@@ -209,49 +218,8 @@
                     </div>
                 </div>
 
-                <div class="auth-code-section">
-                    <h3>Session Token</h3>
-                    <div class="code-display">
-                        <span x-text="session" style="word-break: break-all;"></span>
-                        <button class="copy-button" @click="copySession()">
-                            <template x-if="!sessionCopied">
-                                <span>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
-                                    </svg>
-                                    Copy
-                                </span>
-                            </template>
-                            <template x-if="sessionCopied">
-                                <span>
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>
-                                    Copied!
-                                </span>
-                            </template>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="manual-instructions">
-                    <h4>Manual Session Registration</h4>
-                    <p>Run this command in your terminal to complete the authentication:</p>
-                    <div class="code-block">
-                        <code>thand session register --login-server {{.LoginServer}} --provider {{.Provider}}</code>
-                        <button class="copy-button" @click="copyCommand()">
-                            <template x-if="!commandCopied">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                            </template>
-                            <template x-if="commandCopied">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>
-                            </template>
-                        </button>
-                    </div>
-                    <p class="status-details" style="margin-top: 0.5rem;">You will be prompted to enter the session token shown above.</p>
-                </div>
+                <div x-html="document.getElementById('session-token-template').innerHTML"></div>
+                <div x-html="document.getElementById('manual-instructions-template').innerHTML"></div>
             </div>
         </div>
     </main>
