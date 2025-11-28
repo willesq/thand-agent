@@ -542,6 +542,14 @@ func expandPermissionsToSet(perms []string) map[string]bool {
 	if len(perms) == 0 {
 		return nil
 	}
+
+	// Enforce upper bound to prevent resource exhaustion
+	if len(perms) > MaxPermissions {
+		logrus.Errorf("expandPermissionsToSet: permissions slice length %d exceeds maximum %d; returning nil",
+			len(perms), MaxPermissions)
+		return nil
+	}
+
 	// Estimate capacity: assume ~3 expanded permissions per input on average
 	result := make(map[string]bool, len(perms)*3)
 	for _, perm := range perms {
