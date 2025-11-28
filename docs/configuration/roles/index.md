@@ -2050,17 +2050,17 @@ logging:
 #### Use CLI Tools for Testing
 ```bash
 # Test role resolution (hypothetical CLI commands)
-agent roles list                                    # List all available roles
-agent roles describe aws-developer                  # Show role details
-agent roles test alice@example.com aws-developer    # Test user access
-agent roles inheritance aws-developer               # Show inheritance chain
+thand roles list                                    # List all available roles
+thand roles describe aws-developer                  # Show role details
+thand roles test alice@example.com aws-developer    # Test user access
+thand roles inheritance aws-developer               # Show inheritance chain
 ```
 
 #### Validate Configuration
 ```bash
 # Validate role configuration files
-agent config validate --roles-only
-agent config validate --file ./config/roles/aws.yaml
+thand config validate --roles-only
+thand config validate --file ./config/roles/aws.yaml
 ```
 
 #### Test Inheritance Resolution
@@ -2090,13 +2090,13 @@ logging:
 #### Check System Health
 ```bash
 # Check provider connectivity
-agent providers status
+thand providers status
 
 # Check identity provider integration  
-agent auth status
+thand providers auth status
 
 # Check workflow system
-agent workflows status
+thand workflows status
 ```
 
 #### Contact Information

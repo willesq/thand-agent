@@ -44,13 +44,13 @@ These flags are available for all commands:
 
 ```bash
 # Use custom config file
-agent --config /path/to/config.yaml roles
+thand --config /path/to/config.yaml roles
 
 # Override login server
-agent --login-server https://auth.example.com login
+thand --login-server https://auth.example.com login
 
 # Enable verbose logging
-agent --verbose server
+thand --verbose server
 
 ```
 
@@ -58,21 +58,21 @@ agent --verbose server
 
 ## Main Command
 
-### `agent`
+### `thand`
 
 The main command runs an interactive request wizard when called without subcommands.
 
 ```bash
-agent [reason for access]
+thand [reason for access]
 ```
 
 **Examples:**
 ```bash
 # Interactive wizard
-agent
+thand
 
 # Direct request with reason
-agent "Need access to production database for debugging"
+thand "Need access to production database for debugging"
 ```
 
 **Behavior:**
@@ -90,7 +90,7 @@ agent "Need access to production database for debugging"
 Authenticate with the login server and establish a session.
 
 ```bash
-agent login
+thand login
 ```
 
 **What it does:**
@@ -102,10 +102,10 @@ agent login
 **Examples:**
 ```bash
 # Login to configured server
-agent login
+thand login
 
 # Login with custom server
-agent --login-server https://auth.example.com login
+thand --login-server https://auth.example.com login
 ```
 
 ### `sessions`
@@ -113,7 +113,7 @@ agent --login-server https://auth.example.com login
 Interactive session management interface.
 
 ```bash
-agent sessions
+thand sessions
 ```
 
 **Features:**
@@ -128,7 +128,7 @@ agent sessions
 Register a session from an encoded token.
 
 ```bash
-agent sessions register [flags]
+thand sessions register [flags]
 ```
 
 **Description:**
@@ -144,10 +144,10 @@ This command allows you to import a session that was provided by another source 
 **Examples:**
 ```bash
 # Register a session with provider flag
-agent sessions register --provider thand
+thand sessions register --provider thand
 
 # Register a session (will prompt for provider)
-agent sessions register
+thand sessions register
 ```
 
 **How it works:**
@@ -168,7 +168,7 @@ agent sessions register
 List all active authentication sessions.
 
 ```bash
-agent sessions list
+thand sessions list
 ```
 
 **Description:**
@@ -195,7 +195,7 @@ Provider: gcp
 Create a new authentication session.
 
 ```bash
-agent sessions create
+thand sessions create
 ```
 
 **Description:**
@@ -215,7 +215,7 @@ Guides you through creating a new authentication session for a provider. Display
 Remove an existing authentication session.
 
 ```bash
-agent sessions remove
+thand sessions remove
 ```
 
 **Description:**
@@ -233,7 +233,7 @@ Displays a list of active sessions and prompts for selection. Asks for confirmat
 Refresh or re-authenticate an existing session.
 
 ```bash
-agent sessions refresh
+thand sessions refresh
 ```
 
 **Description:**
@@ -256,14 +256,14 @@ Initiates the authentication flow again for the selected provider to obtain a ne
 Make AI-powered access requests using natural language.
 
 ```bash
-agent request [reason]
+thand request [reason]
 ```
 
 **Examples:**
 ```bash
-agent request "Need to debug production issue in AWS"
-agent request "Quarterly analysis requires Snowflake access"
-agent request "Emergency database maintenance required"
+thand request "Need to debug production issue in AWS"
+thand request "Quarterly analysis requires Snowflake access"
+thand request "Emergency database maintenance required"
 ```
 
 **How it works:**
@@ -277,7 +277,7 @@ agent request "Emergency database maintenance required"
 Make structured access requests with specific parameters.
 
 ```bash
-agent request access --provider <provider> --role <role> --duration <duration> --reason <reason>
+thand request access --provider <provider> --role <role> --duration <duration> --reason <reason>
 ```
 
 **Required Flags:**
@@ -292,14 +292,14 @@ agent request access --provider <provider> --role <role> --duration <duration> -
 **Examples:**
 ```bash
 # Request AWS admin access
-agent request access \
+thand request access \
   --provider aws-prod \
   --role admin \
   --duration 2h \
   --reason "Emergency security patch deployment"
 
 # Request read-only Snowflake access
-agent request access \
+thand request access \
   -r snowflake-prod \
   -o analyst \
   -d 4h \
@@ -315,7 +315,7 @@ agent request access \
 List available roles and their descriptions.
 
 ```bash
-agent roles [flags]
+thand roles [flags]
 ```
 
 **Flags:**
@@ -327,13 +327,13 @@ agent roles [flags]
 **Examples:**
 ```bash
 # List all roles
-agent roles
+thand roles
 
 # List AWS-specific roles
-agent roles --provider aws
+thand roles --provider aws
 
 # List roles for multiple providers
-agent roles --provider gcp
+thand roles --provider gcp
 ```
 
 **Output Format:**
@@ -355,7 +355,7 @@ Total: 4 roles
 Display current agent configuration.
 
 ```bash
-agent config
+thand config
 ```
 
 **Shows:**
@@ -369,7 +369,7 @@ agent config
 Display version information and check for updates.
 
 ```bash
-agent version
+thand version
 ```
 
 **Output includes:**
@@ -387,7 +387,7 @@ agent version
 Run the agent server in the foreground.
 
 ```bash
-agent server
+thand server
 ```
 
 **What it does:**
@@ -413,7 +413,7 @@ The service commands manage the Thand Agent as a system service.
 Install the agent as a system service.
 
 ```bash
-agent service install
+thand service install
 ```
 
 **Requirements:**
@@ -423,10 +423,10 @@ agent service install
 **Platform-specific instructions:**
 ```bash
 # Linux/macOS
-sudo agent service install
+sudo thand service install
 
 # Windows (run as Administrator)
-agent service install
+thand service install
 ```
 
 ### `service start`
@@ -434,7 +434,7 @@ agent service install
 Start the agent system service.
 
 ```bash
-agent service start
+thand service start
 ```
 
 ### `service stop`
@@ -442,7 +442,7 @@ agent service start
 Stop the agent system service.
 
 ```bash
-agent service stop
+thand service stop
 ```
 
 ### `service status`
@@ -450,7 +450,7 @@ agent service stop
 Check the agent service status.
 
 ```bash
-agent service status
+thand service status
 ```
 
 **Output:**
@@ -463,7 +463,7 @@ agent service status
 Uninstall the agent system service.
 
 ```bash
-agent service remove
+thand service remove
 ```
 
 **What it does:**
@@ -480,7 +480,7 @@ agent service remove
 Update the agent to the latest version.
 
 ```bash
-agent update [flags]
+thand update [flags]
 ```
 
 **Flags:**
@@ -493,13 +493,13 @@ agent update [flags]
 **Examples:**
 ```bash
 # Interactive update
-agent update
+thand update
 
 # Force update without prompts
-agent update --force
+thand update --force
 
 # Check for updates only
-agent update --check
+thand update --check
 ```
 
 **Update Process:**
@@ -592,13 +592,13 @@ login:
 EOF
 
 # 2. Login and authenticate
-agent login
+thand login
 
 # 3. View available access options
-agent roles
+thand roles
 
 # 4. Request access
-agent request "Need production access for incident response"
+thand request "Need production access for incident response"
 ```
 
 ---
@@ -611,10 +611,10 @@ agent request "Need production access for incident response"
 - Solution: Configure login server in config file or use `--login-server` flag
 
 **"Authentication required but login was declined"**
-- Solution: Run `agent login` to authenticate
+- Solution: Run `thand login` to authenticate
 
 **"Role not found"**
-- Solution: Check available roles with `agent roles`
+- Solution: Check available roles with `thand roles`
 
 **"Failed to install service"**
 - Solution: Run with elevated privileges (`sudo` or "Run as Administrator")
@@ -624,7 +624,7 @@ agent request "Need production access for incident response"
 Enable verbose output for troubleshooting:
 
 ```bash
-agent --verbose [command]
+thand --verbose [command]
 ```
 
 This provides detailed logging for:
@@ -649,7 +649,7 @@ The main `agent` command provides an interactive wizard:
 
 ### Session Manager
 
-The `agent sessions` command provides interactive session management:
+The `thand sessions` command provides interactive session management:
 
 - Navigate with arrow keys
 - Select actions from menu
@@ -663,7 +663,7 @@ The `agent sessions` command provides interactive session management:
 ### CI/CD Pipeline
 ```bash
 # Automated access request in pipeline
-agent request access \
+thand request access \
   --provider aws-prod \
   --role deployer \
   --duration 1h \
@@ -673,13 +673,13 @@ agent request access \
 ### Emergency Access
 ```bash
 # Quick emergency access
-agent request "Production outage - need immediate admin access"
+thand request "Production outage - need immediate admin access"
 ```
 
 ### Scheduled Maintenance
 ```bash
 # Planned maintenance window
-agent request access \
+thand request access \
   --provider all-systems \
   --role maintenance \
   --duration 4h \

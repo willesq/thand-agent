@@ -105,22 +105,6 @@ roles:
         - oidc:your-team  # Change to your team
 ```
 
-### 4. Test Configuration
-
-```bash
-# List available permissions
-agent providers permissions list --provider cloudflare-prod
-
-# List available roles
-agent providers roles list --provider cloudflare-prod
-
-# Test authorization
-agent providers authorize \
-  --provider cloudflare-prod \
-  --user user@example.com \
-  --role cloudflare-dns-editor
-```
-
 ## Security Best Practices
 
 ### Never Commit Secrets
