@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/go-resty/resty/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/thand-io/agent/internal/common"
 )
@@ -289,6 +291,11 @@ func authProviderKickStart(
 
 	if err != nil {
 
+		// Check if resty.ErrAutoRedirectDisabled
+		if errors.Is(err, resty.ErrAutoRedirectDisabled) {
+			return nil
+		}
+
 		// Check if it's a resty error with response auto redirect is disabled
 		return fmt.Errorf("failed to invoke kickstart request: %w", err)
 	}
@@ -300,26 +307,26 @@ func authProviderKickStart(
 func handleProviderAuthRedirect() resty.RedirectPolicy {
 	return resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
 
-		// Prevent automatic redirects to capture the Location header
-		if req.URL.Host != via[0].URL.Host {
+		authUrl := req.URL.String()
 
-			authUrl := req.URL.String()
+		logrus.WithFields(logrus.Fields{
+			"auth_url": authUrl,
+		}).Debugln("Auth redirect")
 
-			err := openBrowser(authUrl)
+		err := openBrowser(authUrl)
 
-			if err != nil {
+		if err != nil {
 
-				fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
-				fmt.Println(authUrl)
-				fmt.Println()
+			fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
+			fmt.Println(authUrl)
+			fmt.Println()
 
-				return fmt.Errorf("failed to open browser: %w", err)
-			}
-
-			fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
-			return nil
+			return fmt.Errorf("failed to open browser: %w", err)
 		}
 
-		return fmt.Errorf("invalid redirect request")
+		// Once we have opened the browser we can stop following redirects
+		fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
+		return resty.ErrAutoRedirectDisabled
+
 	})
 }
