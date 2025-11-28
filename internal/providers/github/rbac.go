@@ -3,13 +3,13 @@ package github
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -138,13 +138,13 @@ func (p *githubProvider) authorizeOrgMembership(ctx context.Context, username, o
 	}
 
 	// TODO: Use correct GitHub SDK API for organization membership
-	log.Printf("Would add user %s to org %s with role %s", username, orgName, membershipRole)
+	logrus.Infof("Would add user %s to org %s with role %s", username, orgName, membershipRole)
 	return fmt.Errorf("GitHub API integration not yet implemented for org membership")
 }
 
 func (p *githubProvider) revokeOrgMembership(ctx context.Context, username, orgName string) error {
 	// TODO: Use correct GitHub SDK API for organization membership
-	log.Printf("Would remove user %s from org %s", username, orgName)
+	logrus.Infof("Would remove user %s from org %s", username, orgName)
 	return fmt.Errorf("GitHub API integration not yet implemented for org membership")
 }
 
@@ -159,7 +159,7 @@ func (p *githubProvider) authorizeTeamMembership(ctx context.Context, username, 
 	orgName, teamSlug := parts[0], parts[1]
 
 	// TODO: Use correct GitHub SDK API for team membership
-	log.Printf("Would add user %s to team %s/%s", username, orgName, teamSlug)
+	logrus.Infof("Would add user %s to team %s/%s", username, orgName, teamSlug)
 	return fmt.Errorf("GitHub API integration not yet implemented for team membership")
 }
 
@@ -172,7 +172,7 @@ func (p *githubProvider) revokeTeamMembership(ctx context.Context, username, tea
 	orgName, teamSlug := parts[0], parts[1]
 
 	// TODO: Use correct GitHub SDK API for team membership
-	log.Printf("Would remove user %s from team %s/%s", username, orgName, teamSlug)
+	logrus.Infof("Would remove user %s from team %s/%s", username, orgName, teamSlug)
 	return fmt.Errorf("GitHub API integration not yet implemented for team membership")
 }
 
@@ -188,7 +188,7 @@ func (p *githubProvider) authorizeRepoCollaboration(ctx context.Context, usernam
 	permission := p.mapRoleToPermission(role.Name)
 
 	// TODO: Use correct GitHub SDK API for repository collaboration
-	log.Printf("Would add user %s to repo %s/%s with permission %s", username, owner, repo, permission)
+	logrus.Infof("Would add user %s to repo %s/%s with permission %s", username, owner, repo, permission)
 	return fmt.Errorf("GitHub API integration not yet implemented for repo collaboration")
 }
 
@@ -201,7 +201,7 @@ func (p *githubProvider) revokeRepoCollaboration(ctx context.Context, username, 
 	owner, repo := parts[0], parts[1]
 
 	// TODO: Use correct GitHub SDK API for repository collaboration
-	log.Printf("Would remove user %s from repo %s/%s", username, owner, repo)
+	logrus.Infof("Would remove user %s from repo %s/%s", username, owner, repo)
 	return fmt.Errorf("GitHub API integration not yet implemented for repo collaboration")
 }
 

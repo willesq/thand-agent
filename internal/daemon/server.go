@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -260,15 +259,16 @@ func (s *Server) Start() error {
 
 func (s *Server) Stop() {
 	if s.server == nil {
+		logrus.Warning("Server is not running")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.server.Shutdown(ctx); err != nil {
-		log.Println("Server Shutdown:", err)
+		logrus.WithError(err).Error("Server Shutdown")
 	}
-	log.Println("Server exiting")
+	logrus.Info("Server exiting")
 }
 
 // requestCounterMiddleware increments the request counter

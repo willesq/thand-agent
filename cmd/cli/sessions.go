@@ -238,14 +238,23 @@ func createNewSession() error {
 	}
 
 	// Wait for the session to be created (polling)
-	fmt.Println(infoStyle.Render("Waiting for session to be created..."))
+	fmt.Println(infoStyle.Render("Waiting for session to be created... (Press Ctrl+C to cancel)"))
+
+	ctx, cleanup := common.WithInterrupt(context.Background())
+	defer cleanup()
+
 	newSession := sessionManager.AwaitProviderRefresh(
-		context.Background(),
+		ctx,
 		cfg.GetLoginServerHostname(),
 		selectedProvider,
 	)
 
 	if newSession == nil {
+		if ctx.Err() != nil {
+			fmt.Println()
+			fmt.Println(warningStyle.Render("Authentication cancelled by user"))
+			return nil
+		}
 		return fmt.Errorf("authentication timed out or failed")
 	}
 
@@ -419,14 +428,23 @@ func refreshSession() error {
 	}
 
 	// Wait for the session to be refreshed
-	fmt.Println(infoStyle.Render("Waiting for session to be refreshed..."))
+	fmt.Println(infoStyle.Render("Waiting for session to be refreshed... (Press Ctrl+C to cancel)"))
+
+	ctx, cleanup := common.WithInterrupt(context.Background())
+	defer cleanup()
+
 	refreshedSession := sessionManager.AwaitProviderRefresh(
-		context.Background(),
+		ctx,
 		cfg.GetLoginServerHostname(),
 		selectedProvider,
 	)
 
 	if refreshedSession == nil {
+		if ctx.Err() != nil {
+			fmt.Println()
+			fmt.Println(warningStyle.Render("Authentication cancelled by user"))
+			return nil
+		}
 		return fmt.Errorf("authentication timed out or failed")
 	}
 
@@ -545,14 +563,14 @@ func handleProviderAuthRedirect() resty.RedirectPolicy {
 			authUrl := req.URL.String()
 
 			err := openBrowser(authUrl)
-			if err != nil {
-				return fmt.Errorf("failed to open browser: %w", err)
-			}
 
 			if err != nil {
+
 				fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
 				fmt.Println(authUrl)
 				fmt.Println()
+
+				return fmt.Errorf("failed to open browser: %w", err)
 			}
 
 			fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))

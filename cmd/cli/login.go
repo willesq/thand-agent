@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -37,16 +35,8 @@ func runLogin(cmd *cobra.Command, args []string) error {
 
 func authKickStart() error {
 	// Set up signal handling for graceful cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		fmt.Println("\nLogin cancelled.")
-		cancel()
-	}()
+	ctx, cleanup := common.WithInterrupt(context.Background())
+	defer cleanup()
 
 	hostname := cfg.GetLoginServerHostname()
 	fmt.Println("Login server hostname:", hostname)

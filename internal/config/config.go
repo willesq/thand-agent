@@ -119,7 +119,7 @@ func setupHomeConfigPath(v *viper.Viper) error {
 	// Get the user's home directory
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatalf("Failed to get current user: %v", err)
+		logrus.Fatalf("Failed to get current user: %v", err)
 	}
 
 	// Expand the session manager path to use the actual home directory

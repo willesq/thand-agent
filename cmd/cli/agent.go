@@ -3,12 +3,11 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/thand-io/agent/internal/agent"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 )
 
@@ -53,8 +52,8 @@ This will run the web service that handles authentication and authorization requ
 		fmt.Printf("Environment Architecture: %s\n", cfg.Environment.Architecture)
 
 		// Set up signal handling for graceful shutdown
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		sigChan, cleanup := common.NewInterruptChannel()
+		defer cleanup()
 
 		// Start the web service in a goroutine
 		errChan := make(chan error, 1)
