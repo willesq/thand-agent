@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-contrib/sessions"
@@ -37,6 +38,7 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 	}
 
 	callback := c.Query("callback")
+	code := c.Query("code") // Optional
 
 	config := s.GetConfig()
 
@@ -45,8 +47,12 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("Callback URL:", callback)
-	fmt.Println("login server URL:", config.GetLoginServerUrl())
+	logrus.WithFields(logrus.Fields{
+		"provider":    provider,
+		"callback":    callback,
+		"code":        code,
+		"loginServer": config.GetLoginServerUrl(),
+	}).Debugln("Initiating authentication request")
 
 	providerConfig, err := config.GetProviderByName(provider)
 
@@ -59,11 +65,17 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 
 	authResponse, err := providerConfig.GetClient().AuthorizeSession(
 		context.Background(),
+		// This creates the state payload for the auth request
 		&models.AuthorizeUser{
 			Scopes: []string{"email", "profile"},
 			State: models.EncodingWrapper{
 				Type: models.ENCODED_AUTH,
-				Data: models.NewAuthWrapper(callback, client, provider),
+				Data: models.NewAuthWrapper(
+					callback, // where are we returning to
+					client,   // server identifier
+					provider, // provider name
+					code,     // the code sent by the client
+				),
 			}.EncodeAndEncrypt(
 				s.Config.GetServices().GetEncryption(),
 			),
@@ -144,6 +156,7 @@ type AuthPageData struct {
 	config.TemplateData
 	Providers map[string]models.ProviderResponse
 	Callback  string
+	Code      string
 }
 
 // getAuthPage displays the authentication page
@@ -176,6 +189,7 @@ func (s *Server) getAuthPage(c *gin.Context) {
 
 	// Has a provider been specified
 	provider, foundProvider := c.GetQuery("provider")
+	code := c.Query("code")
 
 	if foundProvider && len(provider) > 0 {
 
@@ -190,10 +204,15 @@ func (s *Server) getAuthPage(c *gin.Context) {
 
 		// {{$.Config.GetApiBasePath}}/auth/request/{{$key}}?callback={{$.Callback}}
 
+		params := url.Values{
+			"code":     {code},
+			"callback": {callback},
+		}
+
 		c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s/auth/request/%s?callback=%s",
 			s.Config.GetApiBasePath(),
 			provider,
-			callback,
+			params.Encode(),
 		))
 
 		return
@@ -204,6 +223,7 @@ func (s *Server) getAuthPage(c *gin.Context) {
 			TemplateData: s.GetTemplateData(c),
 			Providers:    foundProviders,
 			Callback:     callback,
+			Code:         code,
 		}
 
 		s.renderHtml(c, "auth.html", data)
@@ -214,8 +234,9 @@ func (s *Server) getAuthPage(c *gin.Context) {
 
 type AuthCallbackPageData struct {
 	config.TemplateData
-	Auth    models.AuthWrapper
-	Session *models.LocalSession
+	Auth        models.AuthWrapper
+	Session     *models.LocalSession
+	LoginServer string
 }
 
 func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
@@ -231,7 +252,7 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 	}
 
 	state := c.Query("state")
-	code := c.Query("code")
+	code := c.Query("code") // This is the code from the provider - not the client
 
 	session, err := provider.GetClient().CreateSession(c, &models.AuthorizeUser{
 		State:       state,
@@ -262,6 +283,7 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 		TemplateData: s.GetTemplateData(c),
 		Auth:         auth,
 		Session:      localSession,
+		LoginServer:  s.Config.GetLoginServerUrl(),
 	}
 
 	if err := s.setAuthCookie(c, auth.Provider, localSession); err != nil {

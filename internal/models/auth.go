@@ -1,34 +1,56 @@
 package models
 
 import (
-	"crypto/rand"
-	"fmt"
 	"strings"
+	"time"
 )
 
+// Only to be used server side. The Code is already encrypted when
+// sent to the server from the client.
 type AuthWrapper struct {
+	Version  int    `json:"version,omitempty"`
 	Callback string `json:"callback"`
 	Client   string `json:"client"`
 	Provider string `json:"provider"`
-	Code     string `json:"code"`
+	Code     string `json:"code,omitempty"` // Optional code if coming from client/cli
 }
 
-func NewAuthWrapper(callback string, client string, provider string) AuthWrapper {
+func NewAuthWrapper(
+	callback string,
+	client string,
+	provider string,
+	code string,
+) AuthWrapper {
 	return AuthWrapper{
 		Callback: callback,
 		Client:   client,
 		Provider: provider,
-		Code:     createOneTimeCode(12),
+		Code:     code,
 	}
 }
 
-// Function to generate random hex code based on a provided length of hex
-// returned as an uppercase string
-func createOneTimeCode(length int) string {
-	code := make([]byte, (length+1)/2)
-	if _, err := rand.Read(code); err != nil {
-		return ""
+// Only to be used agent/client side. The code is to provide
+// what client request was made to create the session.
+type CodeWrapper struct {
+	Version     int       `json:"version,omitempty"`
+	LoginServer string    `json:"login_server"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+func NewCodeWrapper(loginServer string) CodeWrapper {
+	return CodeWrapper{
+		Version:     1,
+		LoginServer: loginServer,
+		ExpiresAt:   time.Now().UTC().Add(5 * time.Minute),
 	}
-	hexString := strings.ToUpper(fmt.Sprintf("%x", code))
-	return fmt.Sprintf("%0*s", length, hexString)
+}
+
+// IsValid checks if the code wrapper is still valid
+func (cw CodeWrapper) IsValid(loginEndpoint string) bool {
+
+	if !strings.EqualFold(cw.LoginServer, loginEndpoint) {
+		return false
+	}
+
+	return time.Now().UTC().Before(cw.ExpiresAt)
 }

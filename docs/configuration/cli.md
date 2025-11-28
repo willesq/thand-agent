@@ -123,6 +123,130 @@ agent sessions
 - Refresh existing sessions
 - Interactive menu-driven interface
 
+### `sessions register`
+
+Register a session from an encoded token.
+
+```bash
+agent sessions register [flags]
+```
+
+**Description:**
+
+This command allows you to import a session that was provided by another source by pasting an encoded session token. This is useful when you need to use a session token that was generated externally or shared with you.
+
+**Flags:**
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--provider` | string | Provider name (e.g., `thand`) |
+
+**Examples:**
+```bash
+# Register a session with provider flag
+agent sessions register --provider thand
+
+# Register a session (will prompt for provider)
+agent sessions register
+```
+
+**How it works:**
+1. Prompts for provider name if not specified via `--provider` flag
+2. Prompts for the encoded session token to paste
+3. Decodes and validates the session token
+4. Warns if the session has expired (with option to continue)
+5. Stores the session in the local session manager
+
+**Output includes:**
+- Login server the session is registered to
+- Provider name
+- Session expiry time
+- Time remaining until expiry (if valid)
+
+### `sessions list`
+
+List all active authentication sessions.
+
+```bash
+agent sessions list
+```
+
+**Description:**
+
+Displays all current authentication sessions with their status, including provider name, session status (active/expired), expiry time, and version information.
+
+**Example output:**
+```
+Current Sessions
+
+Provider: aws
+  ACTIVE
+  Expires: 2024-10-27 15:30:00 (2 hours, 30 minutes)
+  Version: 1
+
+Provider: gcp
+  EXPIRED
+  Expired: 2024-10-27 10:00:00
+  Version: 2
+```
+
+### `sessions create`
+
+Create a new authentication session.
+
+```bash
+agent sessions create
+```
+
+**Description:**
+
+Guides you through creating a new authentication session for a provider. Displays available providers, opens the authentication flow in your browser, and waits for completion.
+
+**How it works:**
+1. Displays list of available providers from configuration
+2. Prompts to select a provider
+3. Checks if an active session already exists (prompts to replace if so)
+4. Opens browser to complete authentication
+5. Waits for session creation (Ctrl+C to cancel)
+6. Confirms successful session creation
+
+### `sessions remove`
+
+Remove an existing authentication session.
+
+```bash
+agent sessions remove
+```
+
+**Description:**
+
+Displays a list of active sessions and prompts for selection. Asks for confirmation before removing the selected session.
+
+**How it works:**
+1. Loads and displays all current sessions
+2. Prompts to select a session to remove
+3. Asks for confirmation
+4. Removes the session from the local session manager
+
+### `sessions refresh`
+
+Refresh or re-authenticate an existing session.
+
+```bash
+agent sessions refresh
+```
+
+**Description:**
+
+Initiates the authentication flow again for the selected provider to obtain a new session token with extended expiry. Useful for sessions that are about to expire or have expired.
+
+**How it works:**
+1. Loads and displays all current sessions
+2. Prompts to select a session to refresh
+3. Opens browser to complete re-authentication
+4. Waits for session refresh (Ctrl+C to cancel)
+5. Confirms successful session refresh with new expiry time
+
 ---
 
 ## Access Request Commands

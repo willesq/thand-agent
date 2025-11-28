@@ -8,7 +8,16 @@
             <div class="auth-providers">
                 {{range $key, $provider := .Providers}}
                     <div class="sso-provider">
-                        <a href="{{$.Config.GetApiBasePath}}/auth/request/{{$key}}?callback={{$.Callback}}" class="sso-button">
+                        {{$baseUrl := printf "%s/auth/request/%s" $.Config.GetApiBasePath $key}}
+                        {{if and $.Callback $.Code}}
+                        <a href="{{$baseUrl}}?callback={{$.Callback}}&amp;code={{$.Code}}" class="sso-button">
+                        {{else if $.Callback}}
+                        <a href="{{$baseUrl}}?callback={{$.Callback}}" class="sso-button">
+                        {{else if $.Code}}
+                        <a href="{{$baseUrl}}?code={{$.Code}}" class="sso-button">
+                        {{else}}
+                        <a href="{{$baseUrl}}" class="sso-button">
+                        {{end}}
                             <div class="sso-icon">
                                 {{if eq $provider.Provider "oauth2.google"}}
                                     <svg width="20" height="20" viewBox="0 0 24 24">

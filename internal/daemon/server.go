@@ -24,8 +24,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -259,15 +259,16 @@ func (s *Server) Start() error {
 
 func (s *Server) Stop() {
 	if s.server == nil {
+		logrus.Warning("Server is not running")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.server.Shutdown(ctx); err != nil {
-		log.Println("Server Shutdown:", err)
+		logrus.WithError(err).Error("Server Shutdown")
 	}
-	log.Println("Server exiting")
+	logrus.Info("Server exiting")
 }
 
 // requestCounterMiddleware increments the request counter
@@ -341,7 +342,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			loginServer := s.Config.GetLoginServerUrl()
 			callbackUrl := s.Config.GetLocalServerUrl()
 
-			if strings.Compare(loginServer, callbackUrl) == 0 {
+			if strings.EqualFold(callbackUrl, loginServer) {
 				s.getErrorPage(ctx,
 					http.StatusBadRequest,
 					"Invalid Configuration",
@@ -349,7 +350,29 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 				return
 			}
 
-			ctx.Redirect(http.StatusTemporaryRedirect, loginServer+"/auth?callback="+callbackUrl)
+			if !s.Config.GetServices().HasEncryption() {
+				s.getErrorPage(ctx,
+					http.StatusInternalServerError,
+					"Encryption service not configured",
+					fmt.Errorf("encryption service must be configured to create session codes"))
+				return
+			}
+
+			// Create a code to identify the session after authentication
+			// This code is encrypted and can only be used by the agent
+			sessionCode := models.EncodingWrapper{
+				Type: models.ENCODED_SESSION_CODE,
+				Data: models.NewCodeWrapper(loginServer),
+			}.EncodeAndEncrypt(
+				s.Config.GetServices().GetEncryption(),
+			)
+
+			params := url.Values{
+				"callback": {callbackUrl},
+				"code":     {sessionCode},
+			}
+
+			ctx.Redirect(http.StatusTemporaryRedirect, loginServer+"/auth?"+params.Encode())
 		})
 	}
 
