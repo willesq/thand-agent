@@ -32,7 +32,10 @@ var loginCmd = &cobra.Command{
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
+	return authKickStart()
+}
 
+func authKickStart() error {
 	// Set up signal handling for graceful cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -103,7 +106,7 @@ func createAuthCode() string {
 	code := models.EncodingWrapper{
 		Type: models.ENCODED_SESSION_CODE,
 		Data: models.NewCodeWrapper(
-			cfg.GetLocalServerUrl(),
+			cfg.GetLoginServerUrl(),
 		),
 	}.EncodeAndEncrypt(
 		cfg.GetServices().GetEncryption(),

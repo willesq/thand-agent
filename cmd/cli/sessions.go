@@ -171,8 +171,10 @@ func createNewSession() error {
 	// Get available providers from config
 	providers := getAvailableProviders()
 	if len(providers) == 0 {
-		fmt.Println(warningStyle.Render("No providers available in configuration"))
-		return nil
+
+		// If there are no providers, then just kick off a general login
+		return authKickStart()
+
 	}
 
 	var selectedProvider string
@@ -227,7 +229,7 @@ func createNewSession() error {
 	fmt.Println(infoStyle.Render("Please complete the authentication in your browser"))
 	fmt.Println()
 
-	err = kickStart(
+	err = authProviderKickStart(
 		selectedProvider,
 	)
 
@@ -249,7 +251,7 @@ func createNewSession() error {
 
 	fmt.Println(successStyle.Render("Session created successfully!"))
 	fmt.Printf("Provider: %s\n", selectedProvider)
-	fmt.Printf("Expires: %s\n", newSession)
+	fmt.Printf("Expires: %s\n", *newSession)
 
 	return nil
 }
@@ -408,7 +410,7 @@ func refreshSession() error {
 	// So we should not be doing anything here other than
 	// hitting the /authorize endpoint again
 
-	err = kickStart(
+	err = authProviderKickStart(
 		selectedProvider,
 	)
 
@@ -418,7 +420,11 @@ func refreshSession() error {
 
 	// Wait for the session to be refreshed
 	fmt.Println(infoStyle.Render("Waiting for session to be refreshed..."))
-	refreshedSession := sessionManager.AwaitProviderRefresh(context.Background(), cfg.GetLoginServerHostname(), selectedProvider)
+	refreshedSession := sessionManager.AwaitProviderRefresh(
+		context.Background(),
+		cfg.GetLoginServerHostname(),
+		selectedProvider,
+	)
 
 	if refreshedSession == nil {
 		return fmt.Errorf("authentication timed out or failed")
@@ -426,7 +432,7 @@ func refreshSession() error {
 
 	fmt.Println(successStyle.Render("Session refreshed successfully!"))
 	fmt.Printf("Provider: %s\n", selectedProvider)
-	fmt.Printf("New expiry: %s\n", refreshedSession)
+	fmt.Printf("New expiry: %s\n", *refreshedSession)
 
 	return nil
 }
@@ -483,8 +489,8 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%d minutes", minutes)
 }
 
-// kickStart initiates the authorization process for a given provider
-func kickStart(
+// authProviderKickStart initiates the authorization process for a given provider
+func authProviderKickStart(
 	selectedProvider string,
 ) error {
 

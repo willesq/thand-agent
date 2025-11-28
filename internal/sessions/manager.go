@@ -190,7 +190,7 @@ func (m *SessionManager) AwaitRefresh(ctx context.Context, loginServer string) *
 
 }
 
-func (m *SessionManager) AwaitProviderRefresh(ctx context.Context, loginServer string, provider string) error {
+func (m *SessionManager) AwaitProviderRefresh(ctx context.Context, loginServer string, provider string) *time.Time {
 
 	// Add a timeout to the provided context if it doesn't have a deadline
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
@@ -224,11 +224,11 @@ func (m *SessionManager) AwaitProviderRefresh(ctx context.Context, loginServer s
 		}).Debugln("Validating session")
 
 		if lastTimestamp == nil && currentTimestamp != nil {
-			return nil
+			return currentTimestamp
 		} else if lastTimestamp != nil &&
 			currentTimestamp != nil &&
 			lastTimestamp.UTC().Before(currentTimestamp.UTC()) {
-			return nil
+			return currentTimestamp
 		}
 	}
 }

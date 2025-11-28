@@ -58,7 +58,7 @@ func (s *Server) postSession(c *gin.Context) {
 	sessionCode := sessionCreateRequest.Code
 
 	// If the code decrypts then we're all good.
-	_, err := models.EncodingWrapper{
+	codeResponse, err := models.EncodingWrapper{
 		Type: models.ENCODED_SESSION_CODE,
 	}.DecodeAndDecrypt(
 		sessionCode,
@@ -67,6 +67,20 @@ func (s *Server) postSession(c *gin.Context) {
 
 	if err != nil {
 		s.getErrorPage(c, http.StatusBadRequest, "Failed to decrypt session code", err)
+		return
+	}
+
+	codeWrapper := models.CodeWrapper{}
+	err = common.ConvertInterfaceToInterface(codeResponse.Data, &codeWrapper)
+
+	if err != nil {
+		s.getErrorPage(c, http.StatusBadRequest, "Invalid session code data")
+		return
+	}
+
+	// Validate the code is still valid
+	if !codeWrapper.IsValid(s.Config.GetLoginServerUrl()) {
+		s.getErrorPage(c, http.StatusBadRequest, "Session code is invalid or expired")
 		return
 	}
 

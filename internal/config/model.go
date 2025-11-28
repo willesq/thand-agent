@@ -397,13 +397,13 @@ func (c *Config) DiscoverLoginServerApiUrl() string {
 
 	baseUrl := c.GetLoginServerUrl()
 
-	healthCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", baseUrl)
+	discoveryCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", baseUrl)
 	defaultUrl := fmt.Sprintf("%s/api/v1", baseUrl)
 
 	client := resty.New()
 	res, err := client.R().
 		EnableTrace().
-		Get(healthCheckUrl)
+		Get(discoveryCheckUrl)
 
 	if err != nil {
 		return defaultUrl
@@ -414,16 +414,15 @@ func (c *Config) DiscoverLoginServerApiUrl() string {
 	}
 
 	// Get the path field in the JSON response this is our API path
-	var healthCheckResponse struct {
+	var discoveryCheckResponse struct {
 		ApiBasePath string `json:"apiBasePath"`
 	}
 
-	if err := json.Unmarshal(res.Body(), &healthCheckResponse); err != nil {
+	if err := json.Unmarshal(res.Body(), &discoveryCheckResponse); err != nil {
 		return defaultUrl
 	}
 
-	trimPath := strings.TrimSuffix(strings.TrimPrefix(healthCheckResponse.ApiBasePath, "/"), "/")
-
+	trimPath := strings.TrimSuffix(strings.TrimPrefix(discoveryCheckResponse.ApiBasePath, "/"), "/")
 	return fmt.Sprintf("%s/%s", c.GetLoginServerUrl(), trimPath)
 }
 

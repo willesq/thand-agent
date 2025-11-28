@@ -342,7 +342,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			loginServer := s.Config.GetLoginServerUrl()
 			callbackUrl := s.Config.GetLocalServerUrl()
 
-			if strings.Compare(loginServer, callbackUrl) == 0 {
+			if strings.EqualFold(callbackUrl, loginServer) {
 				s.getErrorPage(ctx,
 					http.StatusBadRequest,
 					"Invalid Configuration",
@@ -362,7 +362,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			// This code is encrypted and can only be used by the agent
 			sessionCode := models.EncodingWrapper{
 				Type: models.ENCODED_SESSION_CODE,
-				Data: "te",
+				Data: models.NewCodeWrapper(loginServer),
 			}.EncodeAndEncrypt(
 				s.Config.GetServices().GetEncryption(),
 			)

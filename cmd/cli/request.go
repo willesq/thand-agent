@@ -221,9 +221,12 @@ func authenticateUser(request *models.ElevateRequest) error {
 	// the auth in the browser
 	if len(request.Authenticator) > 0 {
 
-		if err := sessionManager.AwaitProviderRefresh(
-			context.Background(), cfg.GetLoginServerHostname(), request.Authenticator); err != nil {
-			return fmt.Errorf("failed to await provider refresh: %w", err)
+		if found := sessionManager.AwaitProviderRefresh(
+			context.Background(),
+			cfg.GetLoginServerHostname(),
+			request.Authenticator,
+		); found == nil {
+			return fmt.Errorf("failed to await provider refresh. Authentication timed out or failed")
 		}
 
 		session, err := sessionManager.GetSession(
