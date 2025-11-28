@@ -145,11 +145,11 @@ func printInstallInstructions() {
 	exePath, _ := os.Executable()
 	fmt.Println("\nService installation failed. You may need to run with elevated privileges:")
 	fmt.Println("\nLinux:")
-	fmt.Printf("   sudo %s agent install\n", exePath)
+	fmt.Printf("   sudo %s thand service install\n", exePath)
 	fmt.Println("\n🪟 Windows:")
-	fmt.Printf("   Run as Administrator: %s agent install\n", exePath)
+	fmt.Printf("   Run as Administrator: %s thand service install\n", exePath)
 	fmt.Println("\nmacOS:")
-	fmt.Printf("   sudo %s agent install\n", exePath)
+	fmt.Printf("   sudo %s thand service install\n", exePath)
 }
 
 func init() {

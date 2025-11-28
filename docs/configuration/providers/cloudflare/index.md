@@ -421,13 +421,13 @@ roles:
 
 ```bash
 # List all predefined Cloudflare roles
-agent providers roles list --provider cloudflare-prod
+thand providers roles list --provider cloudflare-prod
 ```
 
 ### Authorize a User (Account-Wide Role)
 
 ```bash
-agent providers authorize \
+thand providers authorize \
   --provider cloudflare-prod \
   --user user@example.com \
   --role cloudflare-readonly
@@ -438,7 +438,7 @@ agent providers authorize \
 ```bash
 # First, ensure the role is defined in your roles configuration
 # Then authorize the user
-agent providers authorize \
+thand providers authorize \
   --provider cloudflare-prod \
   --user user@example.com \
   --role cloudflare-dns-prod
@@ -447,7 +447,7 @@ agent providers authorize \
 ### Revoke User Access
 
 ```bash
-agent providers revoke \
+thand providers revoke \
   --provider cloudflare-prod \
   --user user@example.com \
   --role cloudflare-dns-prod
@@ -459,10 +459,10 @@ agent providers revoke \
 
 ```bash
 # List all members of the Cloudflare account
-agent providers identities list --provider cloudflare-prod
+thand providers identities list --provider cloudflare-prod
 
 # Search for a specific member
-agent providers identities list --provider cloudflare-prod --filter "user@example.com"
+thand providers identities list --provider cloudflare-prod --filter "user@example.com"
 ```
 
 ## Implementation Details
@@ -486,7 +486,7 @@ When you define a role with `inherits` and `resources`:
 - Use the `inherits` field to specify which Cloudflare roles to assign
 - Role names must match Cloudflare's predefined role names exactly
 - Multiple roles can be inherited for combined permissions
-- Use `agent providers roles list` to see all available role names
+- Use `thand providers roles list` to see all available role names
 
 ### Caching and Performance
 
@@ -549,7 +549,7 @@ When you define a role with `inherits` and `resources`:
 
 **Solutions**:
 - Check role names match Cloudflare's role names exactly
-- Use `agent providers roles list` to see available roles
+- Use `thand providers roles list` to see available roles
 - Verify your API token has permission to list roles
 
 ### Zone Not Found

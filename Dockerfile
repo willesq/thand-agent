@@ -36,7 +36,7 @@ RUN ls -la third_party/iam-dataset/aws/ && ls -la third_party/iam-dataset/azure/
 # Build the application with CGO enabled for sqlite3 support
 RUN GOEXPERIMENT=jsonv2 CGO_ENABLED=1 GOOS=linux go build -a \
     -ldflags "-X github.com/thand-io/agent/internal/common.Version=${VERSION} -X github.com/thand-io/agent/internal/common.GitCommit=${COMMIT}" \
-    -o bin/agent .
+    -o bin/thand .
 
 # Final stage
 FROM alpine:latest
@@ -49,22 +49,22 @@ LABEL org.opencontainers.image.licenses=BSL-1.1
 RUN apk --no-cache add ca-certificates gcompat
 
 # Create a non-root user
-RUN addgroup -S agent && adduser -S agent -G agent
+RUN addgroup -S thand && adduser -S thand -G thand
 
 # Set working directory
 WORKDIR /app
 
 # Copy the binary from builder stage
-COPY --from=builder /app/bin/agent ./agent
+COPY --from=builder /app/bin/thand ./thand
 
 # Copy configuration example file if it exists
 COPY config.example.yaml ./
 
 # Change ownership to non-root user
-RUN chown -R agent:agent /app
+RUN chown -R thand:thand /app
 
 # Switch to non-root user
-USER agent
+USER thand
 
 # Expose the default port (adjust if your server uses a different port)
 EXPOSE 8080
@@ -76,4 +76,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 ENV THAND_SERVER_PORT=8080
 
 # Default command is to run the server
-CMD ["./agent", "server"]
+CMD ["./thand", "server"]

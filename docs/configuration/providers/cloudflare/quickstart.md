@@ -109,50 +109,6 @@ roles:
     enabled: true
 ```
 
-## Step 5: Test the Configuration
-
-### List Available Roles
-
-```bash
-agent providers roles list --provider cloudflare-prod
-```
-
-Expected output:
-```
-Administrator
-Administrator Read Only
-DNS
-Firewall
-Analytics
-...
-```
-
-### List Account Members
-
-```bash
-agent providers identities list --provider cloudflare-prod
-```
-
-## Step 6: Authorize a User
-
-### Using Account-Wide Role
-
-```bash
-agent providers authorize \
-  --provider cloudflare-prod \
-  --user engineer@example.com \
-  --role cloudflare-viewer
-```
-
-### Using Resource-Scoped Role
-
-```bash
-agent providers authorize \
-  --provider cloudflare-prod \
-  --user engineer@example.com \
-  --role cloudflare-dns-editor
-```
-
 ## Common Use Cases
 
 ### Use Case 1: Read-Only Access
