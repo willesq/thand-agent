@@ -68,7 +68,7 @@ func (p *gcpProvider) GetRole(ctx context.Context, role string) (*models.Provide
 	if r, exists := p.rolesMap[role]; exists {
 		return r, nil
 	}
-	return nil, fmt.Errorf("role not found")
+	return nil, fmt.Errorf("GCP role not found: %s", role)
 }
 
 func (p *gcpProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
