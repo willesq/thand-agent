@@ -410,16 +410,10 @@ func (m *WorkflowManager) createTemporalWorkflow(workflowTask *models.WorkflowTa
 
 	ctx := workflowTask.GetContext()
 
-	// Create new workflow
-	we, err := temporalClient.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
+	// Build workflow options
+	workflowOptions := client.StartWorkflowOptions{
 		ID:        workflowTask.WorkflowID,
 		TaskQueue: temporalService.GetTaskQueue(),
-		VersioningOverride: &client.PinnedVersioningOverride{
-			Version: worker.WorkerDeploymentVersion{
-				DeploymentName: models.TemporalDeploymentName,
-				BuildID:        common.GetClientIdentifier(),
-			},
-		},
 		TypedSearchAttributes: temporal.NewSearchAttributes(
 			models.TypedSearchAttributeUser.ValueSet(userEmail),
 			models.TypedSearchAttributeRole.ValueSet(roleName),
@@ -430,7 +424,20 @@ func (m *WorkflowManager) createTemporalWorkflow(workflowTask *models.WorkflowTa
 			models.TypedSearchAttributeReason.ValueSet(elevationRequest.Reason),
 			models.TypedSearchAttributeIdentities.ValueSet(elevationRequest.Identities),
 		),
-	}, models.TemporalExecuteElevationWorkflowName, workflowTask)
+	}
+
+	// Only add versioning override if versioning is enabled
+	if !temporalService.IsVersioningDisabled() {
+		workflowOptions.VersioningOverride = &client.PinnedVersioningOverride{
+			Version: worker.WorkerDeploymentVersion{
+				DeploymentName: models.TemporalDeploymentName,
+				BuildID:        common.GetClientIdentifier(),
+			},
+		}
+	}
+
+	// Create new workflow
+	we, err := temporalClient.ExecuteWorkflow(ctx, workflowOptions, models.TemporalExecuteElevationWorkflowName, workflowTask)
 
 	if err != nil {
 		return fmt.Errorf("failed to start workflow: %w", err)

@@ -1,0 +1,31 @@
+version: "1.0"
+providers:
+  # AWS provider pointing to LocalStack
+  aws-test:
+    name: AWS Test (LocalStack)
+    description: AWS provider for integration tests using LocalStack
+    provider: aws
+    config:
+      region: us-east-1
+      # LocalStack credentials (dummy values work)
+      access_key_id: test
+      secret_access_key: test
+      # Endpoint will be injected at runtime
+      endpoint: "${LOCALSTACK_ENDPOINT}"
+    enabled: true
+
+  # Email provider pointing to MailHog
+  email-test:
+    name: Email Test (MailHog)
+    description: SMTP email provider for integration tests using MailHog
+    provider: email
+    config:
+      platform: smtp
+      host: "${MAILHOG_HOST}"
+      port: "${MAILHOG_PORT}"
+      from: test@example.com
+      # MailHog accepts any credentials - using dummy values
+      user: "test"
+      pass: "test"
+      tls: false
+    enabled: true

@@ -193,6 +193,11 @@ func (t *thandTask) executeNotifyTemporalParallel(
 	notifyTasks []notifyTask,
 ) ([]notifyResult, error) {
 
+	logrus.WithFields(logrus.Fields{
+		"taskName":  taskName,
+		"taskCount": len(notifyTasks),
+	}).Info("Starting executeNotifyTemporalParallel")
+
 	temporalContext := workflowTask.GetTemporalContext()
 	serviceClient := t.config.GetServices()
 
@@ -216,7 +221,19 @@ func (t *thandTask) executeNotifyTemporalParallel(
 		taskIndex := i
 		notifyTask := task
 
+		logrus.WithFields(logrus.Fields{
+			"taskIndex": taskIndex,
+			"recipient": notifyTask.Recipient,
+			"provider":  notifyTask.Provider,
+		}).Info("Scheduling notify activity via workflow.Go")
+
 		workflow.Go(temporalContext, func(ctx workflow.Context) {
+			log := workflow.GetLogger(ctx)
+			log.Info("Inside workflow.Go - about to execute activity",
+				"recipient", notifyTask.Recipient,
+				"activityName", thandFunction.ThandNotifyFunction,
+			)
+
 			err := workflow.ExecuteActivity(
 				aoctx,
 				thandFunction.ThandNotifyFunction,
@@ -225,6 +242,11 @@ func (t *thandTask) executeNotifyTemporalParallel(
 				notifyTask.CallFunc,
 				notifyTask.Payload,
 			).Get(ctx, nil)
+
+			log.Info("Activity completed",
+				"recipient", notifyTask.Recipient,
+				"error", err,
+			)
 
 			// Send result through channel
 			resultCh.Send(ctx, temporalNotifyResult{

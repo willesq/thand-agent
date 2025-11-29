@@ -28,12 +28,12 @@ const TemporalIsApprovedQueryName = "isApproved"
 const TemporalGetWorkflowTaskQueryName = "getWorkflowTask"
 
 var TypedSearchAttributeStatus = temporal.NewSearchAttributeKeyKeyword("status")
-var TypedSearchAttributeTask = temporal.NewSearchAttributeKeyString("task")
-var TypedSearchAttributeUser = temporal.NewSearchAttributeKeyString(VarsContextUser)
-var TypedSearchAttributeRole = temporal.NewSearchAttributeKeyString(VarsContextRole)
-var TypedSearchAttributeWorkflow = temporal.NewSearchAttributeKeyString(VarsContextWorkflow)
+var TypedSearchAttributeTask = temporal.NewSearchAttributeKeyKeyword("task")
+var TypedSearchAttributeUser = temporal.NewSearchAttributeKeyKeyword(VarsContextUser)
+var TypedSearchAttributeRole = temporal.NewSearchAttributeKeyKeyword(VarsContextRole)
+var TypedSearchAttributeWorkflow = temporal.NewSearchAttributeKeyKeyword(VarsContextWorkflow)
 var TypedSearchAttributeProviders = temporal.NewSearchAttributeKeyKeywordList(VarsContextProviders)
-var TypedSearchAttributeReason = temporal.NewSearchAttributeKeyString("reason")
+var TypedSearchAttributeReason = temporal.NewSearchAttributeKeyString("reason") // Description or reason for the workflow
 var TypedSearchAttributeDuration = temporal.NewSearchAttributeKeyInt64("duration")
 var TypedSearchAttributeIdentities = temporal.NewSearchAttributeKeyKeywordList("identities")
 var TypedSearchAttributeApproved = temporal.NewSearchAttributeKeyBool(VarsContextApproved)
@@ -46,6 +46,9 @@ type TemporalConfig struct {
 	ApiKey              string `mapstructure:"api_key" default:""`
 	MtlsCertificate     string `mapstructure:"mtls_cert" default:""`
 	MtlsCertificatePath string `mapstructure:"mtls_cert_path" default:""`
+
+	// DisableVersioning disables worker versioning/deployments for testing
+	DisableVersioning bool `mapstructure:"disable_versioning" default:"false"`
 }
 
 type TemporalImpl interface {
@@ -61,6 +64,8 @@ type TemporalImpl interface {
 	GetHostPort() string
 	GetNamespace() string
 	GetTaskQueue() string
+
+	IsVersioningDisabled() bool
 }
 
 type TemporalTerminationRequest struct {
