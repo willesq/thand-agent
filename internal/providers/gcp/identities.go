@@ -121,11 +121,17 @@ func parseMemberToIdentity(member string) (*models.Identity, string) {
 			ID:    memberValue,
 			Label: name,
 			User: &models.User{
-				ID:       memberValue,
-				Email:    memberValue,
-				Username: strings.Split(memberValue, "@")[0],
-				Name:     name,
-				Source:   "gcp",
+				ID:    memberValue,
+				Email: memberValue,
+				Username: func() string {
+					username, _, found := strings.Cut(memberValue, "@")
+					if !found {
+						return memberValue
+					}
+					return username
+				}(),
+				Name:   name,
+				Source: "gcp",
 			},
 		}, "user"
 
