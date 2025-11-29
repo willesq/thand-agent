@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"net/mail"
 	"slices"
 	"strings"
 	"time"
@@ -190,8 +191,9 @@ func (p *gcpProvider) RevokeRole(
 			// Custom role - get the role object and unbind
 			// Extract the role name from the full path (projects/{project}/roles/{roleName})
 			parts := strings.Split(roleName, "/")
-			if len(parts) < 1 || parts[len(parts)-1] == "" {
-				return nil, fmt.Errorf("invalid custom role name format: %q", roleName)
+			// Expected format: projects/{project}/roles/{roleName} (4 parts)
+			if len(parts) < 4 || parts[len(parts)-1] == "" {
+				return nil, fmt.Errorf("invalid custom role name format: %q, expected projects/{project}/roles/{roleName}", roleName)
 			}
 			customRoleName := parts[len(parts)-1]
 
@@ -274,126 +276,12 @@ func (p *gcpProvider) getRole(projectID, roleName string) (*iam.Role, error) {
 
 // bindUserToPredefinedRole binds a user to a predefined GCP role (e.g., roles/viewer)
 func (p *gcpProvider) bindUserToPredefinedRole(projectID string, user *models.User, roleName string) error {
-	crmService := p.crmClient
-
-	// Get current IAM policy - request version 3 to support conditions
-	policy, err := crmService.Projects.GetIamPolicy(projectID, &cloudresourcemanager.GetIamPolicyRequest{
-		Options: &cloudresourcemanager.GetPolicyOptions{
-			RequestedPolicyVersion: 3,
-		},
-	}).Do()
-	if err != nil {
-		return fmt.Errorf("failed to get IAM policy: %w", err)
-	}
-
-	// Ensure policy version is 3 for conditions support
-	policy.Version = 3
-
-	// Create member string based on user type
-	var member string
-	if len(user.Email) > 0 {
-		member = "user:" + user.Email
-	} else {
-		return fmt.Errorf("user email is required for GCP IAM binding")
-	}
-
-	// Check if binding already exists with our thand condition
-	bindingExists := false
-	for _, binding := range policy.Bindings {
-		if binding.Role == roleName && isThandManagedBinding(binding) {
-			if slices.Contains(binding.Members, member) {
-				bindingExists = true
-			}
-			if !bindingExists {
-				// Add member to existing thand-managed binding
-				binding.Members = append(binding.Members, member)
-				bindingExists = true
-			}
-			break
-		}
-	}
-
-	// If no binding exists for this role with our condition, create a new one
-	if !bindingExists {
-		newBinding := &cloudresourcemanager.Binding{
-			Role:      roleName,
-			Members:   []string{member},
-			Condition: newThandCondition(),
-		}
-		policy.Bindings = append(policy.Bindings, newBinding)
-	}
-
-	// Set the updated IAM policy
-	_, err = crmService.Projects.SetIamPolicy(projectID, &cloudresourcemanager.SetIamPolicyRequest{
-		Policy: policy,
-	}).Do()
-	if err != nil {
-		return fmt.Errorf("failed to set IAM policy: %w", err)
-	}
-
-	return nil
+	return p.bindUserToRoleByName(projectID, user, roleName)
 }
 
 // unbindUserFromPredefinedRole removes a user from a predefined GCP role
 func (p *gcpProvider) unbindUserFromPredefinedRole(projectID string, user *models.User, roleName string) error {
-	crmService := p.crmClient
-
-	// Get current IAM policy - request version 3 to support conditions
-	policy, err := crmService.Projects.GetIamPolicy(projectID, &cloudresourcemanager.GetIamPolicyRequest{
-		Options: &cloudresourcemanager.GetPolicyOptions{
-			RequestedPolicyVersion: 3,
-		},
-	}).Do()
-	if err != nil {
-		return fmt.Errorf("failed to get IAM policy: %w", err)
-	}
-
-	// Ensure policy version is 3 for conditions support
-	policy.Version = 3
-
-	// Create member string based on user type
-	var member string
-	if len(user.Email) > 0 {
-		member = "user:" + user.Email
-	} else {
-		return fmt.Errorf("user email is required for GCP IAM binding")
-	}
-
-	// Find and remove the user from the thand-managed role binding
-	bindingFound := false
-	for i, binding := range policy.Bindings {
-		if binding.Role == roleName && isThandManagedBinding(binding) {
-			bindingFound = true
-			// Find and remove the member from this binding
-			for j, bindingMember := range binding.Members {
-				if bindingMember == member {
-					// Remove the member from the slice
-					binding.Members = append(binding.Members[:j], binding.Members[j+1:]...)
-					break
-				}
-			}
-			// If the binding has no members left, remove the entire binding
-			if len(binding.Members) == 0 {
-				policy.Bindings = append(policy.Bindings[:i], policy.Bindings[i+1:]...)
-			}
-			break
-		}
-	}
-
-	// If no binding was found for this role, the user wasn't bound to it
-	if !bindingFound {
-		return fmt.Errorf("thand-managed role binding not found for role %s", roleName)
-	}
-
-	// Set the updated IAM policy
-	_, err = crmService.Projects.SetIamPolicy(projectID, &cloudresourcemanager.SetIamPolicyRequest{
-		Policy: policy,
-	}).Do()
-	if err != nil {
-		return fmt.Errorf("failed to set IAM policy: %w", err)
-	}
-
-	return nil
+	return p.unbindUserFromRoleByName(projectID, user, roleName)
 }
 
 // isThandManagedBinding checks if a binding has the thand condition tag
@@ -401,7 +289,90 @@ func isThandManagedBinding(binding *cloudresourcemanager.Binding) bool {
 	return binding.Condition != nil && binding.Condition.Title == "managed-by-thand"
 }
 
+// validateAndFormatMember validates the user email and returns a formatted IAM member string
+func validateAndFormatMember(user *models.User) (string, error) {
+	if user == nil {
+		return "", fmt.Errorf("user is required for GCP IAM binding")
+	}
+	if len(user.Email) == 0 {
+		return "", fmt.Errorf("user email is required for GCP IAM binding")
+	}
+	// Use net/mail.ParseAddress for robust email validation
+	addr, err := mail.ParseAddress(user.Email)
+	if err != nil {
+		return "", fmt.Errorf("invalid email format for GCP IAM binding: %s", user.Email)
+	}
+	return "user:" + addr.Address, nil
+}
+
+// addMemberToPolicy adds a member to a role binding in the policy, creating a new binding if necessary
+// Returns true if the policy was modified
+func addMemberToPolicy(policy *cloudresourcemanager.Policy, roleName, member string) bool {
+	// Check if binding already exists with our thand condition
+	for _, binding := range policy.Bindings {
+		if binding.Role == roleName && isThandManagedBinding(binding) {
+			if slices.Contains(binding.Members, member) {
+				return false // Already bound, no modification needed
+			}
+			// Add member to existing thand-managed binding
+			binding.Members = append(binding.Members, member)
+			return true
+		}
+	}
+
+	// No binding exists for this role with our condition, create a new one
+	newBinding := &cloudresourcemanager.Binding{
+		Role:      roleName,
+		Members:   []string{member},
+		Condition: newThandCondition(),
+	}
+	policy.Bindings = append(policy.Bindings, newBinding)
+	return true
+}
+
+// removeMemberFromPolicy removes a member from a role binding in the policy
+// Returns true if the member was found and removed, false otherwise
+func removeMemberFromPolicy(policy *cloudresourcemanager.Policy, roleName, member string) bool {
+	for i, binding := range policy.Bindings {
+		if binding.Role == roleName && isThandManagedBinding(binding) {
+			// Find the member index first, then remove outside the loop
+			memberIndex := -1
+			for j, bindingMember := range binding.Members {
+				if bindingMember == member {
+					memberIndex = j
+					break
+				}
+			}
+			if memberIndex == -1 {
+				return false // Member not found in binding
+			}
+			// Remove the member from the slice (outside the iteration loop)
+			binding.Members = append(binding.Members[:memberIndex], binding.Members[memberIndex+1:]...)
+			// If the binding has no members left, remove the entire binding
+			if len(binding.Members) == 0 {
+				policy.Bindings = append(policy.Bindings[:i], policy.Bindings[i+1:]...)
+			}
+			return true
+		}
+	}
+	return false // Binding not found
+}
+
 func (p *gcpProvider) bindUserToRole(projectID string, user *models.User, iamRole *iam.Role) error {
+	return p.bindUserToRoleByName(projectID, user, iamRole.Name)
+}
+
+func (p *gcpProvider) unbindUserFromRole(projectID string, user *models.User, iamRole *iam.Role) error {
+	return p.unbindUserFromRoleByName(projectID, user, iamRole.Name)
+}
+
+// bindUserToRoleByName is the core implementation for binding a user to any role
+func (p *gcpProvider) bindUserToRoleByName(projectID string, user *models.User, roleName string) error {
+	member, err := validateAndFormatMember(user)
+	if err != nil {
+		return err
+	}
+
 	crmService := p.crmClient
 
 	// Get current IAM policy - request version 3 to support conditions
@@ -417,38 +388,10 @@ func (p *gcpProvider) bindUserToRole(projectID string, user *models.User, iamRol
 	// Ensure policy version is 3 for conditions support
 	policy.Version = 3
 
-	// Create member string based on user type
-	var member string
-	if len(user.Email) > 0 {
-		member = "user:" + user.Email
-	} else {
-		return fmt.Errorf("user email is required for GCP IAM binding")
-	}
-
-	// Check if binding already exists with our thand condition
-	bindingExists := false
-	for _, binding := range policy.Bindings {
-		if binding.Role == iamRole.Name && isThandManagedBinding(binding) {
-			if slices.Contains(binding.Members, member) {
-				bindingExists = true
-			}
-			if !bindingExists {
-				// Add member to existing thand-managed binding
-				binding.Members = append(binding.Members, member)
-				bindingExists = true
-			}
-			break
-		}
-	}
-
-	// If no binding exists for this role with our condition, create a new one
-	if !bindingExists {
-		newBinding := &cloudresourcemanager.Binding{
-			Role:      iamRole.Name,
-			Members:   []string{member},
-			Condition: newThandCondition(),
-		}
-		policy.Bindings = append(policy.Bindings, newBinding)
+	// Add member to the policy (handles both existing and new bindings)
+	if !addMemberToPolicy(policy, roleName, member) {
+		// Member already bound, nothing to do
+		return nil
 	}
 
 	// Set the updated IAM policy
@@ -462,7 +405,13 @@ func (p *gcpProvider) bindUserToRole(projectID string, user *models.User, iamRol
 	return nil
 }
 
-func (p *gcpProvider) unbindUserFromRole(projectID string, user *models.User, iamRole *iam.Role) error {
+// unbindUserFromRoleByName is the core implementation for unbinding a user from any role
+func (p *gcpProvider) unbindUserFromRoleByName(projectID string, user *models.User, roleName string) error {
+	member, err := validateAndFormatMember(user)
+	if err != nil {
+		return err
+	}
+
 	crmService := p.crmClient
 
 	// Get current IAM policy - request version 3 to support conditions
@@ -478,38 +427,9 @@ func (p *gcpProvider) unbindUserFromRole(projectID string, user *models.User, ia
 	// Ensure policy version is 3 for conditions support
 	policy.Version = 3
 
-	// Create member string based on user type
-	var member string
-	if len(user.Email) > 0 {
-		member = "user:" + user.Email
-	} else {
-		return fmt.Errorf("user email is required for GCP IAM binding")
-	}
-
-	// Find and remove the user from the thand-managed role binding
-	bindingFound := false
-	for i, binding := range policy.Bindings {
-		if binding.Role == iamRole.Name && isThandManagedBinding(binding) {
-			bindingFound = true
-			// Find and remove the member from this binding
-			for j, bindingMember := range binding.Members {
-				if bindingMember == member {
-					// Remove the member from the slice
-					binding.Members = append(binding.Members[:j], binding.Members[j+1:]...)
-					break
-				}
-			}
-			// If the binding has no members left, remove the entire binding
-			if len(binding.Members) == 0 {
-				policy.Bindings = append(policy.Bindings[:i], policy.Bindings[i+1:]...)
-			}
-			break
-		}
-	}
-
-	// If no binding was found for this role, the user wasn't bound to it
-	if !bindingFound {
-		return fmt.Errorf("thand-managed role binding not found for role %s", iamRole.Name)
+	// Remove member from the policy
+	if !removeMemberFromPolicy(policy, roleName, member) {
+		return fmt.Errorf("thand-managed role binding not found for role %s", roleName)
 	}
 
 	// Set the updated IAM policy
