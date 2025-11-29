@@ -196,8 +196,8 @@ func (c *Config) initializeSingleProvider(providerKey string, p *models.Provider
 		return err
 	}
 
-	// Before we initalize, we need to check if any of the provider's
-	// config has any envrionment variable references and resolve them
+	// Before we initialize, we need to check if any of the provider's
+	// config has any environment variable references and resolve them
 	err = p.ResolveConfig(
 		map[string]any{},
 	)

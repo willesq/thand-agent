@@ -79,13 +79,16 @@ func (p *Provider) SetConfig(config *BasicConfig) {
 
 func (p *Provider) ResolveConfig(vars map[string]any) error {
 
-	names := os.Environ()
+	envs := os.Environ()
 
-	for _, envName := range names {
-		vars[envName] = os.Getenv(envName)
+	for _, env := range envs {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			vars[parts[0]] = parts[1]
+		}
 	}
 
-	newConfig, err := interpolate.NewTraverse(p.Config.AsMap(), nil, vars)
+	newConfig, err := interpolate.NewTraverse(p.Config.AsMap(), vars, nil)
 
 	if err != nil {
 		return fmt.Errorf("failed to create traverse for provider config: %w", err)
