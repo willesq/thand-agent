@@ -192,7 +192,7 @@ func (p *gcpProvider) RevokeRole(
 			// Extract the role name from the full path (projects/{project}/roles/{roleName})
 			parts := strings.Split(roleName, "/")
 			// Expected format: projects/{project}/roles/{roleName} (4 parts)
-			if len(parts) < 4 || parts[len(parts)-1] == "" {
+			if len(parts) != 4 || parts[len(parts)-1] == "" {
 				return nil, fmt.Errorf("invalid custom role name format: %q, expected projects/{project}/roles/{roleName}", roleName)
 			}
 			customRoleName := parts[len(parts)-1]

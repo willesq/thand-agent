@@ -72,7 +72,9 @@ func (p *oktaProvider) RefreshIdentities(ctx context.Context) error {
 
 	// Build the identities map
 	for i := range identities {
+
 		identity := &identities[i]
+
 		// Map by ID (lowercase)
 		identitiesMap[strings.ToLower(identity.ID)] = identity
 		// Map by label (lowercase)
