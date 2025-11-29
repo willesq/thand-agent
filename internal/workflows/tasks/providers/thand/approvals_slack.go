@@ -336,7 +336,7 @@ func (a *approvalsNotifier) addActionSection(
 					"Approve",
 					slack.NewTextBlockObject(
 						slack.PlainTextType,
-						"✅ Approve",
+						"Approve",
 						false,
 						false,
 					),
@@ -346,11 +346,21 @@ func (a *approvalsNotifier) addActionSection(
 					"Deny",
 					slack.NewTextBlockObject(
 						slack.PlainTextType,
-						"❌ Deny",
+						"Deny",
 						false,
 						false,
 					),
 				).WithURL(a.createCallbackUrl(workflowTask, approvalNotifier, false)).WithStyle(slack.StyleDanger),
+				slack.NewButtonBlockElement(
+					"view_request",
+					"View Request",
+					slack.NewTextBlockObject(
+						slack.PlainTextType,
+						"View Request",
+						false,
+						false,
+					),
+				).WithURL(a.createViewRequestUrl(workflowTask)),
 			))
 
 		}
@@ -366,6 +376,10 @@ func (a *approvalsNotifier) addActionSection(
 			nil,
 		))
 	}
+}
+
+func (a *approvalsNotifier) createViewRequestUrl(workflowTask *models.WorkflowTask) string {
+	return fmt.Sprintf("%s/execution/%s", a.config.GetLoginServerUrl(), workflowTask.WorkflowID)
 }
 
 func (a *approvalsNotifier) createCallbackUrl(
