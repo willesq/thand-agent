@@ -189,9 +189,21 @@ func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[strin
 
 // initializeSingleProvider initializes a single provider
 func (c *Config) initializeSingleProvider(providerKey string, p *models.Provider) error {
+
 	impl, err := c.getProviderImplementation(providerKey, p.Provider)
+
 	if err != nil {
 		return err
+	}
+
+	// Before we initialize, we need to check if any of the provider's
+	// config has any environment variable references and resolve them
+	err = p.ResolveConfig(
+		map[string]any{},
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to resolve environment variables for provider %s: %w", providerKey, err)
 	}
 
 	if err := impl.Initialize(*p); err != nil {

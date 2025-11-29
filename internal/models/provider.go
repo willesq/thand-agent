@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/interpolate"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -69,6 +71,35 @@ func (p *Provider) SetClient(client ProviderImpl) {
 
 func (p *Provider) GetConfig() *BasicConfig {
 	return p.Config
+}
+
+func (p *Provider) SetConfig(config *BasicConfig) {
+	p.Config = config
+}
+
+func (p *Provider) ResolveConfig(vars map[string]any) error {
+
+	envs := os.Environ()
+
+	for _, env := range envs {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			vars[parts[0]] = parts[1]
+		}
+	}
+
+	newConfig, err := interpolate.NewTraverse(p.Config.AsMap(), vars, nil)
+
+	if err != nil {
+		return fmt.Errorf("failed to create traverse for provider config: %w", err)
+	}
+
+	if basicConfig, ok := newConfig.(map[string]any); ok {
+		p.Config.Update(basicConfig)
+		return nil
+	}
+
+	return fmt.Errorf("the traversed config was not a map")
 }
 
 // ProvidersResponse represents the response for a providers query
