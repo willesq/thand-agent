@@ -184,20 +184,23 @@ func (a *approvalsNotifier) createApprovalEmailBody() (string, string) {
 			actionMessage = fmt.Sprintf("Action Required:\n%d more approvals are needed (%d of %d received). Please review the request and choose an action.", remainingApprovals, approvedCount, notifyReq.Approvals)
 		}
 
-		plainText.WriteString(fmt.Sprintf("\n%s\n", actionMessage))
+		plainText.WriteString(fmt.Sprintf("\n%s\n\n", actionMessage))
 
 		// Add action buttons with URLs
 		if remainingApprovals > 0 {
 			approveURL := a.createCallbackUrl(workflowTask, notifyReq, true)
 			denyURL := a.createCallbackUrl(workflowTask, notifyReq, false)
+			viewRequestURL := a.createViewRequestUrl(workflowTask)
 
-			plainText.WriteString(fmt.Sprintf("\nApprove: %s\n", approveURL))
+			plainText.WriteString(fmt.Sprintf("Approve: %s\n", approveURL))
 			plainText.WriteString(fmt.Sprintf("Deny: %s\n", denyURL))
+			plainText.WriteString(fmt.Sprintf("View Request: %s\n", viewRequestURL))
 
 			// Add URLs to template data
 			data["ActionMessage"] = actionMessage
 			data["ApproveURL"] = approveURL
 			data["DenyURL"] = denyURL
+			data["ViewRequestURL"] = viewRequestURL
 			data["ShowActions"] = true
 		} else {
 			data["ActionMessage"] = actionMessage
