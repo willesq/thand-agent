@@ -118,6 +118,171 @@ providers:
 - **enabled**: Whether the provider is active
 - **config**: Provider-specific configuration parameters
 
+## Dynamic Configuration with Environment Variables
+
+Provider configurations support dynamic value resolution using [jq](https://jqlang.github.io/jq/) expressions. This allows you to:
+
+- Reference environment variables in your configuration
+- Use conditional logic to change settings based on environment
+- Concatenate strings dynamically
+- Provide default values for optional settings
+
+### Syntax
+
+Dynamic expressions use the `${ }` syntax with jq expressions inside. Environment variables and any values passed to the configuration are accessible using dot notation (`.VARIABLE_NAME`).
+
+### Basic Environment Variable Access
+
+Reference environment variables directly in your configuration:
+
+```yaml
+providers:
+  aws-prod:
+    name: AWS Production
+    provider: aws
+    config:
+      region: ${ .AWS_REGION }
+      account_id: ${ .AWS_ACCOUNT_ID }
+      role_arn: ${ .AWS_ROLE_ARN }
+```
+
+### Default Values
+
+Use the jq alternative operator (`//`) to provide fallback values when an environment variable is not set:
+
+```yaml
+providers:
+  aws:
+    name: AWS
+    provider: aws
+    config:
+      region: ${ .AWS_REGION // "us-east-1" }
+      timeout: ${ .AWS_TIMEOUT // "30" }
+```
+
+### String Concatenation
+
+Build dynamic strings by concatenating values:
+
+```yaml
+providers:
+  aws:
+    name: AWS
+    provider: aws
+    config:
+      role_arn: ${ "arn:aws:iam::" + .AWS_ACCOUNT_ID + ":role/" + .AWS_ROLE_NAME }
+```
+
+### Conditional Configuration
+
+Use jq conditionals to change configuration based on environment:
+
+```yaml
+providers:
+  database:
+    name: Database
+    provider: postgres
+    config:
+      # Switch between production and development settings
+      host: ${ if .MODE == "prod" then "db.production.example.com" else "localhost" end }
+      port: ${ if .MODE == "prod" then "5432" else "5433" end }
+      ssl_mode: ${ if .MODE == "prod" then "require" else "disable" end }
+      
+  aws:
+    name: AWS
+    provider: aws
+    config:
+      # Use different accounts based on environment
+      account_id: ${ if .ENV == "production" then .PROD_ACCOUNT_ID else .DEV_ACCOUNT_ID end }
+      region: ${ if .ENV == "production" then "us-east-1" else "us-west-2" end }
+```
+
+### Nested Object Access
+
+Access nested values from structured input:
+
+```yaml
+providers:
+  kubernetes:
+    name: Kubernetes
+    provider: kubernetes
+    config:
+      cluster: ${ .cluster.name }
+      endpoint: ${ .cluster.endpoint }
+      namespace: ${ .cluster.namespace // "default" }
+```
+
+### Real-World Examples
+
+#### Multi-Environment AWS Configuration
+
+```yaml
+providers:
+  aws:
+    name: ${ "AWS " + (.ENV // "Development") }
+    description: ${ if .ENV == "prod" then "Production AWS Environment" else "Development AWS Environment" end }
+    provider: aws
+    enabled: true
+    config:
+      region: ${ .AWS_REGION // "us-east-1" }
+      account_id: ${ .AWS_ACCOUNT_ID }
+      role_arn: ${ "arn:aws:iam::" + .AWS_ACCOUNT_ID + ":role/" + (.AWS_ROLE // "ThandAgentRole") }
+      session_duration: ${ if .ENV == "prod" then "3600" else "7200" end }
+```
+
+#### Conditional Notification Provider
+
+```yaml
+providers:
+  notifications:
+    name: Notifications
+    provider: ${ if .NOTIFICATION_TYPE == "slack" then "slack" else "email" end }
+    config:
+      # Slack configuration
+      webhook_url: ${ .SLACK_WEBHOOK_URL // null }
+      channel: ${ .SLACK_CHANNEL // "#alerts" }
+      
+      # Email configuration (used when NOTIFICATION_TYPE != "slack")
+      smtp_host: ${ .SMTP_HOST // "smtp.example.com" }
+      smtp_port: ${ .SMTP_PORT // "587" }
+      from_address: ${ .EMAIL_FROM // "noreply@example.com" }
+```
+
+### Environment Variable Setup
+
+Set environment variables before running the agent:
+
+```bash
+# Linux/macOS
+export MODE=prod
+export AWS_REGION=us-east-1
+export AWS_ACCOUNT_ID=123456789012
+
+# Or inline with the command
+MODE=prod AWS_REGION=us-east-1 thand-agent start
+```
+
+```powershell
+# Windows PowerShell
+$env:MODE = "prod"
+$env:AWS_REGION = "us-east-1"
+$env:AWS_ACCOUNT_ID = "123456789012"
+```
+
+### Available jq Features
+
+The configuration resolver supports standard jq syntax including:
+
+| Feature | Example | Description |
+|---------|---------|-------------|
+| Field access | `.FIELD_NAME` | Access a field value |
+| Nested access | `.parent.child` | Access nested fields |
+| Alternative | `.VAR // "default"` | Provide default if null |
+| Conditionals | `if .X == "y" then "a" else "b" end` | Conditional logic |
+| String concat | `"prefix" + .VAR + "suffix"` | Concatenate strings |
+| Comparison | `.VAR == "value"` | Equality comparison |
+| Boolean ops | `.A and .B`, `.A or .B` | Logical operations |
+
 ## Getting Started
 
 1. **Choose Your Providers**: Select providers based on your infrastructure and requirements
