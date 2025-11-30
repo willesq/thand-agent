@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -13,10 +14,16 @@ func (p *awsProvider) AuthorizeRole(
 	req *models.AuthorizeRoleRequest,
 ) (*models.AuthorizeRoleResponse, error) {
 
-	// Check for nil inputs
+	// Check for nil inputs first to avoid nil pointer dereference
 	if !req.IsValid() {
 		return nil, fmt.Errorf("user and role must be provided to authorize aws role")
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"req_user_email":    req.User.Email,
+		"req_user_source":   req.User.Source,
+		"req_user_username": req.User.Username,
+	}).Info("AWS AuthorizeRole called")
 
 	// Determine if we should use IAM Identity Center or traditional IAM
 	// For now, detect based on the user's source or configuration
@@ -71,7 +78,14 @@ func (p *awsProvider) GetAuthorizedAccessUrl(
 func (p *awsProvider) shouldUseIdentityCenter(user *models.User) bool {
 	// For now, assume Identity Center if user source suggests SSO
 	// You could also check for specific configuration flags
-	return user.Source != "" && user.Source != "iam"
+	useIC := user.Source != "" && user.Source != "iam"
+	logrus.WithFields(logrus.Fields{
+		"user_source":         user.Source,
+		"user_email":          user.Email,
+		"user_username":       user.Username,
+		"use_identity_center": useIC,
+	}).Info("Determining whether to use Identity Center")
+	return useIC
 }
 
 // PolicyDocument represents an IAM policy document

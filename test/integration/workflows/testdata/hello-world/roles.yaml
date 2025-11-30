@@ -1,0 +1,20 @@
+version: "1.0"
+roles:
+  # Simple test role for hello world workflow
+  test-role:
+    name: Test Role
+    description: A simple test role for hello world workflow testing
+    authenticators:
+      - test_auth
+    workflows:
+      - hello_world
+    # Inherit AdministratorAccess policy - this is what grants the permissions
+    inherits:
+      - arn:aws:iam::aws:policy/AdministratorAccess
+    scopes:
+      users:
+        - test@example.com
+    providers:
+      - aws-test
+      - email-test
+    enabled: true

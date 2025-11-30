@@ -59,6 +59,15 @@ func (t *thandTask) executeApprovalsTask(
 	var approvalsTask ApprovalsTask
 	err = common.ConvertInterfaceToInterface(call.With, &approvalsTask)
 
+	// Debug logging for integration test
+	logrus.WithFields(logrus.Fields{
+		"taskName":       taskName,
+		"callWith":       fmt.Sprintf("%+v", call.With),
+		"approvalsTask":  fmt.Sprintf("%+v", approvalsTask),
+		"hasNotifiers":   approvalsTask.HasNotifiers(),
+		"notifiersCount": len(approvalsTask.Notifiers),
+	}).Info("Parsed approvals task")
+
 	if err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"taskName": taskName,
@@ -349,6 +358,11 @@ func (t *thandTask) makeApprovalNotifications(
 
 		// Get recipients for this notifier
 		recipients := approvalNotifier.GetRecipients()
+
+		logrus.WithFields(logrus.Fields{
+			"providerKey": providerKey,
+			"recipients":  recipients,
+		}).Info("Processing approval notifier")
 
 		// Build notification tasks for each recipient
 		for _, recipient := range recipients {

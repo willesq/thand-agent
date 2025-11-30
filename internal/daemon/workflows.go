@@ -229,7 +229,7 @@ func (s *Server) cancelRunningWorkflow(c *gin.Context) {
 
 	// Check if the workflow is owned by the user
 
-	ownerEmail, foundUser := workflowRun.TypedSearchAttributes.GetString(models.TypedSearchAttributeUser)
+	ownerEmail, foundUser := workflowRun.TypedSearchAttributes.GetKeyword(models.TypedSearchAttributeUser)
 
 	if !foundUser {
 		s.getErrorPage(c, http.StatusForbidden, "Unable to determine owner of workflow", nil)

@@ -132,12 +132,11 @@ func (t *thandTask) executeRevocationTask(
 				}
 			}
 
+			user := t.resolveUserFromIdentity(identity)
+
 			revokeReq := models.RevokeRoleRequest{
 				RoleRequest: &models.RoleRequest{
-					User: &models.User{
-						Email:  identity,
-						Source: "thand",
-					},
+					User:     user,
 					Role:     elevateRequest.Role,
 					Duration: &duration,
 				},
