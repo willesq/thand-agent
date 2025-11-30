@@ -103,7 +103,11 @@ func (c *Config) GetProviders() ProviderConfig {
 func (c *Config) GetServices() models.ServicesClientImpl {
 
 	c.initializeServiceClientOnce.Do(func() {
-		newClient := services.NewServicesClient(&c.Environment, &c.Services)
+		newClient := services.NewServicesClient(
+			&c.Environment,
+			&c.Services,
+			&c.Secret,
+		)
 		err := newClient.Initialize()
 		if err != nil {
 			logrus.WithError(err).Fatalf("Failed to initialize services client: %v", err)
@@ -293,6 +297,10 @@ type RoleConfig struct {
 
 func (r *RoleConfig) GetRoleByName(name string) (*models.Role, error) {
 	if role, exists := r.Definitions[name]; exists {
+		// Ensure the role has a name (use the key if not set)
+		if len(role.Name) == 0 {
+			role.Name = name
+		}
 		return &role, nil
 	}
 	return nil, fmt.Errorf("role not found: %s", name)
@@ -393,13 +401,13 @@ func (c *Config) DiscoverLoginServerApiUrl() string {
 
 	baseUrl := c.GetLoginServerUrl()
 
-	healthCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", baseUrl)
+	discoveryCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", baseUrl)
 	defaultUrl := fmt.Sprintf("%s/api/v1", baseUrl)
 
 	client := resty.New()
 	res, err := client.R().
 		EnableTrace().
-		Get(healthCheckUrl)
+		Get(discoveryCheckUrl)
 
 	if err != nil {
 		return defaultUrl
@@ -410,16 +418,15 @@ func (c *Config) DiscoverLoginServerApiUrl() string {
 	}
 
 	// Get the path field in the JSON response this is our API path
-	var healthCheckResponse struct {
+	var discoveryCheckResponse struct {
 		ApiBasePath string `json:"apiBasePath"`
 	}
 
-	if err := json.Unmarshal(res.Body(), &healthCheckResponse); err != nil {
+	if err := json.Unmarshal(res.Body(), &discoveryCheckResponse); err != nil {
 		return defaultUrl
 	}
 
-	trimPath := strings.TrimSuffix(strings.TrimPrefix(healthCheckResponse.ApiBasePath, "/"), "/")
-
+	trimPath := strings.TrimSuffix(strings.TrimPrefix(discoveryCheckResponse.ApiBasePath, "/"), "/")
 	return fmt.Sprintf("%s/%s", c.GetLoginServerUrl(), trimPath)
 }
 

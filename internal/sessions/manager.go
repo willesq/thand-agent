@@ -3,7 +3,6 @@ package sessions
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -142,15 +141,18 @@ func (m *SessionManager) GetLoginServer(loginServer string) (*LoginServer, error
 	return &server, nil
 }
 
-func (m *SessionManager) AwaitRefresh(loginServer string) *LoginServer {
+func (m *SessionManager) AwaitRefresh(ctx context.Context, loginServer string) *LoginServer {
 
 	logrus.WithFields(logrus.Fields{
 		"loginServer": loginServer,
 	}).Debugln("Awaiting refresh for login server")
 
-	// provide a context deadline to try and reload the sessions
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// Add a timeout to the provided context if it doesn't have a deadline
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+	}
 
 	lastLoginServer, _ := m.GetLoginServer(loginServer)
 
@@ -187,11 +189,14 @@ func (m *SessionManager) AwaitRefresh(loginServer string) *LoginServer {
 
 }
 
-func (m *SessionManager) AwaitProviderRefresh(loginServer string, provider string) error {
+func (m *SessionManager) AwaitProviderRefresh(ctx context.Context, loginServer string, provider string) *time.Time {
 
-	// provide a context deadline to try and reload the sessions
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// Add a timeout to the provided context if it doesn't have a deadline
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+	}
 
 	lastTimestamp := m.GetLastTimestamp(loginServer, provider)
 
@@ -218,11 +223,11 @@ func (m *SessionManager) AwaitProviderRefresh(loginServer string, provider strin
 		}).Debugln("Validating session")
 
 		if lastTimestamp == nil && currentTimestamp != nil {
-			return nil
+			return currentTimestamp
 		} else if lastTimestamp != nil &&
 			currentTimestamp != nil &&
 			lastTimestamp.UTC().Before(currentTimestamp.UTC()) {
-			return nil
+			return currentTimestamp
 		}
 	}
 }
@@ -350,7 +355,7 @@ func loadSessionFile(logonServerHostName string) *os.File {
 	// Get the user's home directory
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatalf("Failed to get current user: %v", err)
+		logrus.Fatalf("Failed to get current user: %v", err)
 	}
 
 	// Expand the session manager path to use the actual home directory
@@ -361,7 +366,7 @@ func loadSessionFile(logonServerHostName string) *os.File {
 	if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
 		err := os.MkdirAll(sessionPath, os.ModePerm)
 		if err != nil {
-			log.Fatalf("Failed to create session manager directory: %v", err)
+			logrus.Fatalf("Failed to create session manager directory: %v", err)
 		}
 	}
 
@@ -371,7 +376,7 @@ func loadSessionFile(logonServerHostName string) *os.File {
 	file, err := os.OpenFile(
 		filepath.Join(sessionPath, logonServer), os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
-		log.Fatalf("Failed to open session manager file: %v", err)
+		logrus.Fatalf("Failed to open session manager file: %v", err)
 	}
 	return file
 }

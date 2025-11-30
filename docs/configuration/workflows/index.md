@@ -580,10 +580,10 @@ Use workflow testing:
 
 ```bash
 # Test workflow execution
-agent workflow test --workflow approval --input request.json
+thand workflow test --workflow approval --input request.json
 
 # Validate workflow syntax
-agent workflow validate --file workflows.yaml
+thand workflow validate --file workflows.yaml
 ```
 
 ## Best Practices

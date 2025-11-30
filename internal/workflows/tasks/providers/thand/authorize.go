@@ -151,13 +151,11 @@ func (t *thandTask) executeAuthorization(
 		maps.Copy(modelOutput, validateOutput)
 
 		for _, identity := range elevateRequest.Identities {
+			user := t.resolveUserFromIdentity(identity)
 
 			authReq := models.AuthorizeRoleRequest{
 				RoleRequest: &models.RoleRequest{
-					User: &models.User{
-						Email:  identity,
-						Source: "thand",
-					},
+					User:     user,
 					Role:     elevateRequest.Role,
 					Duration: &duration,
 				},
@@ -177,6 +175,8 @@ func (t *thandTask) executeAuthorization(
 
 			log.WithFields(models.Fields{
 				"user":     authReq.User.GetIdentity(),
+				"source":   authReq.User.Source,
+				"username": authReq.User.Username,
 				"role":     authReq.Role.GetName(),
 				"provider": providerName,
 				"duration": duration,

@@ -309,13 +309,13 @@ func (s *Server) getFormDataFromWorkflow(c *gin.Context, workflowID string) (*Fo
 	}
 
 	// Get workflow name from search attributes
-	workflowName, found := workflowRun.TypedSearchAttributes.GetString(models.TypedSearchAttributeWorkflow)
+	workflowName, found := workflowRun.TypedSearchAttributes.GetKeyword(models.TypedSearchAttributeWorkflow)
 	if !found || len(workflowName) == 0 {
 		return nil, fmt.Errorf("workflow name not found in search attributes")
 	}
 
 	// Get current task from search attributes
-	currentTask, found := workflowRun.TypedSearchAttributes.GetString(models.TypedSearchAttributeTask)
+	currentTask, found := workflowRun.TypedSearchAttributes.GetKeyword(models.TypedSearchAttributeTask)
 	if !found || len(currentTask) == 0 {
 		return nil, fmt.Errorf("no active task in workflow")
 	}

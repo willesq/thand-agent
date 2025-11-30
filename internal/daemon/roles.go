@@ -10,6 +10,17 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// EvaluateRoleRequest represents the request body for POST /roles/evaluate
+type EvaluateRoleRequest struct {
+	Role     string `json:"role" binding:"required"`     // Role name to evaluate
+	Identity string `json:"identity" binding:"required"` // Identity ID to evaluate against
+}
+
+// EvaluateRoleResponse represents the response for POST /roles/evaluate
+type EvaluateRoleResponse struct {
+	Role *models.Role `json:"role"` // The evaluated composite role
+}
+
 // getRoles handles GET /api/v1/roles
 //
 //	@Summary		List roles
@@ -128,4 +139,82 @@ func (s *Server) getRoleByName(c *gin.Context) {
 
 func (s *Server) getRolesPage(c *gin.Context) {
 	s.getRoles(c)
+}
+
+// postEvaluateRole handles POST /api/v1/roles/evaluate
+//
+//	@Summary		Evaluate composite role
+//	@Description	Evaluate a role against an identity to get the composite role with all inherited permissions resolved
+//	@Tags			roles
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		EvaluateRoleRequest		true	"Role evaluation request"
+//	@Success		200		{object}	EvaluateRoleResponse	"Evaluated composite role"
+//	@Failure		400		{object}	map[string]any			"Bad request"
+//	@Failure		401		{object}	map[string]any			"Unauthorized"
+//	@Failure		404		{object}	map[string]any			"Role or identity not found"
+//	@Failure		500		{object}	map[string]any			"Internal server error"
+//	@Router			/roles/evaluate [post]
+//	@Security		BearerAuth
+func (s *Server) postEvaluateRole(c *gin.Context) {
+	var request EvaluateRoleRequest
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		s.getErrorPage(c, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+
+	// Get the authenticated user
+	_, session, err := s.getUser(c)
+	if err != nil {
+		s.getErrorPage(c, http.StatusUnauthorized, "Unauthorized", err)
+		return
+	}
+
+	// Get the base role by name
+	baseRole, err := s.Config.GetRoleByName(request.Role)
+	if err != nil {
+		s.getErrorPage(c, http.StatusNotFound, "Role not found", err)
+		return
+	}
+
+	// Look up the identity from available identities
+	identity, err := s.findIdentityByID(session.User, request.Identity)
+	if err != nil {
+		s.getErrorPage(c, http.StatusNotFound, "Identity not found", err)
+		return
+	}
+
+	// Evaluate the composite role
+	compositeRole, err := s.Config.GetCompositeRole(identity, baseRole)
+	if err != nil {
+		s.getErrorPage(c, http.StatusInternalServerError, "Failed to evaluate composite role", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, EvaluateRoleResponse{
+		Role: compositeRole,
+	})
+}
+
+// findIdentityByID looks up an identity by its ID from available identity sources
+func (s *Server) findIdentityByID(user *models.User, identityID string) (*models.Identity, error) {
+	// Get identities from all providers for this user
+	identities, err := s.Config.GetIdentitiesWithFilter(user, config.IdentityTypeAll)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, identity := range identities {
+		if identity.ID == identityID {
+			return &identity, nil
+		}
+	}
+
+	// If no exact match found, create a basic identity with just the ID
+	// This allows evaluation for identities that may not be in the system yet
+	return &models.Identity{
+		ID:    identityID,
+		Label: identityID,
+	}, nil
 }

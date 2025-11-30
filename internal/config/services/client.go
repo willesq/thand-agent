@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config/services/temporal"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -11,6 +12,7 @@ import (
 type localClient struct {
 	environment *models.EnvironmentConfig
 	config      *models.ServicesConfig
+	secret      *string
 
 	encrypt   models.EncryptionImpl
 	vault     models.VaultImpl
@@ -22,10 +24,12 @@ type localClient struct {
 func NewServicesClient(
 	environment *models.EnvironmentConfig,
 	config *models.ServicesConfig,
+	secret *string,
 ) *localClient {
 	return &localClient{
 		environment: environment,
 		config:      config,
+		secret:      secret,
 	}
 }
 
@@ -35,6 +39,13 @@ func (e *localClient) GetServicesConfig() *models.ServicesConfig {
 
 func (e *localClient) GetEnvironmentConfig() *models.EnvironmentConfig {
 	return e.environment
+}
+
+func (e *localClient) GetSecret() string {
+	if e.secret == nil {
+		return common.DefaultServerSecret
+	}
+	return *e.secret
 }
 
 func (e *localClient) Initialize() error {

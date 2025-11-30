@@ -347,6 +347,8 @@ func TestCondensedActionParsing(t *testing.T) {
 					"s3:listBuckets",
 					"s3:getBucketLocation",
 				},
+				// Wildcards subsume specific permissions for the same resource
+				// s3 permissions are condensed since they have no wildcard
 				expected: []string{
 					"ec2:*",
 					"rds:*",
@@ -363,6 +365,358 @@ func TestCondensedActionParsing(t *testing.T) {
 				assert.ElementsMatch(t, tc.expected, result)
 			})
 		}
+	})
+}
+
+// TestIsCondensablePermission tests the helper function that determines
+// whether a permission uses condensable colon-separated actions
+func TestIsCondensablePermission(t *testing.T) {
+	testCases := []struct {
+		name       string
+		permission string
+		expected   bool
+	}{
+		// K8s-style permissions (condensable)
+		{
+			name:       "k8s simple action",
+			permission: "k8s:pods:get",
+			expected:   true,
+		},
+		{
+			name:       "k8s with namespace path",
+			permission: "k8s:apps/deployments:list",
+			expected:   true,
+		},
+		{
+			name:       "k8s condensed actions",
+			permission: "k8s:pods:get,list,watch",
+			expected:   true,
+		},
+		// GCP-style permissions (NOT condensable - last segment has dots)
+		{
+			name:       "gcp simple permission",
+			permission: "gcp-prod:accessapproval.requests.approve",
+			expected:   false,
+		},
+		{
+			name:       "gcp compute permission",
+			permission: "gcp-prod:compute.instances.start",
+			expected:   false,
+		},
+		{
+			name:       "gcp storage permission",
+			permission: "gcp-prod:storage.buckets.list",
+			expected:   false,
+		},
+		{
+			name:       "gcp iam permission",
+			permission: "gcp:iam.serviceAccounts.actAs",
+			expected:   false,
+		},
+		// AWS-style permissions (condensable - no dots in action)
+		{
+			name:       "aws_ec2_permission",
+			permission: "ec2:DescribeInstances",
+			expected:   true,
+		},
+		{
+			name:       "aws_s3_permission",
+			permission: "s3:GetObject",
+			expected:   true,
+		},
+		{
+			name:       "aws_wildcard",
+			permission: "ec2:*",
+			expected:   true,
+		},
+		// Edge cases
+		{
+			name:       "no colon at all",
+			permission: "somePermission",
+			expected:   false,
+		},
+		{
+			name:       "single_colon_only",
+			permission: "resource:action",
+			expected:   true, // simple action without dots is condensable
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isCondensablePermission(tc.permission)
+			assert.Equal(t, tc.expected, result, "permission: %s", tc.permission)
+		})
+	}
+}
+
+// TestGCPStylePermissionHandling tests that GCP-style permissions are
+// treated as atomic and not incorrectly condensed or expanded
+func TestGCPStylePermissionHandling(t *testing.T) {
+	t.Run("expand does not modify GCP permissions", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			input    string
+			expected []string
+		}{
+			{
+				name:     "gcp accessapproval permission",
+				input:    "gcp-prod:accessapproval.requests.approve",
+				expected: []string{"gcp-prod:accessapproval.requests.approve"},
+			},
+			{
+				name:     "gcp compute permission",
+				input:    "gcp-prod:compute.instances.start",
+				expected: []string{"gcp-prod:compute.instances.start"},
+			},
+			{
+				name:     "gcp storage permission",
+				input:    "gcp:storage.buckets.list",
+				expected: []string{"gcp:storage.buckets.list"},
+			},
+			{
+				name:     "gcp iam permission",
+				input:    "gcp:iam.serviceAccounts.actAs",
+				expected: []string{"gcp:iam.serviceAccounts.actAs"},
+			},
+			{
+				name:     "gcp permission with dots that could look like condensed",
+				input:    "gcp-prod:pubsub.topics.publish",
+				expected: []string{"gcp-prod:pubsub.topics.publish"},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				result := expandCondensedActions(tc.input)
+				assert.Equal(t, tc.expected, result)
+			})
+		}
+	})
+
+	t.Run("condense keeps GCP permissions atomic", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			input    []string
+			expected []string
+		}{
+			{
+				name: "multiple GCP permissions same service",
+				input: []string{
+					"gcp-prod:compute.instances.start",
+					"gcp-prod:compute.instances.stop",
+					"gcp-prod:compute.instances.list",
+				},
+				expected: []string{
+					"gcp-prod:compute.instances.list",
+					"gcp-prod:compute.instances.start",
+					"gcp-prod:compute.instances.stop",
+				},
+			},
+			{
+				name: "mixed GCP and k8s permissions",
+				input: []string{
+					"gcp-prod:compute.instances.start",
+					"gcp-prod:compute.instances.stop",
+					"k8s:pods:get",
+					"k8s:pods:list",
+					"k8s:pods:watch",
+				},
+				expected: []string{
+					"gcp-prod:compute.instances.start",
+					"gcp-prod:compute.instances.stop",
+					"k8s:pods:get,list,watch",
+				},
+			},
+			{
+				name: "GCP permissions different services",
+				input: []string{
+					"gcp:storage.buckets.list",
+					"gcp:storage.objects.get",
+					"gcp:compute.instances.list",
+					"gcp:iam.serviceAccounts.actAs",
+				},
+				expected: []string{
+					"gcp:compute.instances.list",
+					"gcp:iam.serviceAccounts.actAs",
+					"gcp:storage.buckets.list",
+					"gcp:storage.objects.get",
+				},
+			},
+			{
+				name: "GCP wildcard subsumes GCP permissions",
+				input: []string{
+					"gcp-prod:*",
+					"gcp-prod:compute.instances.start",
+					"gcp-prod:compute.instances.stop",
+					"gcp-prod:storage.buckets.list",
+				},
+				// gcp-prod:* subsumes all gcp-prod: permissions
+				expected: []string{
+					"gcp-prod:*",
+				},
+			},
+			{
+				name: "mixed wildcards subsume their respective permissions",
+				input: []string{
+					"ec2:*",
+					"ec2:DescribeInstances",
+					"s3:GetObject",
+					"gcp-prod:*",
+					"gcp-prod:compute.instances.list",
+					"k8s:pods:get",
+					"k8s:pods:list",
+				},
+				// ec2:* subsumes ec2:DescribeInstances, gcp-prod:* subsumes gcp-prod:compute.instances.list
+				expected: []string{
+					"ec2:*",
+					"gcp-prod:*",
+					"k8s:pods:get,list",
+					"s3:GetObject",
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				result := condenseActions(tc.input)
+				sort.Strings(result)
+				sort.Strings(tc.expected)
+				assert.ElementsMatch(t, tc.expected, result)
+			})
+		}
+	})
+
+	t.Run("role composition preserves GCP permissions", func(t *testing.T) {
+		roles := map[string]models.Role{
+			"gcp-viewer": {
+				Name: "GCP Viewer",
+				Permissions: models.Permissions{
+					Allow: []string{
+						"gcp-prod:compute.instances.list",
+						"gcp-prod:compute.instances.get",
+						"gcp-prod:storage.buckets.list",
+					},
+				},
+				Enabled: true,
+			},
+			"gcp-admin": {
+				Name:     "GCP Admin",
+				Inherits: []string{"gcp-viewer"},
+				Permissions: models.Permissions{
+					Allow: []string{
+						"gcp-prod:compute.instances.start",
+						"gcp-prod:compute.instances.stop",
+						"gcp-prod:storage.buckets.create",
+					},
+				},
+				Enabled: true,
+			},
+		}
+
+		config := &Config{
+			Roles: RoleConfig{
+				Definitions: roles,
+			},
+		}
+
+		identity := &models.Identity{
+			ID: "gcp-admin-user",
+			User: &models.User{
+				Username: "gcpadmin",
+				Email:    "admin@example.com",
+			},
+		}
+
+		result, err := config.GetCompositeRoleByName(identity, "gcp-admin")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		// All GCP permissions should remain as individual entries, not condensed
+		expectedPermissions := []string{
+			"gcp-prod:compute.instances.get",
+			"gcp-prod:compute.instances.list",
+			"gcp-prod:compute.instances.start",
+			"gcp-prod:compute.instances.stop",
+			"gcp-prod:storage.buckets.create",
+			"gcp-prod:storage.buckets.list",
+		}
+
+		sort.Strings(result.Permissions.Allow)
+		sort.Strings(expectedPermissions)
+
+		assert.ElementsMatch(t, expectedPermissions, result.Permissions.Allow,
+			"GCP permissions should remain atomic and not be condensed")
+	})
+
+	t.Run("mixed provider permissions handled correctly", func(t *testing.T) {
+		roles := map[string]models.Role{
+			"multi-cloud": {
+				Name: "Multi-Cloud Access",
+				Permissions: models.Permissions{
+					Allow: []string{
+						// GCP permissions (should stay atomic - dots in action)
+						"gcp-prod:compute.instances.list",
+						"gcp-prod:compute.instances.get",
+						// K8s permissions (should be condensed)
+						"k8s:pods:get",
+						"k8s:pods:list",
+						"k8s:pods:watch",
+						// AWS permissions (should be condensed - no dots in action)
+						"ec2:DescribeInstances",
+						"ec2:StartInstances",
+						"s3:GetObject",
+					},
+				},
+				Enabled: true,
+			},
+		}
+
+		config := &Config{
+			Roles: RoleConfig{
+				Definitions: roles,
+			},
+		}
+
+		identity := &models.Identity{
+			ID: "multi-cloud-user",
+			User: &models.User{
+				Username: "multicloud",
+				Email:    "user@example.com",
+			},
+		}
+
+		result, err := config.GetCompositeRoleByName(identity, "multi-cloud")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		// Verify GCP permissions are atomic
+		assert.Contains(t, result.Permissions.Allow, "gcp-prod:compute.instances.list")
+		assert.Contains(t, result.Permissions.Allow, "gcp-prod:compute.instances.get")
+
+		// Verify K8s permissions are condensed
+		hasCondensedK8s := false
+		for _, perm := range result.Permissions.Allow {
+			if perm == "k8s:pods:get,list,watch" {
+				hasCondensedK8s = true
+				break
+			}
+		}
+		assert.True(t, hasCondensedK8s, "K8s permissions should be condensed: got %v", result.Permissions.Allow)
+
+		// Verify AWS permissions are present (condensed or not based on implementation)
+		hasEC2 := false
+		hasS3 := false
+		for _, perm := range result.Permissions.Allow {
+			if perm == "ec2:DescribeInstances,StartInstances" || perm == "ec2:DescribeInstances" || perm == "ec2:StartInstances" {
+				hasEC2 = true
+			}
+			if perm == "s3:GetObject" {
+				hasS3 = true
+			}
+		}
+		assert.True(t, hasEC2, "EC2 permissions should be present: got %v", result.Permissions.Allow)
+		assert.True(t, hasS3, "S3 permissions should be present: got %v", result.Permissions.Allow)
 	})
 }
 

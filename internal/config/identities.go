@@ -19,6 +19,129 @@ const (
 
 type IdentityType string
 
+// GetIdentity looks up an identity by its identifier.
+// The identity string can optionally include a provider prefix (e.g., "aws-prod:username").
+// If a prefix is provided, it queries only that specific provider.
+// Otherwise, it queries all identity providers and returns the first match.
+func (c *Config) GetIdentity(identity string) (*models.Identity, error) {
+	ctx := context.Background()
+
+	// Check if the identity has a provider prefix (e.g., "aws-prod:username")
+	var providerID string
+	var identityKey string
+
+	if colonIdx := strings.Index(identity, ":"); colonIdx != -1 {
+		// Has provider prefix
+		providerID = identity[:colonIdx]
+		identityKey = identity[colonIdx+1:]
+	} else {
+		// No prefix, use the full identity
+		identityKey = identity
+	}
+
+	// If we have a specific provider, query only that one
+	if providerID != "" {
+		provider, err := c.GetProviderByName(providerID)
+		if err != nil {
+			return nil, fmt.Errorf("provider '%s' not found: %w", providerID, err)
+		}
+
+		result, err := provider.GetClient().GetIdentity(ctx, identityKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get identity '%s' from provider '%s': %w", identityKey, providerID, err)
+		}
+
+		return result, nil
+	}
+
+	// No provider prefix - query all identity providers
+	providerMap := c.GetProvidersByCapability(models.ProviderCapabilityIdentities)
+
+	if len(providerMap) == 0 {
+		// No identity providers, create a basic identity from the string
+		// Extract username from email if possible
+		username := ""
+		if atIdx := strings.Index(identity, "@"); atIdx > 0 {
+			username = identity[:atIdx]
+		}
+		return &models.Identity{
+			ID:    identity,
+			Label: identity,
+			User: &models.User{
+				Email:    identity,
+				Username: username,
+				Source:   "", // Empty source means use traditional IAM, not Identity Center
+			},
+		}, nil
+	}
+
+	// Query all providers in parallel and return the first match
+	var wg sync.WaitGroup
+	resultChan := make(chan *models.Identity, len(providerMap))
+	doneChan := make(chan struct{})
+
+	for _, provider := range providerMap {
+		wg.Add(1)
+		go func(p models.Provider) {
+			defer wg.Done()
+
+			result, err := p.GetClient().GetIdentity(ctx, identityKey)
+			if err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"provider": p.Name,
+					"identity": identityKey,
+				}).Debug("Failed to get identity from provider")
+				return
+			}
+
+			if result != nil {
+				select {
+				case resultChan <- result:
+				case <-doneChan:
+					// Another goroutine already found a result
+				}
+			}
+		}(provider)
+	}
+
+	// Wait for all goroutines in a separate goroutine
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Create a channel that will be closed when all goroutines are done
+	wgDoneChan := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(wgDoneChan)
+	}()
+
+	// Return the first result we get
+	select {
+	case result := <-resultChan:
+		close(doneChan)
+		return result, nil
+	case <-wgDoneChan:
+		// All goroutines finished without finding a result
+		// Return a basic identity
+		// Extract username from email if possible
+		username := ""
+		if atIdx := strings.Index(identityKey, "@"); atIdx > 0 {
+			username = identityKey[:atIdx]
+		}
+		return &models.Identity{
+			ID:    identity,
+			Label: identity,
+			User: &models.User{
+				Email:    identity,
+				Username: username,
+				Source:   "", // Empty source means use traditional IAM, not Identity Center
+			},
+		}, nil
+	}
+}
+
 func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType IdentityType, filter ...string) ([]models.Identity, error) {
 
 	// Find providers with identity capabilities

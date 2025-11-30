@@ -1,10 +1,10 @@
 package agent
 
 import (
-	"log"
 	"os"
 
 	"github.com/kardianos/service"
+	"github.com/sirupsen/logrus"
 	config "github.com/thand-io/agent/internal/config"
 )
 
@@ -15,7 +15,7 @@ type ServiceProgram struct {
 }
 
 func (p *ServiceProgram) Start(s service.Service) error {
-	log.Println("Thand Agent service starting")
+	logrus.Infoln("Thand Agent service starting")
 	go p.run()
 	return nil
 }
@@ -25,15 +25,15 @@ func (p *ServiceProgram) run() {
 	_, err := StartWebService(p.config)
 
 	if err != nil {
-		log.Printf("Failed to start web service: %v", err)
+		logrus.WithError(err).Errorf("Failed to start web service")
 		return
 	}
 
-	log.Println("Thand Agent service is running")
+	logrus.Infoln("Thand Agent service is running")
 }
 
 func (p *ServiceProgram) Stop(s service.Service) error {
-	log.Println("Thand Agent service stopping")
+	logrus.Infoln("Thand Agent service stopping")
 	close(p.exit)
 	return nil
 }
@@ -55,7 +55,7 @@ func getServiceConfig() *service.Config {
 	exePath, err := os.Executable()
 
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	return &service.Config{

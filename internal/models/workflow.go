@@ -92,12 +92,14 @@ type WorkflowExecutionInfo struct {
 	History []string `json:"history,omitempty"` // History of state transitions
 
 	// SearchAttributes are the custom search attributes associated with the workflow
-	Workflow   string   `json:"name"` // workflowName
-	Role       string   `json:"role"`
-	User       string   `json:"user"`
-	Reason     string   `json:"reason,omitempty"`
-	Duration   int64    `json:"duration,omitempty"` // Duration in seconds
-	Approved   *bool    `json:"approved"`           // nil = pending approval, true = approved, false = denied
+	Workflow string `json:"name"` // workflowName
+	Role     string `json:"role"`
+	User     string `json:"user"`
+	Reason   string `json:"reason,omitempty"`
+	Duration int64  `json:"duration,omitempty"` // Duration in seconds
+	Approved *bool  `json:"approved"`           // nil = pending approval, true = approved, false = denied
+
+	Providers  []string `json:"providers,omitempty"`
 	Identities []string `json:"identities,omitempty"`
 
 	// Context

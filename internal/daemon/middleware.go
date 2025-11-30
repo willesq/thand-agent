@@ -9,7 +9,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/config"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	sessionManager "github.com/thand-io/agent/internal/sessions"
 )
@@ -34,13 +34,13 @@ func (s *Server) SetupMiddleware() gin.HandlerFunc {
 		// Ok so we're running in server mode, check if the hostname
 		// has been configured
 
-		notDefaultLoginEndpoint := s.Config.GetLoginServerUrl() != config.DefaultLoginServerEndpoint
-		notDefaultSecret := s.Config.Secret != config.DefaultServerSecret
-		hasEncryption := s.Config.GetServices().HasEncryption()
+		notDefaultLoginEndpoint := s.Config.GetLoginServerUrl() != common.DefaultLoginServerEndpoint
+		notDefaultSecret := s.Config.Secret != common.DefaultServerSecret
+		hasEncryptionService := s.Config.GetServices().HasEncryption()
 
 		// If any configuration is missing, show setup page
 		// Make sure all these are true
-		if notDefaultLoginEndpoint && notDefaultSecret && hasEncryption {
+		if notDefaultLoginEndpoint && notDefaultSecret && hasEncryptionService {
 
 			// Server has been configured, continue
 
@@ -96,9 +96,27 @@ func (s *Server) processProviderCookies(
 	encryptionServer models.EncryptionImpl,
 	foundSessions map[string]*models.Session,
 ) {
-	allProviders := s.Config.GetProvidersByCapability(models.ProviderCapabilityAuthorizer)
+	// Get providers to check for cookies
+	providersToCheck := make(map[string]bool)
 
-	for providerName := range allProviders {
+	// Always check providers configured locally
+	for providerName := range s.Config.GetProvidersByCapability(models.ProviderCapabilityAuthorizer) {
+		providersToCheck[providerName] = true
+	}
+
+	// In agent/client mode, also check providers from the session manager
+	// This ensures we find cookies that were set from login server sessions
+	if s.Config.IsAgent() || s.Config.IsClient() {
+		sm := sessionManager.GetSessionManager()
+		loginServer, err := sm.GetLoginServer(s.Config.GetLoginServerHostname())
+		if err == nil {
+			for providerName := range loginServer.GetSessions() {
+				providersToCheck[providerName] = true
+			}
+		}
+	}
+
+	for providerName := range providersToCheck {
 
 		cookie := sessions.DefaultMany(c, CreateCookieName(providerName))
 
@@ -181,10 +199,22 @@ func (s *Server) handleAgentMode(c *gin.Context) {
 	loginServer, err := sm.GetLoginServer(s.Config.GetLoginServerHostname())
 	if err != nil {
 		logrus.WithError(err).Warnln("Failed to get login server for session")
+		c.Next()
 		return
 	}
 
 	agentSessions := loginServer.GetSessions()
+
+	// If no sessions available, just continue without redirect
+	if len(agentSessions) == 0 {
+		logrus.Debugln("No agent sessions available, continuing without redirect")
+		c.Next()
+		return
+	}
+
+	// Track if we actually set any new cookies
+	cookiesSet := false
+
 	for providerName, remoteSession := range agentSessions {
 
 		cookie := sessions.DefaultMany(c, CreateCookieName(providerName))
@@ -193,19 +223,37 @@ func (s *Server) handleAgentMode(c *gin.Context) {
 			continue
 		}
 
-		cookie.Set(ThandCookieAttributeSessionName, remoteSession.GetEncodedLocalSession())
+		// Check if the cookie already has the same session data to avoid redirect loops
+		existingSession, ok := cookie.Get(ThandCookieAttributeSessionName).(string)
+		newSession := remoteSession.GetEncodedLocalSession()
+
+		if ok && existingSession == newSession {
+			// Session already set, no need to redirect
+			continue
+		}
+
+		cookie.Set(ThandCookieAttributeSessionName, newSession)
 
 		err = cookie.Save()
 
 		if err != nil {
 			logrus.WithError(err).Warnln("Failed to save session cookie")
+			c.Next()
 			return
 		}
 
+		cookiesSet = true
 	}
 
-	// Redirect to reload the page with new cookies
-	c.Redirect(http.StatusTemporaryRedirect, c.Request.RequestURI)
+	// Only redirect if we actually set new cookies
+	if cookiesSet {
+		// Redirect to reload the page with new cookies
+		c.Redirect(http.StatusTemporaryRedirect, c.Request.RequestURI)
+		return
+	}
+
+	// No new cookies set, continue processing the request
+	c.Next()
 }
 
 func getDecodedSession(encryptor models.EncryptionImpl, session string) (*models.ExportableSession, error) {

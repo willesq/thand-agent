@@ -69,6 +69,7 @@ func (s *LocalSession) GetDecodedSession(decryptor EncryptionImpl) (*ExportableS
 }
 
 type SessionCreateRequest struct {
+	Code     string `json:"code" binding:"required"`     // Verification code
 	Provider string `json:"provider" binding:"required"` // Provider ID
 	Session  string `json:"session" binding:"required"`  // Encoded session token
 }

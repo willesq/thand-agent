@@ -24,8 +24,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -42,7 +42,7 @@ import (
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/manager"
-	"go.temporal.io/sdk/client"
+	"go.temporal.io/api/workflowservice/v1"
 )
 
 //go:embed static/*
@@ -259,15 +259,16 @@ func (s *Server) Start() error {
 
 func (s *Server) Stop() {
 	if s.server == nil {
+		logrus.Warning("Server is not running")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.server.Shutdown(ctx); err != nil {
-		log.Println("Server Shutdown:", err)
+		logrus.WithError(err).Error("Server Shutdown")
 	}
-	log.Println("Server exiting")
+	logrus.Info("Server exiting")
 }
 
 // requestCounterMiddleware increments the request counter
@@ -345,7 +346,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			loginServer := s.Config.GetLoginServerUrl()
 			callbackUrl := s.Config.GetLocalServerUrl()
 
-			if strings.Compare(loginServer, callbackUrl) == 0 {
+			if strings.EqualFold(callbackUrl, loginServer) {
 				s.getErrorPage(ctx,
 					http.StatusBadRequest,
 					"Invalid Configuration",
@@ -353,7 +354,29 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 				return
 			}
 
-			ctx.Redirect(http.StatusTemporaryRedirect, loginServer+"/auth?callback="+callbackUrl)
+			if !s.Config.GetServices().HasEncryption() {
+				s.getErrorPage(ctx,
+					http.StatusInternalServerError,
+					"Encryption service not configured",
+					fmt.Errorf("encryption service must be configured to create session codes"))
+				return
+			}
+
+			// Create a code to identify the session after authentication
+			// This code is encrypted and can only be used by the agent
+			sessionCode := models.EncodingWrapper{
+				Type: models.ENCODED_SESSION_CODE,
+				Data: models.NewCodeWrapper(loginServer),
+			}.EncodeAndEncrypt(
+				s.Config.GetServices().GetEncryption(),
+			)
+
+			params := url.Values{
+				"callback": {callbackUrl},
+				"code":     {sessionCode},
+			}
+
+			ctx.Redirect(http.StatusTemporaryRedirect, loginServer+"/auth?"+params.Encode())
 		})
 	}
 
@@ -393,6 +416,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 
 			// Server endpoints
 			api.GET("/roles", s.getRoles)
+			api.POST("/roles/evaluate", s.postEvaluateRole)
 			api.GET("/workflows", s.getWorkflows)
 			api.GET("/providers", s.getProviders)
 
@@ -456,8 +480,13 @@ func (s *Server) healthHandler(c *gin.Context) {
 	services := s.Config.GetServices()
 
 	if services.HasTemporal() {
-		_, err := services.GetTemporal().GetClient().CheckHealth(
-			c.Request.Context(), &client.CheckHealthRequest{})
+
+		// Use count rather than health check as temporal cloud
+		// does not support external health checks
+		_, err := services.GetTemporal().GetClient().CountWorkflow(
+			c.Request.Context(),
+			&workflowservice.CountWorkflowExecutionsRequest{},
+		)
 		if err != nil {
 
 			logrus.WithError(err).Error("Temporal service health check failed")

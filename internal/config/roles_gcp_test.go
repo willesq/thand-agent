@@ -73,8 +73,8 @@ func TestGCPRoles(t *testing.T) {
 			"iam.serviceAccounts.*",
 		}, result.Permissions.Allow)
 
-		// Verify resources
-		assert.ElementsMatch(t, []string{"gcp:*"}, result.Resources.Allow)
+		// Verify resources - gcp:* becomes * since gcp matches allowed providers
+		assert.ElementsMatch(t, []string{"*"}, result.Resources.Allow)
 
 		// Verify providers
 		assert.ElementsMatch(t, []string{"gcp-prod"}, result.Providers)

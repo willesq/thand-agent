@@ -140,6 +140,11 @@ func ValidateRole(
 	providerCall ProviderImpl,
 	elevateRequest ElevateRequestInternal,
 ) (map[string]any, error) {
+
+	if providerCall == nil {
+		return nil, fmt.Errorf("provider implementation is nil. Ensure the provider is initialized")
+	}
+
 	// Check the user has access to the required scopes etc
 
 	identity := Identity{
@@ -175,6 +180,11 @@ func ValidateRole(
 }
 
 func validateRole(provider ProviderImpl, _ *Identity, role *Role) error {
+
+	if provider == nil {
+		return fmt.Errorf("provider implementation is nil. Ensure the provider is initialized")
+	}
+
 	if err := validateRoleNotEmpty(role); err != nil {
 		return err
 	}
@@ -202,6 +212,11 @@ func validateRoleNotEmpty(role *Role) error {
 
 // validateRoleInheritance validates that all inherited roles exist in the provider
 func validateRoleInheritance(provider ProviderImpl, role *Role) error {
+
+	if provider == nil {
+		return fmt.Errorf("provider implementation is nil. Ensure the provider is initialized")
+	}
+
 	if len(role.Inherits) == 0 {
 		return nil
 	}
@@ -221,6 +236,11 @@ func validateRoleInheritance(provider ProviderImpl, role *Role) error {
 
 // validateInheritedRolesExist checks that all inherited roles exist in the provider
 func validateInheritedRolesExist(provider ProviderImpl, role *Role, providerRoles []ProviderRole) error {
+
+	if provider == nil {
+		return fmt.Errorf("provider implementation is nil. Ensure the provider is initialized")
+	}
+
 	for _, inherit := range role.Inherits {
 		if !strings.HasPrefix(inherit, fmt.Sprintf("%s:", provider.GetName())) {
 			// This is a local role, skip validation
@@ -240,6 +260,11 @@ func validateInheritedRolesExist(provider ProviderImpl, role *Role, providerRole
 
 // validateRolePermissions validates that role permissions exist in the provider
 func validateRolePermissions(provider ProviderImpl, role *Role) error {
+
+	if provider == nil {
+		return fmt.Errorf("provider implementation is nil. Ensure the provider is initialized")
+	}
+
 	if len(role.Permissions.Allow) == 0 && len(role.Permissions.Deny) == 0 {
 		return nil
 	}
@@ -259,6 +284,11 @@ func validateRolePermissions(provider ProviderImpl, role *Role) error {
 
 // validateRolePermissionLists validates both allow and deny permission lists
 func validateRolePermissionLists(role *Role, providerPermissions []ProviderPermission) error {
+
+	if role == nil {
+		return fmt.Errorf("role is nil")
+	}
+
 	var err error
 
 	role.Permissions.Allow, err = validatePermissions(providerPermissions, role.Permissions.Allow)

@@ -1,14 +1,18 @@
 package cli
 
 import (
-	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
+	"github.com/go-resty/resty/v2"
+	"github.com/serverlessworkflow/sdk-go/v3/model"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/thand-io/agent/internal/common"
-	"github.com/thand-io/agent/internal/models"
 )
 
 // Session manager to let users from the command line add and remove sessions
@@ -35,8 +39,99 @@ var sessionCmd = &cobra.Command{
 	},
 }
 
+// sessionRegisterCmd represents the session register command
+var sessionRegisterCmd = &cobra.Command{
+	Use:   "register",
+	Short: "Register a session from an encoded token",
+	Long: `Register a session by pasting an encoded session token.
+This allows you to import a session that was provided by another source.
+
+Example:
+  thand sessions register --provider thand`,
+	PreRunE: preRunClientConfigE,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runSessionRegister(cmd)
+	},
+}
+
+// sessionListCmd represents the session list command
+var sessionListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all active sessions",
+	Long: `Display all current authentication sessions with their status.
+
+Shows provider name, session status (active/expired), expiry time,
+and version information for each session.
+
+Example:
+  thand sessions list`,
+	PreRunE: preRunClientConfigE,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return listSessions()
+	},
+}
+
+// sessionCreateCmd represents the session create command
+var sessionCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a new authentication session",
+	Long: `Create a new authentication session for a provider.
+
+Guides you through selecting a provider and completing the
+authentication flow in your browser.
+
+Example:
+  thand sessions create`,
+	PreRunE: preRunServerE,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return createNewSession()
+	},
+}
+
+// sessionRemoveCmd represents the session remove command
+var sessionRemoveCmd = &cobra.Command{
+	Use:   "remove",
+	Short: "Remove an existing session",
+	Long: `Remove an authentication session for a provider.
+
+Displays a list of active sessions and prompts for confirmation
+before removing the selected session.
+
+Example:
+  thand sessions remove`,
+	PreRunE: preRunClientConfigE,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return removeSession()
+	},
+}
+
+// sessionRefreshCmd represents the session refresh command
+var sessionRefreshCmd = &cobra.Command{
+	Use:   "refresh",
+	Short: "Refresh an existing session",
+	Long: `Refresh or re-authenticate an existing session.
+
+Initiates the authentication flow again for the selected provider
+to obtain a new session token with extended expiry.
+
+Example:
+  thand sessions refresh`,
+	PreRunE: preRunServerE,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return refreshSession()
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(sessionCmd)
+	sessionCmd.AddCommand(sessionRegisterCmd)
+	sessionCmd.AddCommand(sessionListCmd)
+	sessionCmd.AddCommand(sessionCreateCmd)
+	sessionCmd.AddCommand(sessionRemoveCmd)
+	sessionCmd.AddCommand(sessionRefreshCmd)
+
+	// Add flags for register command
+	sessionRegisterCmd.Flags().String("provider", "", "Provider name (e.g., thand)")
 }
 
 // runInteractiveSessionManager starts the interactive session management interface
@@ -105,381 +200,6 @@ func promptForAction() (SessionAction, error) {
 	return SessionAction(action), nil
 }
 
-// listSessions displays all current sessions with their status
-func listSessions() error {
-	fmt.Println(headerStyle.Render("Current Sessions"))
-	fmt.Println()
-
-	// Reload sessions to get the latest state
-	if err := sessionManager.Load(cfg.GetLoginServerHostname()); err != nil {
-		return fmt.Errorf("failed to load sessions: %w", err)
-	}
-
-	loginServer, err := sessionManager.GetLoginServer(cfg.GetLoginServerHostname())
-
-	if err != nil {
-		return fmt.Errorf("failed to get sessions for logon server: %w", err)
-	}
-
-	sessions := loginServer.GetSessions()
-
-	if len(sessions) == 0 {
-		fmt.Println(infoStyle.Render("ℹ️  No active sessions found"))
-		return nil
-	}
-
-	currentTime := time.Now().UTC()
-
-	for provider, session := range sessions {
-		providerDisplay := headerStyle.Render(fmt.Sprintf("Provider: %s", provider))
-
-		var statusDisplay string
-		var expiryDisplay string
-
-		sessionExpiryTime := session.Expiry.UTC()
-		if sessionExpiryTime.Before(currentTime) {
-			statusDisplay = expiredStyle.Render("EXPIRED")
-			expiryDisplay = expiredStyle.Render(fmt.Sprintf("Expired: %s", session.Expiry.Format("2006-01-02 15:04:05")))
-		} else {
-			statusDisplay = activeStyle.Render("ACTIVE")
-			timeUntilExpiry := time.Until(session.Expiry)
-			expiryDisplay = activeStyle.Render(fmt.Sprintf("Expires: %s (%s)",
-				session.Expiry.Format("2006-01-02 15:04:05"),
-				formatDuration(timeUntilExpiry)))
-		}
-
-		versionDisplay := infoStyle.Render(fmt.Sprintf("Version: %d", session.Version))
-
-		fmt.Println(providerDisplay)
-		fmt.Println("  " + statusDisplay)
-		fmt.Println("  " + expiryDisplay)
-		fmt.Println("  " + versionDisplay)
-		fmt.Println()
-	}
-
-	return nil
-}
-
-// createNewSession guides the user through creating a new session
-func createNewSession() error {
-	fmt.Println(headerStyle.Render("Create New Session"))
-	fmt.Println()
-
-	// Get available providers from config
-	providers := getAvailableProviders()
-	if len(providers) == 0 {
-		fmt.Println(warningStyle.Render("No providers available in configuration"))
-		return nil
-	}
-
-	var selectedProvider string
-
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Select a provider:").
-				Description("Choose the provider you want to create a session for").
-				Options(providers...).
-				Value(&selectedProvider),
-		),
-	)
-
-	err := form.Run()
-	if err != nil {
-		return err
-	}
-
-	if len(selectedProvider) == 0 {
-		fmt.Println(warningStyle.Render("No provider selected"))
-		return nil
-	}
-
-	// Check if session already exists
-	existingSession, _ := sessionManager.GetSession(cfg.GetLoginServerHostname(), selectedProvider)
-	if existingSession != nil {
-		now := time.Now().UTC()
-		if existingSession.Expiry.After(now) {
-			var overwrite bool
-			overwriteForm := huh.NewForm(
-				huh.NewGroup(
-					huh.NewConfirm().
-						Title("Session already exists").
-						Description(fmt.Sprintf("An active session for %s already exists. Do you want to replace it?", selectedProvider)).
-						Value(&overwrite),
-				),
-			)
-
-			if err := overwriteForm.Run(); err != nil {
-				return err
-			}
-
-			if !overwrite {
-				fmt.Println(infoStyle.Render("ℹ️  Session creation cancelled"))
-				return nil
-			}
-		}
-	}
-
-	fmt.Println(infoStyle.Render("Starting authentication flow..."))
-	fmt.Println(infoStyle.Render("Please complete the authentication in your browser"))
-	fmt.Println()
-
-	// Get provider implementation
-	providerImpl, err := cfg.GetProviderByName(selectedProvider)
-	if err != nil {
-		return fmt.Errorf("provider not found: %w", err)
-	}
-
-	localCallbackUrl := cfg.GetLocalServerUrl()
-	client := common.GetClientIdentifier()
-
-	// TODO FIX ME
-	// Start the authentication flow by getting the authorization URL
-	authResponse, err := providerImpl.GetClient().AuthorizeSession(context.Background(), &models.AuthorizeUser{
-		Scopes: []string{"email", "profile"},
-		State: models.EncodingWrapper{
-			Type: models.ENCODED_AUTH,
-			Data: models.NewAuthWrapper(localCallbackUrl, client, selectedProvider),
-		}.Encode(),
-		RedirectUri: cfg.GetAuthCallbackUrl(selectedProvider),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to start authorization: %w", err)
-	}
-
-	if len(authResponse.Url) > 0 {
-		err := openBrowser(authResponse.Url)
-
-		if err != nil {
-			fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
-			fmt.Println(authResponse.Url)
-			fmt.Println()
-		}
-
-		fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
-	}
-
-	// Wait for the session to be created (polling)
-	fmt.Println(infoStyle.Render("Waiting for session to be created..."))
-	newSession := sessionManager.AwaitProviderRefresh(
-		cfg.GetLoginServerHostname(),
-		selectedProvider,
-	)
-
-	if newSession == nil {
-		return fmt.Errorf("authentication timed out or failed")
-	}
-
-	fmt.Println(successStyle.Render("Session created successfully!"))
-	fmt.Printf("Provider: %s\n", selectedProvider)
-	fmt.Printf("Expires: %s\n", newSession)
-
-	return nil
-}
-
-// removeSession allows the user to remove an existing session
-func removeSession() error {
-	fmt.Println(headerStyle.Render("Remove Session"))
-	fmt.Println()
-
-	// Reload sessions to get the latest state
-	if err := sessionManager.Load(cfg.GetLoginServerHostname()); err != nil {
-		return fmt.Errorf("failed to load sessions: %w", err)
-	}
-
-	loginServer, err := sessionManager.GetLoginServer(cfg.GetLoginServerHostname())
-	if err != nil {
-		return fmt.Errorf("failed to get sessions: %w", err)
-	}
-
-	sessions := loginServer.GetSessions()
-
-	if len(sessions) == 0 {
-		fmt.Println(infoStyle.Render("ℹ️  No sessions to remove"))
-		return nil
-	}
-
-	// Build options from existing sessions
-	var options []huh.Option[string]
-	now := time.Now().UTC()
-
-	for provider, session := range sessions {
-		var label string
-		if session.Expiry.Before(now) {
-			label = fmt.Sprintf("%s (EXPIRED - %s)", provider, session.Expiry.Format("2006-01-02 15:04"))
-		} else {
-			timeUntilExpiry := time.Until(session.Expiry)
-			label = fmt.Sprintf("%s (expires in %s)", provider, formatDuration(timeUntilExpiry))
-		}
-		options = append(options, huh.NewOption(label, provider))
-	}
-
-	var selectedProvider string
-
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Select session to remove:").
-				Options(options...).
-				Value(&selectedProvider),
-		),
-	)
-
-	err = form.Run()
-	if err != nil {
-		return err
-	}
-
-	if len(selectedProvider) == 0 {
-		fmt.Println(warningStyle.Render("No session selected"))
-		return nil
-	}
-
-	// Confirm removal
-	var confirm bool
-	confirmForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Confirm removal").
-				Description(fmt.Sprintf("Are you sure you want to remove the session for %s?", selectedProvider)).
-				Value(&confirm),
-		),
-	)
-
-	if err := confirmForm.Run(); err != nil {
-		return err
-	}
-
-	if !confirm {
-		fmt.Println(infoStyle.Render("ℹ️  Session removal cancelled"))
-		return nil
-	}
-
-	// Remove the session
-	if err := sessionManager.RemoveSession(cfg.GetLoginServerHostname(), selectedProvider); err != nil {
-		return fmt.Errorf("failed to remove session: %w", err)
-	}
-
-	fmt.Println(successStyle.Render("Session removed successfully!"))
-
-	return nil
-}
-
-// refreshSession allows the user to refresh/re-authenticate an existing session
-func refreshSession() error {
-	fmt.Println(headerStyle.Render("Refresh Session"))
-	fmt.Println()
-
-	// Reload sessions to get the latest state
-	if err := sessionManager.Load(cfg.GetLoginServerHostname()); err != nil {
-		return fmt.Errorf("failed to load sessions: %w", err)
-	}
-
-	loginServer, err := sessionManager.GetLoginServer(cfg.GetLoginServerHostname())
-	if err != nil {
-		return fmt.Errorf("failed to get sessions: %w", err)
-	}
-
-	sessions := loginServer.GetSessions()
-
-	if len(sessions) == 0 {
-		fmt.Println(infoStyle.Render("ℹ️  No sessions to refresh"))
-		return nil
-	}
-
-	// Build options from existing sessions
-	var options []huh.Option[string]
-	currentTime := time.Now().UTC()
-
-	for provider, session := range sessions {
-		var label string
-		sessionExpiryTime := session.Expiry.UTC()
-		if sessionExpiryTime.Before(currentTime) {
-			label = fmt.Sprintf("%s (EXPIRED - %s)", provider, session.Expiry.Format("2006-01-02 15:04"))
-		} else {
-			timeUntilExpiry := time.Until(session.Expiry)
-			label = fmt.Sprintf("%s (expires in %s)", provider, formatDuration(timeUntilExpiry))
-		}
-		options = append(options, huh.NewOption(label, provider))
-	}
-
-	var selectedProvider string
-
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Select session to refresh:").
-				Options(options...).
-				Value(&selectedProvider),
-		),
-	)
-
-	err = form.Run()
-	if err != nil {
-		return err
-	}
-
-	if len(selectedProvider) == 0 {
-		fmt.Println(warningStyle.Render("No session selected"))
-		return nil
-	}
-
-	fmt.Println(infoStyle.Render("Starting re-authentication flow..."))
-	fmt.Println(infoStyle.Render("Please complete the authentication in your browser"))
-	fmt.Println()
-
-	// Get provider implementation
-	providerImpl, err := cfg.GetProviderByName(selectedProvider)
-	if err != nil {
-		return fmt.Errorf("provider not found: %w", err)
-	}
-
-	localCallbackUrl := cfg.GetLocalServerUrl()
-	client := common.GetClientIdentifier()
-
-	// Start the authentication flow
-	// TODO FIX ME
-	authResponse, err := providerImpl.GetClient().AuthorizeSession(context.Background(), &models.AuthorizeUser{
-		Scopes: []string{"email", "profile"},
-		State: models.EncodingWrapper{
-			Type: models.ENCODED_AUTH,
-			Data: models.NewAuthWrapper(localCallbackUrl, client, selectedProvider),
-		}.Encode(),
-		RedirectUri: cfg.GetAuthCallbackUrl(selectedProvider),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to start authorization: %w", err)
-	}
-
-	if len(authResponse.Url) > 0 {
-		err := openBrowser(authResponse.Url)
-
-		if err != nil {
-			fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
-			fmt.Println(authResponse.Url)
-			fmt.Println()
-		}
-
-		fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
-	}
-
-	// Wait for the session to be refreshed
-	fmt.Println(infoStyle.Render("Waiting for session to be refreshed..."))
-	refreshedSession := sessionManager.AwaitProviderRefresh(cfg.GetLoginServerHostname(), selectedProvider)
-
-	if refreshedSession == nil {
-		return fmt.Errorf("authentication timed out or failed")
-	}
-
-	fmt.Println(successStyle.Render("Session refreshed successfully!"))
-	fmt.Printf("Provider: %s\n", selectedProvider)
-	fmt.Printf("New expiry: %s\n", refreshedSession)
-
-	return nil
-}
-
 // getAvailableProviders returns a list of available providers from the configuration
 func getAvailableProviders() []huh.Option[string] {
 	var options []huh.Option[string]
@@ -530,4 +250,83 @@ func formatDuration(d time.Duration) string {
 		return "1 minute"
 	}
 	return fmt.Sprintf("%d minutes", minutes)
+}
+
+// authProviderKickStart initiates the authorization process for a given provider
+func authProviderKickStart(
+	selectedProvider string,
+) error {
+
+	localCallbackUrl := cfg.GetLocalServerUrl()
+	loginServerUrl := fmt.Sprintf(
+		"%s/auth/request/%s",
+		cfg.DiscoverLoginServerApiUrl(),
+		selectedProvider,
+	)
+
+	clientIdentifier := common.GetClientIdentifier()
+
+	client := resty.New()
+	client.SetRedirectPolicy(handleProviderAuthRedirect())
+
+	_, err := common.InvokeHttpRequestWithClient(
+		client,
+		&model.HTTPArguments{
+			Method: http.MethodGet,
+			Endpoint: &model.Endpoint{
+				EndpointConfig: &model.EndpointConfiguration{
+					URI: &model.LiteralUri{Value: loginServerUrl},
+				},
+			},
+			Headers: map[string]string{
+				"X-Client": clientIdentifier,
+			},
+			Query: map[string]any{
+				"callback": localCallbackUrl,
+				"code":     createAuthCode(),
+				"provider": strings.ToLower(selectedProvider),
+			},
+		},
+	)
+
+	if err != nil {
+
+		// Check if resty.ErrAutoRedirectDisabled
+		if errors.Is(err, resty.ErrAutoRedirectDisabled) {
+			return nil
+		}
+
+		// Check if it's a resty error with response auto redirect is disabled
+		return fmt.Errorf("failed to invoke kickstart request: %w", err)
+	}
+
+	return nil
+
+}
+
+func handleProviderAuthRedirect() resty.RedirectPolicy {
+	return resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
+
+		authUrl := req.URL.String()
+
+		logrus.WithFields(logrus.Fields{
+			"auth_url": authUrl,
+		}).Debugln("Auth redirect")
+
+		err := openBrowser(authUrl)
+
+		if err != nil {
+
+			fmt.Println(infoStyle.Render("Please open this URL in your browser:"))
+			fmt.Println(authUrl)
+			fmt.Println()
+
+			return fmt.Errorf("failed to open browser: %w", err)
+		}
+
+		// Once we have opened the browser we can stop following redirects
+		fmt.Println(infoStyle.Render("Waiting for authentication to complete..."))
+		return resty.ErrAutoRedirectDisabled
+
+	})
 }

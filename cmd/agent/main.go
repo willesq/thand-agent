@@ -1,8 +1,7 @@
 package cli
 
 import (
-	"log"
-
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/thand-io/agent/internal/agent"
 	"github.com/thand-io/agent/internal/config"
@@ -26,11 +25,11 @@ If no config file is specified, the agent will look for config files in the foll
 		// Load configuration
 		cfg, err := config.Load(configFile)
 		if err != nil {
-			log.Fatalf("Failed to load configuration: %v", err)
+			logrus.Fatalf("Failed to load configuration: %v", err)
 		}
 
 		if _, err := agent.StartWebService(cfg); err != nil {
-			log.Fatalf("Failed to start web service: %v", err)
+			logrus.Fatalf("Failed to start web service: %v", err)
 		}
 	},
 }
@@ -41,6 +40,6 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalf("Failed to execute command: %v", err)
+		logrus.Fatalf("Failed to execute command: %v", err)
 	}
 }

@@ -220,6 +220,25 @@ definitions:
       url:
         type: string
     type: object
+  daemon.EvaluateRoleRequest:
+    properties:
+      identity:
+        description: Identity ID to evaluate against
+        type: string
+      role:
+        description: Role name to evaluate
+        type: string
+    required:
+    - identity
+    - role
+    type: object
+  daemon.EvaluateRoleResponse:
+    properties:
+      role:
+        allOf:
+        - $ref: '#/definitions/models.Role'
+        description: The evaluated composite role
+    type: object
   daemon.ExecutionStatePageData:
     properties:
       execution:
@@ -231,6 +250,8 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/github_com_thand-io_agent_internal_config.Config'
+      environment:
+        $ref: '#/definitions/models.EnvironmentConfig'
       executions:
         items:
           $ref: '#/definitions/models.WorkflowExecutionInfo'
@@ -1240,6 +1261,9 @@ definitions:
     type: object
   models.SessionCreateRequest:
     properties:
+      code:
+        description: Verification code
+        type: string
       provider:
         description: Provider ID
         type: string
@@ -1247,6 +1271,7 @@ definitions:
         description: Encoded session token
         type: string
     required:
+    - code
     - provider
     - session
     type: object
@@ -1297,6 +1322,10 @@ definitions:
           with the workflow
         type: string
       output: {}
+      providers:
+        items:
+          type: string
+        type: array
       reason:
         type: string
       role:
@@ -2310,6 +2339,51 @@ paths:
       security:
       - BearerAuth: []
       summary: List roles
+      tags:
+      - roles
+  /roles/evaluate:
+    post:
+      consumes:
+      - application/json
+      description: Evaluate a role against an identity to get the composite role with
+        all inherited permissions resolved
+      parameters:
+      - description: Role evaluation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/daemon.EvaluateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Evaluated composite role
+          schema:
+            $ref: '#/definitions/daemon.EvaluateRoleResponse'
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Role or identity not found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Evaluate composite role
       tags:
       - roles
   /session/{provider}:

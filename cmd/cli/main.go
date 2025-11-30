@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/kardianos/service"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/thand-io/agent/internal/agent"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/sessions"
 )
@@ -83,6 +85,15 @@ func preRunConfigE(cmd *cobra.Command, mode config.Mode) error {
 			if err != nil {
 				return fmt.Errorf("failed to set API key: %w", err)
 			}
+		}
+
+		// Generate a global secret if one hasn't been set
+		if strings.EqualFold(cfg.Secret, common.DefaultServerSecret) {
+			generatedSecret, err := common.GenerateSecureRandomString(32)
+			if err != nil {
+				return fmt.Errorf("failed to generate secret: %w", err)
+			}
+			cfg.Secret = generatedSecret
 		}
 
 		// Load users session state before any command runs

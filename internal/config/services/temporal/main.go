@@ -81,16 +81,20 @@ func (a *TemporalClient) Initialize() error {
 	// Get agent version for Worker Build ID
 	buildID := common.GetClientIdentifier()
 
-	logrus.WithFields(logrus.Fields{
-		"BuildID":        buildID,
-		"DeploymentName": models.TemporalDeploymentName,
-	}).Info("Configuring Worker with versioning")
+	var workerOptions worker.Options
 
-	// Lets register the worker with versioning
-	a.worker = worker.New(
-		temporalClient,
-		a.GetTaskQueue(),
-		worker.Options{
+	if a.config.DisableVersioning {
+		logrus.Info("Configuring Worker WITHOUT versioning (DisableVersioning=true)")
+		workerOptions = worker.Options{
+			Identity: a.GetIdentity(),
+		}
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"BuildID":        buildID,
+			"DeploymentName": models.TemporalDeploymentName,
+		}).Info("Configuring Worker with versioning")
+
+		workerOptions = worker.Options{
 			Identity: a.GetIdentity(),
 			DeploymentOptions: worker.DeploymentOptions{
 				UseVersioning: true,
@@ -101,7 +105,14 @@ func (a *TemporalClient) Initialize() error {
 				// Default workflows to Pinned behavior
 				DefaultVersioningBehavior: workflow.VersioningBehaviorPinned,
 			},
-		},
+		}
+	}
+
+	// Create worker with configured options
+	a.worker = worker.New(
+		temporalClient,
+		a.GetTaskQueue(),
+		workerOptions,
 	)
 
 	go func() {
@@ -150,6 +161,10 @@ func (c *TemporalClient) GetTaskQueue() string {
 
 func (c *TemporalClient) GetIdentity() string {
 	return c.identity
+}
+
+func (c *TemporalClient) IsVersioningDisabled() bool {
+	return c.config.DisableVersioning
 }
 
 func (c *TemporalClient) Shutdown() error {

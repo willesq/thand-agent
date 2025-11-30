@@ -19,6 +19,7 @@ var ENCODED_WORKFLOW_SIGNAL = "workflow_signal"
 var ENCODED_AUTH = "auth"
 var ENCODED_SESSION = "session"
 var ENCODED_SESSION_LOCAL = "session_local"
+var ENCODED_SESSION_CODE = "session_code"
 
 type EncodingWrapper struct {
 	Type string `json:"type"`
@@ -153,6 +154,14 @@ func (pc *BasicConfig) GetString(key string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func (pc *BasicConfig) HasString(key string) bool {
+	if pc == nil {
+		return false
+	}
+	_, ok := (*pc)[key]
+	return ok
 }
 
 func (pc *BasicConfig) GetInt(key string) (int, bool) {

@@ -1,7 +1,7 @@
 {{template "header" .}}
     <main>
         <div class="container" style="width: 100%;">
-            <div class="hero">
+            <div class="hero" x-data="healthCheck()">
                 <h1>{{.ServiceName}}</h1>
                 <p>A minimal, secure role-based access control and workflow management system for modern infrastructure.</p>
                 
@@ -11,8 +11,8 @@
 
                 <div class="status-card">
                     <div class="status-indicator">
-                        <div class="status-dot" id="status-dot"></div>
-                        <span>Service Status: <span id="status">{{.Status}}</span></span>
+                        <div class="status-dot" :class="statusClass"></div>
+                        <span>Service Status: <span x-text="statusText">{{.Status}}</span></span>
                     </div>
                     <div style="margin-top: 0.5rem; font-size: 0.875rem; color: hsl(var(--muted-foreground));">
                         Version: {{.Version}} | Host: {{.Config.Server.Host}}:{{.Config.Server.Port}}
@@ -23,16 +23,45 @@
     </main>
 
     <script>
-        // Check service health
-        fetch('{{.Config.Server.Health.Path}}')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('status').textContent = 'Online';
-                document.getElementById('status-dot').classList.remove('offline');
-            })
-            .catch(error => {
-                document.getElementById('status').textContent = 'Offline';
-                document.getElementById('status-dot').classList.add('offline');
-            });
+        function healthCheck() {
+            return {
+                status: null,
+                statusText: '{{.Status}}',
+                statusClass: '',
+                
+                init() {
+                    this.checkHealth();
+                },
+                
+                async checkHealth() {
+                    try {
+                        const response = await fetch('{{.Config.Server.Health.Path}}');
+                        const data = await response.json();
+                        this.status = data.status;
+                        
+                        switch (data.status) {
+                            case 'healthy':
+                                this.statusText = 'Healthy';
+                                this.statusClass = 'healthy';
+                                break;
+                            case 'degraded':
+                                this.statusText = 'Degraded';
+                                this.statusClass = 'degraded';
+                                break;
+                            case 'unhealthy':
+                                this.statusText = 'Unhealthy';
+                                this.statusClass = 'unhealthy';
+                                break;
+                            default:
+                                this.statusText = 'Unknown';
+                                this.statusClass = 'offline';
+                        }
+                    } catch (error) {
+                        this.statusText = 'Offline';
+                        this.statusClass = 'offline';
+                    }
+                }
+            }
+        }
     </script>
 {{template "footer" .}}

@@ -8,13 +8,13 @@ The CLI connects to a running instance of the Thand Agent, which hosts, manages 
 
 ```bash
 # Login to your Thand server
-agent login --login-server <server-url>
+thand login --login-server <server-url>
 
 # Request access using AI (natural language)
-agent request "I need admin access to AWS production for database maintenance"
+thand request "I need admin access to AWS production for database maintenance"
 
 # Or use specific access request
-agent request access --provider aws-prod --role admin --duration 4h --reason "Database maintenance"
+thand request access --provider aws-prod --role admin --duration 4h --reason "Database maintenance"
 ```
 
 ## Global Options
@@ -29,43 +29,43 @@ All commands support these global flags:
 
 ### Core Commands
 
-#### `agent` (default)
+#### `thand` (default)
 Interactive access request wizard when no subcommand is specified.
 
 **Usage:**
 ```bash
-agent
+thand
 ```
 
 When run without arguments, launches an interactive wizard to request access if a login server is configured.
 
-#### `agent login`
+#### `thand login`
 Authenticate with the login server and establish a session.
 
 **Usage:**
 ```bash
-agent login
+thand login
 ```
 
 Opens a browser to authenticate with the configured login server and establishes a session for subsequent requests.
 
-#### `agent request <reason>`
+#### `thand request <reason>`
 Request access using AI to determine the appropriate role and permissions.
 
 **Usage:**
 ```bash
-agent request "I need access to production database for troubleshooting"
-agent request "Grant me read access to S3 bucket for data analysis"
+thand request "I need access to production database for troubleshooting"
+thand request "Grant me read access to S3 bucket for data analysis"
 ```
 
 The AI analyzes your natural language request and automatically determines the appropriate provider, role, and permissions needed.
 
-#### `agent request access`
+#### `thand request access`
 Request access to a specific provider with explicit parameters.
 
 **Usage:**
 ```bash
-agent request access --provider <provider> --role <role> --duration <duration> --reason <reason>
+thand request access --provider <provider> --role <role> --duration <duration> --reason <reason>
 ```
 
 **Options:**
@@ -76,17 +76,17 @@ agent request access --provider <provider> --role <role> --duration <duration> -
 
 **Example:**
 ```bash
-agent request access --provider aws-prod --role admin --duration 4h --reason "Database maintenance required"
+thand request access --provider aws-prod --role admin --duration 4h --reason "Database maintenance required"
 ```
 
 ### Session Management
 
-#### `agent sessions`
+#### `thand sessions`
 Interactive session manager for authentication sessions.
 
 **Usage:**
 ```bash
-agent sessions
+thand sessions
 ```
 
 Launches an interactive terminal interface that allows you to:
@@ -105,12 +105,12 @@ Launches an interactive terminal interface that allows you to:
 
 ### Configuration and Information
 
-#### `agent config`
+#### `thand config`
 Display current agent configuration.
 
 **Usage:**
 ```bash
-agent config
+thand config
 ```
 
 Shows current configuration including:
@@ -118,12 +118,12 @@ Shows current configuration including:
 - Login endpoint
 - Logging level
 
-#### `agent roles`
+#### `thand roles`
 List available roles from the remote login server.
 
 **Usage:**
 ```bash
-agent roles [--provider <provider>]
+thand roles [--provider <provider>]
 ```
 
 **Options:**
@@ -131,36 +131,36 @@ agent roles [--provider <provider>]
 
 **Examples:**
 ```bash
-agent roles                    # List all available roles
-agent roles --provider aws     # List only AWS roles
+thand roles                    # List all available roles
+thand roles --provider aws     # List only AWS roles
 ```
 
-#### `agent version`
+#### `thand version`
 Show version information.
 
 **Usage:**
 ```bash
-agent version
+thand version
 ```
 
 ### Server Management
 
-#### `agent server`
+#### `thand server`
 Run the agent server directly in the foreground.
 
 **Usage:**
 ```bash
-agent server
+thand server
 ```
 
 Starts the Thand Agent server that handles authentication and authorization requests. Useful for development or when running the agent as a standalone service.
 
-#### `agent service`
+#### `thand service`
 System service management commands.
 
 **Usage:**
 ```bash
-agent service <subcommand>
+thand service <subcommand>
 ```
 
 **Subcommands:**
@@ -172,21 +172,21 @@ agent service <subcommand>
 
 **Examples:**
 ```bash
-agent service install    # Install as system service
-agent service start      # Start the service
-agent service status     # Check if service is running
-agent service stop       # Stop the service
-agent service remove     # Uninstall the service
+thand service install    # Install as system service
+thand service start      # Start the service
+thand service status     # Check if service is running
+thand service stop       # Stop the service
+thand service remove     # Uninstall the service
 ```
 
 ### Maintenance
 
-#### `agent update`
+#### `thand update`
 Update the agent to the latest version.
 
 **Usage:**
 ```bash
-agent update [--force] [--check]
+thand update [--force] [--check]
 ```
 
 **Options:**
@@ -197,17 +197,17 @@ Checks GitHub repository for the latest release and automatically updates the bi
 
 **Examples:**
 ```bash
-agent update           # Check and install updates with confirmation
-agent update --check   # Only check for available updates
-agent update --force   # Update without confirmation prompt
+thand update           # Check and install updates with confirmation
+thand update --check   # Only check for available updates
+thand update --force   # Update without confirmation prompt
 ```
 
-#### `agent wizard` (hidden)
+#### `thand wizard` (hidden)
 Interactive wizard to configure access requests with validation.
 
 **Usage:**
 ```bash
-agent wizard
+thand wizard
 ```
 
 Launches a guided wizard that walks through creating an access request with proper validation using your configured workflows, roles, and providers.
@@ -238,26 +238,26 @@ logging:
 
 ```bash
 # Basic workflow
-agent login --login-server https://thand.company.com
-agent request "I need read access to the customer database"
+thand login --login-server https://thand.company.com
+thand request "I need read access to the customer database"
 
 # Explicit access request
-agent request access \
+thand request access \
   --provider database-prod \
   --role readonly \
   --duration 2h \
   --reason "Customer support ticket investigation"
 
 # Manage sessions
-agent sessions
+thand sessions
 
 # Check available roles for AWS
-agent roles --provider aws
+thand roles --provider aws
 
 # Install as system service
-sudo agent service install
-agent service start
+sudo thand service install
+thand service start
 
 # Update to latest version
-agent update --check
+thand update --check
 ```

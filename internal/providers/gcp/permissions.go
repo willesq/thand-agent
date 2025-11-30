@@ -100,7 +100,7 @@ func (p *gcpProvider) GetPermission(ctx context.Context, permission string) (*mo
 	if perm, exists := p.permissionsMap[permission]; exists {
 		return perm, nil
 	}
-	return nil, fmt.Errorf("permission not found")
+	return nil, fmt.Errorf("GCP permission not found: %s", permission)
 }
 
 func (p *gcpProvider) ListPermissions(ctx context.Context, filters ...string) ([]models.ProviderPermission, error) {

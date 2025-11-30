@@ -127,7 +127,7 @@ docker run -d \
   -v $(pwd)/thand-config:/app/config:ro \
   -e THAND_CONFIG_PATH=/app/config/config.yaml \
   ghcr.io/thand-io/agent:latest \
-  ./agent server --config /app/config/config.yaml
+  ./thand server --config /app/config/config.yaml
 ```
 
 ### Option 2: Environment Variables

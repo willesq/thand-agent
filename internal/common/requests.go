@@ -10,9 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func InvokeHttpRequest(r *model.HTTPArguments) (*resty.Response, error) {
+func InvokeHttpRequestWithClient(client *resty.Client, r *model.HTTPArguments) (*resty.Response, error) {
 
-	builder, err := CreateRequestBuilderFromEndpoint(r)
+	builder, err := CreateRequestBuilderFromEndpointWithClient(client, r)
 
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
@@ -34,6 +34,13 @@ func InvokeHttpRequest(r *model.HTTPArguments) (*resty.Response, error) {
 
 }
 
+func InvokeHttpRequest(r *model.HTTPArguments) (*resty.Response, error) {
+
+	client := resty.New()
+	return InvokeHttpRequestWithClient(client, r)
+
+}
+
 func MakeRequestFromBuilder(restBuilder *resty.Request, method string, finalUrl string) (*resty.Response, error) {
 
 	switch strings.ToUpper(method) {
@@ -52,11 +59,15 @@ func MakeRequestFromBuilder(restBuilder *resty.Request, method string, finalUrl 
 }
 
 func CreateRequestBuilderFromEndpoint(req *model.HTTPArguments) (*resty.Request, error) {
+	client := resty.New()
+	return CreateRequestBuilderFromEndpointWithClient(client, req)
+}
+
+func CreateRequestBuilderFromEndpointWithClient(client *resty.Client, req *model.HTTPArguments) (*resty.Request, error) {
 	if err := validateHTTPArguments(req); err != nil {
 		return nil, err
 	}
 
-	client := resty.New()
 	restBuilder := client.R().EnableTrace()
 
 	if err := configureAuthentication(restBuilder, req.Endpoint); err != nil {

@@ -126,6 +126,14 @@ func (t *authorizeFunction) executeAuthorization(
 		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"provider":      elevateRequest.Provider,
+		"provider_type": fmt.Sprintf("%T", providerCall.GetClient()),
+		"user_email":    elevateRequest.RoleRequest.User.Email,
+		"user_source":   elevateRequest.RoleRequest.User.Source,
+		"user_username": elevateRequest.RoleRequest.User.Username,
+	}).Info("About to call AuthorizeRole on provider")
+
 	authOut, err := providerCall.GetClient().AuthorizeRole(
 		workflowTask.GetContext(), &models.AuthorizeRoleRequest{
 			RoleRequest: elevateRequest.RoleRequest,
