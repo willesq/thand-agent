@@ -14,16 +14,16 @@ func (p *awsProvider) AuthorizeRole(
 	req *models.AuthorizeRoleRequest,
 ) (*models.AuthorizeRoleResponse, error) {
 
+	// Check for nil inputs first to avoid nil pointer dereference
+	if !req.IsValid() {
+		return nil, fmt.Errorf("user and role must be provided to authorize aws role")
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"req_user_email":    req.User.Email,
 		"req_user_source":   req.User.Source,
 		"req_user_username": req.User.Username,
 	}).Info("AWS AuthorizeRole called")
-
-	// Check for nil inputs
-	if !req.IsValid() {
-		return nil, fmt.Errorf("user and role must be provided to authorize aws role")
-	}
 
 	// Determine if we should use IAM Identity Center or traditional IAM
 	// For now, detect based on the user's source or configuration
