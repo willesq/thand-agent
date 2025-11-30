@@ -99,6 +99,11 @@ func TestAWSElevationWorkflow(t *testing.T) {
 		require.True(t, services.HasTemporal(), "Temporal should be configured")
 		t.Logf("Temporal is configured and available")
 
+		// Wait for worker to be ready to poll for tasks
+		// The worker is started in a goroutine during Initialize() and needs time to start polling
+		t.Log("Waiting for Temporal worker to start polling...")
+		time.Sleep(2 * time.Second)
+
 		t.Log("Starting workflow execution via Temporal...")
 
 		// Start the workflow via Temporal - this will properly handle signals
@@ -398,4 +403,35 @@ func createLocalStackIAMClient(t *testing.T, ctx context.Context, endpoint strin
 	require.NoError(t, err, "Failed to create AWS config for LocalStack")
 
 	return iam.NewFromConfig(cfg)
+}
+
+// waitForRoleToExist waits for an IAM role to exist
+func waitForRoleToExist(ctx context.Context, iamClient *iam.Client, roleName string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		_, err := iamClient.GetRole(ctx, &iam.GetRoleInput{
+			RoleName: aws.String(roleName),
+		})
+		if err == nil {
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("timeout waiting for role %s to exist", roleName)
+}
+
+// waitForRoleToNotExist waits for an IAM role to be deleted
+func waitForRoleToNotExist(ctx context.Context, iamClient *iam.Client, roleName string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		_, err := iamClient.GetRole(ctx, &iam.GetRoleInput{
+			RoleName: aws.String(roleName),
+		})
+		if err != nil {
+			// Role doesn't exist, which is what we want
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return fmt.Errorf("timeout waiting for role %s to be deleted", roleName)
 }

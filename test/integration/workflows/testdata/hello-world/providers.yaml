@@ -16,7 +16,6 @@ providers:
 
   # Email provider pointing to MailHog
   email-test:
-    platform: smtp
     name: Email Test (MailHog)
     description: SMTP email provider for integration tests using MailHog
     provider: email
@@ -25,4 +24,8 @@ providers:
       host: "${MAILHOG_HOST}"
       port: "${MAILHOG_PORT}"
       from: test@example.com
+      # MailHog accepts any credentials - using dummy values
+      user: "test"
+      pass: "test"
+      tls: false
     enabled: true
