@@ -6,9 +6,26 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/manager"
 )
+
+// createConfigWithCleanup creates a config from a test case and registers cleanup
+func createConfigWithCleanup(t *testing.T, loader *TestCaseLoader, testCase *TestCase, infra *TestInfrastructure) *config.Config {
+	t.Helper()
+	cfg, err := loader.CreateConfigFromTestCase(testCase)
+	require.NoError(t, err, "Failed to create config")
+
+	// Register cleanup to gracefully shutdown Temporal worker before container teardown
+	infra.RegisterCleanup(func() {
+		if cfg.GetServices().HasTemporal() {
+			cfg.GetServices().GetTemporal().Shutdown()
+		}
+	})
+
+	return cfg
+}
 
 // TestHelloWorldWorkflow tests the simplest workflow execution
 func TestHelloWorldWorkflow(t *testing.T) {
@@ -66,8 +83,7 @@ func TestHelloWorldWorkflow(t *testing.T) {
 	})
 
 	t.Run("Config creates successfully", func(t *testing.T) {
-		cfg, err := loader.CreateConfigFromTestCase(testCase)
-		require.NoError(t, err, "Failed to create config from test case")
+		cfg := createConfigWithCleanup(t, loader, testCase, infra)
 		require.NotNil(t, cfg, "Config should not be nil")
 
 		// Verify providers are set
@@ -78,8 +94,7 @@ func TestHelloWorldWorkflow(t *testing.T) {
 	})
 
 	t.Run("Workflow manager initializes", func(t *testing.T) {
-		cfg, err := loader.CreateConfigFromTestCase(testCase)
-		require.NoError(t, err, "Failed to create config")
+		cfg := createConfigWithCleanup(t, loader, testCase, infra)
 
 		// Create workflow manager (without Temporal for now - just testing the runner)
 		wm := manager.NewWorkflowManager(cfg)
@@ -92,8 +107,7 @@ func TestHelloWorldWorkflow(t *testing.T) {
 	})
 
 	t.Run("Workflow executes with simple input", func(t *testing.T) {
-		cfg, err := loader.CreateConfigFromTestCase(testCase)
-		require.NoError(t, err, "Failed to create config")
+		cfg := createConfigWithCleanup(t, loader, testCase, infra)
 
 		workflow := testCase.Workflows["hello_world"]
 
@@ -128,8 +142,7 @@ func TestHelloWorldWorkflow(t *testing.T) {
 	})
 
 	t.Run("Workflow uses default name when not provided", func(t *testing.T) {
-		cfg, err := loader.CreateConfigFromTestCase(testCase)
-		require.NoError(t, err, "Failed to create config")
+		cfg := createConfigWithCleanup(t, loader, testCase, infra)
 
 		workflow := testCase.Workflows["hello_world"]
 

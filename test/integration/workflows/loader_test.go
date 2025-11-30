@@ -146,7 +146,12 @@ func (l *TestCaseLoader) substituteVariables(content []byte) []byte {
 	str := string(content)
 
 	// Parse MailHog host and port
-	mailhogHost, mailhogPort, _ := net.SplitHostPort(l.infra.MailHogSMTP)
+	mailhogHost, mailhogPort, err := net.SplitHostPort(l.infra.MailHogSMTP)
+	if err != nil {
+		// If no port in SMTP, use full string as host and empty port
+		mailhogHost = l.infra.MailHogSMTP
+		mailhogPort = ""
+	}
 
 	// Define variable substitutions
 	substitutions := map[string]string{
@@ -185,7 +190,10 @@ func (l *TestCaseLoader) CreateConfigFromTestCase(tc *TestCase) (*config.Config,
 		host = l.infra.TemporalEndpoint
 		portStr = TemporalDefaultPort
 	}
-	port, _ := strconv.Atoi(portStr)
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid port in Temporal endpoint: %w", err)
+	}
 
 	cfg.Services.Temporal = &models.TemporalConfig{
 		Host:              host,

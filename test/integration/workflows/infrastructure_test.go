@@ -56,6 +56,9 @@ type TestInfrastructure struct {
 	temporalContainer testcontainers.Container
 	TemporalEndpoint  string
 	TemporalClient    client.Client
+
+	// Cleanup callbacks - called before container teardown to gracefully shutdown workers
+	cleanupCallbacks []func()
 }
 
 // SetupTestInfrastructure creates and starts Temporal and LocalStack containers
@@ -297,7 +300,11 @@ func (infra *TestInfrastructure) startTemporal(ctx context.Context) {
 	postgresInspect, err := postgresContainer.Inspect(ctx)
 	require.NoError(infra.t, err, "Failed to inspect PostgreSQL container")
 
-	postgresIP := postgresInspect.NetworkSettings.Networks["bridge"].IPAddress
+	bridgeNet, exists := postgresInspect.NetworkSettings.Networks["bridge"]
+	if !exists {
+		infra.t.Fatal("Bridge network not found for PostgreSQL container")
+	}
+	postgresIP := bridgeNet.IPAddress
 	infra.t.Logf("PostgreSQL internal IP: %s", postgresIP)
 
 	// Now start Temporal auto-setup
@@ -368,9 +375,20 @@ system.forceSearchAttributesCacheRefreshOnRead:
 	infra.t.Log("Temporal client connected")
 }
 
+// RegisterCleanup adds a cleanup callback that will be called before container teardown.
+// Use this to gracefully shutdown Temporal workers and other resources.
+func (infra *TestInfrastructure) RegisterCleanup(cleanup func()) {
+	infra.cleanupCallbacks = append(infra.cleanupCallbacks, cleanup)
+}
+
 // Teardown stops and removes all containers
 func (infra *TestInfrastructure) Teardown() {
 	infra.t.Log("Tearing down test infrastructure...")
+
+	// Run cleanup callbacks first to gracefully shutdown workers
+	for _, cleanup := range infra.cleanupCallbacks {
+		cleanup()
+	}
 
 	terminateCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

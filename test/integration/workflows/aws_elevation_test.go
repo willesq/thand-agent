@@ -57,6 +57,13 @@ func TestAWSElevationWorkflow(t *testing.T) {
 		cfg, err := loader.CreateConfigFromTestCase(testCase)
 		require.NoError(t, err, "Failed to create config")
 
+		// Register cleanup to gracefully shutdown Temporal worker before container teardown
+		infra.RegisterCleanup(func() {
+			if cfg.GetServices().HasTemporal() {
+				cfg.GetServices().GetTemporal().Shutdown()
+			}
+		})
+
 		// Create test user
 		testUser := &models.User{
 			Email: "testuser@thand.io",
@@ -253,6 +260,13 @@ func TestAWSElevationWithTemporal(t *testing.T) {
 
 	cfg, err := loader.CreateConfigFromTestCase(testCase)
 	require.NoError(t, err, "Failed to create config")
+
+	// Register cleanup to gracefully shutdown Temporal worker before container teardown
+	infra.RegisterCleanup(func() {
+		if cfg.GetServices().HasTemporal() {
+			cfg.GetServices().GetTemporal().Shutdown()
+		}
+	})
 
 	// Create IAM client for LocalStack verification
 	iamClient := createLocalStackIAMClient(t, ctx, infra.LocalStackEndpoint)
