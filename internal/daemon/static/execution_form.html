@@ -581,7 +581,6 @@
                 
                 try {
                     const fetchUrl = `${this.apiBasePath}/execution/${this.workflowId}`;
-                    console.log('Polling - fetching:', fetchUrl);
                     
                     const response = await fetch(fetchUrl, {
                         method: 'GET',
@@ -591,10 +590,7 @@
                         credentials: 'same-origin'
                     });
                     
-                    console.log('Polling - response status:', response.status, response.statusText);
-                    
                     if (!response.ok) {
-                        console.log('Polling - response not ok, status:', response.status);
                         // Workflow might have ended - show success but keep polling
                         if (!this.submitted) {
                             this.submitted = true;
@@ -619,18 +615,12 @@
                     
                     // Check if task has changed
                     const currentTask = execution.task;
-                    console.log('Polling - currentTask:', currentTask, 'originalTask:', this.originalTask);
-                    console.log('Polling - workflowDsl:', workflowDsl);
-                    console.log('Polling - workflowDsl.do:', workflowDsl?.do);
                     
                     if (currentTask && currentTask !== this.originalTask) {
                         // Check if the new task is a form task
-                        console.log('Task changed! Checking if form task...');
                         const isFormTask = this.isFormTask(currentTask, workflowDsl);
-                        console.log('isFormTask result:', isFormTask);
                         if (isFormTask) {
                             // Reload the page to show the new form
-                            console.log('Reloading page for new form...');
                             this.stopPolling();
                             window.location.reload();
                             return;
@@ -649,11 +639,6 @@
                     }
                     
                 } catch (error) {
-                    console.error('Polling error:', error);
-                    console.error('Polling error name:', error.name);
-                    console.error('Polling error message:', error.message);
-                    console.error('apiBasePath:', this.apiBasePath);
-                    console.error('workflowId:', this.workflowId);
                     // Continue polling on error - don't stop
                 }
             },
@@ -683,39 +668,24 @@
             
             // Find a task definition by name in the workflow DSL
             findTaskDefinition(taskName, workflowDsl) {
-                console.log('findTaskDefinition called with taskName:', taskName);
-                console.log('findTaskDefinition workflowDsl:', workflowDsl);
-                
                 if (!workflowDsl || !workflowDsl.do) {
-                    console.log('findTaskDefinition: No workflowDsl or workflowDsl.do');
                     return null;
                 }
-                
-                console.log('findTaskDefinition: workflowDsl.do has', workflowDsl.do.length, 'steps');
                 
                 // Recursively search for the task in the workflow definition
                 const findTask = (steps, depth = 0) => {
                     if (!steps || !Array.isArray(steps)) {
-                        console.log('findTask depth', depth, ': steps is not an array');
                         return null;
                     }
-                    
-                    console.log('findTask depth', depth, ': searching', steps.length, 'steps');
                     
                     for (let i = 0; i < steps.length; i++) {
                         const step = steps[i];
                         if (!step || typeof step !== 'object') {
-                            console.log('findTask depth', depth, 'step', i, ': skipping invalid step');
                             continue;
                         }
                         
-                        const keys = Object.keys(step);
-                        console.log('findTask depth', depth, 'step', i, ': keys are', keys);
-                        
                         for (const [name, taskDef] of Object.entries(step)) {
-                            console.log('findTask depth', depth, ': checking task', name, 'against', taskName);
                             if (name === taskName) {
-                                console.log('findTask: FOUND task', taskName, 'taskDef:', taskDef);
                                 return taskDef;
                             }
                             // Check nested steps (switch, etc.)
@@ -742,24 +712,19 @@
                             }
                         }
                     }
-                    console.log('findTask depth', depth, ': task not found in this level');
                     return null;
                 };
                 
-                const result = findTask(workflowDsl.do);
-                console.log('findTaskDefinition result:', result);
-                return result;
+                return findTask(workflowDsl.do);
             },
             
             isFormTask(taskName, workflowDsl) {
                 const taskDef = this.findTaskDefinition(taskName, workflowDsl);
                 if (!taskDef) {
-                    console.log('isFormTask: Could not find task', taskName, 'in workflow');
                     return false;
                 }
                 
                 const thandType = this.getThandTaskType(taskDef);
-                console.log('isFormTask:', taskName, 'thandType:', thandType, 'taskDef:', taskDef);
                 return thandType === 'form';
             },
             
@@ -776,15 +741,35 @@
                 const text = textObj.text || '';
                 
                 if (textObj.type === 'mrkdwn') {
-                    // Simple markdown conversion
-                    return text
-                        .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
-                        .replace(/_([^_]+)_/g, '<em>$1</em>')
-                        .replace(/~([^~]+)~/g, '<del>$1</del>')
-                        .replace(/`([^`]+)`/g, '<code>$1</code>')
-                        .replace(/<(https?:\/\/[^|>]+)\|([^>]+)>/g, '<a href="$1" target="_blank" rel="noopener">$2</a>')
-                        .replace(/<(https?:\/\/[^>]+)>/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
-                        .replace(/\n/g, '<br>');
+                    // Convert Slack-style mrkdwn links to standard markdown before parsing
+                    // <url|text> -> [text](url) and <url> -> <url> (marked handles bare URLs)
+                    let markdown = text
+                        .replace(/<(https?:\/\/[^|>]+)\|([^>]+)>/g, '[$2]($1)')
+                        .replace(/<(https?:\/\/[^>]+)>/g, '$1');
+                    
+                    // Use marked.js for parsing with DOMPurify for XSS protection
+                    // Configure marked for inline parsing (no <p> wrapper for single lines)
+                    const html = marked.parseInline(markdown, { breaks: true });
+                    
+                    // Sanitize with DOMPurify - only allow safe HTML tags
+                    // Add hook to ensure all links open safely in new tabs
+                    DOMPurify.addHook('afterSanitizeAttributes', function(node) {
+                        if (node.tagName === 'A' && node.hasAttribute('href')) {
+                            node.setAttribute('target', '_blank');
+                            node.setAttribute('rel', 'noopener noreferrer');
+                        }
+                    });
+                    
+                    const sanitized = DOMPurify.sanitize(html, {
+                        ALLOWED_TAGS: ['strong', 'b', 'em', 'i', 'del', 's', 'code', 'a', 'br'],
+                        ALLOWED_ATTR: ['href', 'target', 'rel'],
+                        ALLOW_DATA_ATTR: false
+                    });
+                    
+                    // Remove hook to avoid affecting other sanitization calls
+                    DOMPurify.removeHook('afterSanitizeAttributes');
+                    
+                    return sanitized;
                 }
                 
                 return this.escapeHtml(text);

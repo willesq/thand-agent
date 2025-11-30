@@ -81,11 +81,11 @@ func (p *oktaProvider) RefreshIdentities(ctx context.Context) error {
 		identitiesMap[strings.ToLower(identity.Label)] = identity
 
 		// For users, also map by email
-		if identity.User != nil && identity.User.Email != "" {
+		if identity.User != nil && len(identity.User.Email) != 0 {
 			identitiesMap[strings.ToLower(identity.User.Email)] = identity
 		}
 		// For groups, also map by name
-		if identity.Group != nil && identity.Group.Name != "" {
+		if identity.Group != nil && len(identity.Group.Name) != 0 {
 			identitiesMap[strings.ToLower(identity.Group.Name)] = identity
 		}
 	}
@@ -123,7 +123,7 @@ func (p *oktaProvider) fetchUserIdentities(ctx context.Context) ([]models.Identi
 				name = nameVal
 			}
 			if lastNameVal, ok := (*user.Profile)["lastName"].(string); ok {
-				if name != "" {
+				if len(name) != 0 {
 					name = name + " " + lastNameVal
 				} else {
 					name = lastNameVal
@@ -199,7 +199,7 @@ func (p *oktaProvider) GetIdentity(ctx context.Context, identity string) (*model
 				name = nameVal
 			}
 			if lastNameVal, ok := (*user.Profile)["lastName"].(string); ok {
-				if name != "" {
+				if len(name) != 0 {
 					name = name + " " + lastNameVal
 				} else {
 					name = lastNameVal

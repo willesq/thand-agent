@@ -72,15 +72,15 @@ func (p *gcpProvider) RefreshIdentities(ctx context.Context) error {
 		identitiesMap[strings.ToLower(identity.Label)] = identity
 
 		// For users, also map by email
-		if identity.User != nil && identity.User.Email != "" {
+		if identity.User != nil && len(identity.User.Email) != 0 {
 			identitiesMap[strings.ToLower(identity.User.Email)] = identity
 		}
 		// For groups, also map by name/email
 		if identity.Group != nil {
-			if identity.Group.Name != "" {
+			if len(identity.Group.Name) != 0 {
 				identitiesMap[strings.ToLower(identity.Group.Name)] = identity
 			}
-			if identity.Group.Email != "" {
+			if len(identity.Group.Email) != 0 {
 				identitiesMap[strings.ToLower(identity.Group.Email)] = identity
 			}
 		}

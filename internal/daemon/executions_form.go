@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/mail"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -152,7 +151,7 @@ func (s *Server) getFormPage(c *gin.Context) {
 	}
 
 	if s.canAcceptHtml(c) {
-		s.renderHtml(c, "form.html", formData)
+		s.renderHtml(c, "execution_form.html", formData)
 	} else {
 		c.JSON(http.StatusOK, formData)
 	}
@@ -354,10 +353,10 @@ func (s *Server) getFormDataFromWorkflow(c *gin.Context, workflowID string) (*Fo
 		SubmitLabel:  formConfig.SubmitLabel,
 	}
 
-	if formData.FormTitle == "" {
+	if len(formData.FormTitle) == 0 {
 		formData.FormTitle = "Form"
 	}
-	if formData.SubmitLabel == "" {
+	if len(formData.SubmitLabel) == 0 {
 		formData.SubmitLabel = "Submit"
 	}
 
@@ -727,6 +726,16 @@ func convertOptionGroups(groups []*slack.OptionGroupBlockObject) []*FormOptionGr
 func (s *Server) validateFormSubmission(formData *FormPageData, submission *FormSubmission) []FormValidationError {
 	var errors []FormValidationError
 
+	// Validate that the submitted task name matches the current active task
+	if submission.TaskName != formData.TaskName {
+		errors = append(errors, FormValidationError{
+			Field:   "task_name",
+			Message: fmt.Sprintf("Invalid task name: expected '%s', got '%s'", formData.TaskName, submission.TaskName),
+		})
+		// Return early - if task name doesn't match, other validation is meaningless
+		return errors
+	}
+
 	// Build a map of required fields and their validation rules
 	for _, block := range formData.Blocks {
 		if block.Type != "input" {
@@ -738,14 +747,14 @@ func (s *Server) validateFormSubmission(formData *FormPageData, submission *Form
 		}
 
 		actionID := block.Element.ActionID
-		if actionID == "" {
+		if len(actionID) == 0 {
 			continue
 		}
 
 		value, exists := submission.Values[actionID]
 
 		// Check required fields
-		if !block.Optional && (!exists || value == "") {
+		if !block.Optional && (!exists || len(value) == 0) {
 			label := "Field"
 			if block.Label != nil {
 				label = block.Label.Text
@@ -758,7 +767,7 @@ func (s *Server) validateFormSubmission(formData *FormPageData, submission *Form
 		}
 
 		// Skip further validation if field is empty and optional
-		if !exists || value == "" {
+		if !exists || len(value) == 0 {
 			continue
 		}
 
@@ -779,7 +788,7 @@ func (s *Server) validateFormSubmission(formData *FormPageData, submission *Form
 			}
 
 		case "email_text_input":
-			if !isValidEmail(value) {
+			if !common.IsValidEmail(value) {
 				errors = append(errors, FormValidationError{
 					Field:   actionID,
 					Message: "Please enter a valid email address",
@@ -787,7 +796,7 @@ func (s *Server) validateFormSubmission(formData *FormPageData, submission *Form
 			}
 
 		case "url_text_input":
-			if !isValidURL(value) {
+			if !common.IsValidURL(value) {
 				errors = append(errors, FormValidationError{
 					Field:   actionID,
 					Message: "Please enter a valid URL",
@@ -795,58 +804,19 @@ func (s *Server) validateFormSubmission(formData *FormPageData, submission *Form
 			}
 
 		case "number_input":
-			if !isValidNumber(value, block.Element.IsDecimalAllowed) {
+			if !common.IsValidNumber(value, block.Element.IsDecimalAllowed) {
 				errors = append(errors, FormValidationError{
 					Field:   actionID,
 					Message: "Please enter a valid number",
+				})
+			} else if rangeErr := common.ValidateNumberRange(value, block.Element.MinValue, block.Element.MaxValue); len(rangeErr) != 0 {
+				errors = append(errors, FormValidationError{
+					Field:   actionID,
+					Message: rangeErr,
 				})
 			}
 		}
 	}
 
 	return errors
-}
-
-// isValidEmail checks if a string is a valid email format
-func isValidEmail(email string) bool {
-	// Use net/mail to validate email format according to RFC 5322
-	_, err := mail.ParseAddress(email)
-	return err == nil
-}
-
-// isValidURL checks if a string is a valid URL format
-func isValidURL(url string) bool {
-	return (len(url) >= 7 && url[:7] == "http://") || (len(url) >= 8 && url[:8] == "https://")
-}
-
-// isValidNumber checks if a string is a valid number
-func isValidNumber(value string, decimalAllowed bool) bool {
-	if len(value) == 0 {
-		return false
-	}
-
-	hasDecimal := false
-	start := 0
-
-	// Allow negative numbers
-	if value[0] == '-' {
-		start = 1
-		if len(value) == 1 {
-			return false
-		}
-	}
-
-	for i := start; i < len(value); i++ {
-		c := value[i]
-		if c == '.' {
-			if !decimalAllowed || hasDecimal {
-				return false
-			}
-			hasDecimal = true
-		} else if c < '0' || c > '9' {
-			return false
-		}
-	}
-
-	return true
 }

@@ -235,7 +235,7 @@ func (m tuiModel) renderStatusSection() string {
 		section.WriteString("\n")
 	}
 
-	if m.execution.Role != "" {
+	if len(m.execution.Role) != 0 {
 		section.WriteString(fmt.Sprintf("Role:          %s", m.execution.Role))
 		section.WriteString("\n")
 	}

@@ -115,7 +115,7 @@ func TestLoginServer_GetFirstActiveSession(t *testing.T) {
 				return
 			}
 
-			if tt.expectProvider != "" && providerName != tt.expectProvider {
+			if len(tt.expectProvider) != 0 && providerName != tt.expectProvider {
 				t.Errorf("Expected provider %s, got %s", tt.expectProvider, providerName)
 			}
 		})
