@@ -20,6 +20,9 @@ var authorizeEmailContentHTML string
 //go:embed revoke_email_content.html
 var revokeEmailContentHTML string
 
+//go:embed form_email_content.html
+var formEmailContentHTML string
+
 // EmailData is a simple struct for email template data
 type EmailData struct {
 	Title   string
@@ -30,6 +33,7 @@ var emailTemplate *template.Template
 var approvalContentTemplate *template.Template
 var authorizeContentTemplate *template.Template
 var revokeContentTemplate *template.Template
+var formContentTemplate *template.Template
 
 func init() {
 	var err error
@@ -52,6 +56,11 @@ func init() {
 	revokeContentTemplate, err = template.New("revoke_content").Parse(revokeEmailContentHTML)
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to parse revoke content template")
+	}
+
+	formContentTemplate, err = template.New("form_content").Parse(formEmailContentHTML)
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to parse form content template")
 	}
 }
 
@@ -97,4 +106,9 @@ func GetAuthorizeContentTemplate() *template.Template {
 // GetRevokeContentTemplate returns the revoke content template
 func GetRevokeContentTemplate() *template.Template {
 	return revokeContentTemplate
+}
+
+// GetFormContentTemplate returns the form content template
+func GetFormContentTemplate() *template.Template {
+	return formContentTemplate
 }

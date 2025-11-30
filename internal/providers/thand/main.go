@@ -167,7 +167,7 @@ func (p *thandProvider) ValidateSession(ctx context.Context, session *models.Ses
 	}
 
 	// Optionally validate the access token by making a test call to userinfo
-	if session.AccessToken != "" {
+	if len(session.AccessToken) != 0 {
 		_, err := p.getUserInfo(ctx, session.AccessToken)
 		if err != nil {
 			return fmt.Errorf("token validation failed: %w", err)

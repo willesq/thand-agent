@@ -1476,3 +1476,307 @@ footer p {
 .button-small.mr {
     margin-right: 0.5rem;
 }
+
+/* ========================================
+   Form Styles - Slack Block Forms
+   ======================================== */
+
+.form-container {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+.form-block {
+    margin-bottom: 1.5rem;
+}
+
+.form-block:last-child {
+    margin-bottom: 0;
+}
+
+/* Block: Header */
+.block-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: hsl(var(--foreground));
+}
+
+/* Block: Section */
+.block-section {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.section-content {
+    flex: 1;
+}
+
+.section-text {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: hsl(var(--foreground));
+}
+
+.section-text.markdown strong {
+    font-weight: 700;
+}
+
+.section-text.markdown code {
+    background-color: hsl(var(--muted));
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+.section-text.markdown a {
+    color: hsl(210 100% 50%);
+    text-decoration: none;
+}
+
+.section-text.markdown a:hover {
+    text-decoration: underline;
+}
+
+.section-fields {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.section-field {
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+}
+
+.section-accessory {
+    flex-shrink: 0;
+}
+
+/* Block: Divider */
+.block-divider {
+    border: none;
+    border-top: 1px solid hsl(var(--border));
+    margin: 1rem 0;
+}
+
+/* Block: Image */
+.block-image {
+    text-align: center;
+}
+
+.image-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.5rem;
+}
+
+.block-image-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.375rem;
+}
+
+/* Block: Context */
+.block-context {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.context-element {
+    display: inline-flex;
+    align-items: center;
+}
+
+.context-image {
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.125rem;
+}
+
+/* Block: Input */
+.block-input {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.input-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+}
+
+.required-indicator {
+    color: #ef4444;
+    margin-left: 0.25rem;
+}
+
+.input-hint {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.25rem;
+}
+
+/* Form Input Elements */
+.form-input,
+.form-textarea,
+.form-select {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.375rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+    outline: none;
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+}
+
+.form-input:disabled,
+.form-textarea:disabled,
+.form-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 6rem;
+}
+
+.form-select {
+    cursor: pointer;
+}
+
+.form-select[multiple] {
+    min-height: 8rem;
+}
+
+/* Radio and Checkbox Groups */
+.radio-group,
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.radio-label,
+.checkbox-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    transition: background-color 0.15s ease;
+}
+
+.radio-label:hover,
+.checkbox-label:hover {
+    background-color: hsl(var(--muted) / 0.5);
+}
+
+.radio-label input[type="radio"],
+.checkbox-label input[type="checkbox"] {
+    margin-top: 0.25rem;
+    cursor: pointer;
+}
+
+.radio-text,
+.checkbox-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+}
+
+.radio-description,
+.checkbox-description {
+    width: 100%;
+    padding-left: 1.25rem;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+}
+
+/* Block: Actions */
+.block-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.element-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.25rem;
+}
+
+/* Form Error Messages */
+.field-error {
+    font-size: 0.75rem;
+    color: #ef4444;
+    margin-top: 0.25rem;
+}
+
+.form-error-message {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    color: #991b1b;
+    font-size: 0.875rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    .form-error-message {
+        background-color: #450a0a;
+        border-color: #7f1d1d;
+        color: #fecaca;
+    }
+}
+
+/* Form Submit Section */
+.form-submit {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid hsl(var(--border));
+}
+
+/* Button danger style for actions */
+.button-danger {
+    background-color: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+.button-danger:hover {
+    background-color: #dc2626;
+    border-color: #dc2626;
+}

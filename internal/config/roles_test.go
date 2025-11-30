@@ -366,7 +366,7 @@ func TestGetCompositeRole(t *testing.T) {
 			// Check error expectations
 			if tt.expectError {
 				require.Error(t, err)
-				if tt.errorContains != "" {
+				if len(tt.errorContains) != 0 {
 					assert.Contains(t, err.Error(), tt.errorContains)
 				}
 				return

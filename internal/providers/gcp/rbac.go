@@ -3,12 +3,12 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"net/mail"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/temporal"
 	"google.golang.org/api/cloudresourcemanager/v1"
@@ -192,7 +192,7 @@ func (p *gcpProvider) RevokeRole(
 			// Extract the role name from the full path (projects/{project}/roles/{roleName})
 			parts := strings.Split(roleName, "/")
 			// Expected format: projects/{project}/roles/{roleName} (4 parts)
-			if len(parts) != 4 || parts[len(parts)-1] == "" {
+			if len(parts) != 4 || len(parts[len(parts)-1]) == 0 {
 				return nil, fmt.Errorf("invalid custom role name format: %q, expected projects/{project}/roles/{roleName}", roleName)
 			}
 			customRoleName := parts[len(parts)-1]
@@ -297,12 +297,10 @@ func validateAndFormatMember(user *models.User) (string, error) {
 	if len(user.Email) == 0 {
 		return "", fmt.Errorf("user email is required for GCP IAM binding")
 	}
-	// Use net/mail.ParseAddress for robust email validation
-	addr, err := mail.ParseAddress(user.Email)
-	if err != nil {
+	if !common.IsValidEmail(user.Email) {
 		return "", fmt.Errorf("invalid email format for GCP IAM binding: %s", user.Email)
 	}
-	return "user:" + addr.Address, nil
+	return "user:" + user.Email, nil
 }
 
 // addMemberToPolicy adds a member to a role binding in the policy, creating a new binding if necessary

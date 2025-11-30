@@ -140,7 +140,7 @@ func TestAWSElevationWorkflow(t *testing.T) {
 			}
 		}
 
-		if approveURL != "" {
+		if len(approveURL) != 0 {
 			t.Logf("Approval link found: %s", approveURL)
 		} else {
 			t.Log("No explicit 'approve' link found, but email was received successfully")

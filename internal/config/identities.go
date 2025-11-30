@@ -40,7 +40,7 @@ func (c *Config) GetIdentity(identity string) (*models.Identity, error) {
 	}
 
 	// If we have a specific provider, query only that one
-	if providerID != "" {
+	if len(providerID) != 0 {
 		provider, err := c.GetProviderByName(providerID)
 		if err != nil {
 			return nil, fmt.Errorf("provider '%s' not found: %w", providerID, err)

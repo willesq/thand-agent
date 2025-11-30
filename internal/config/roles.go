@@ -280,9 +280,9 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 			// Try to get as provider role
 			providerRole := c.GetProviderRoleWithIdentity(identity, roleName, providerName)
 			if providerRole != nil {
-				if providerRole.Name != "" {
+				if len(providerRole.Name) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Name)
-				} else if providerRole.Id != "" {
+				} else if len(providerRole.Id) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Id)
 				}
 				continue
@@ -299,9 +299,9 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 		if len(baseRole.Providers) > 0 {
 			providerRole := c.GetProviderRoleWithIdentity(identity, inheritedRoleName, baseRole.Providers...)
 			if providerRole != nil {
-				if providerRole.Name != "" {
+				if len(providerRole.Name) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Name)
-				} else if providerRole.Id != "" {
+				} else if len(providerRole.Id) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Id)
 				}
 				continue
@@ -680,7 +680,7 @@ func expandCondensedActions(permission string) []string {
 
 	for _, action := range actions {
 		action = strings.TrimSpace(action)
-		if action != "" {
+		if len(action) != 0 {
 			result = append(result, resource+":"+action)
 		}
 	}

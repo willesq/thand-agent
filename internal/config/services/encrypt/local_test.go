@@ -52,10 +52,10 @@ func TestLocalVault_Initialize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := &models.BasicConfig{}
-			if tt.password != "" {
+			if len(tt.password) != 0 {
 				config.SetKeyWithValue("password", tt.password)
 			}
-			if tt.salt != "" {
+			if len(tt.salt) != 0 {
 				config.SetKeyWithValue("salt", tt.salt)
 			}
 

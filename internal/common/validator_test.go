@@ -37,3 +37,117 @@ func BenchmarkIsAllDigits(b *testing.B) {
 		IsAllDigits(testString)
 	}
 }
+
+func TestIsValidNumber(t *testing.T) {
+	tests := []struct {
+		value          string
+		decimalAllowed bool
+		expected       bool
+	}{
+		// Valid integers
+		{"123", true, true},
+		{"123", false, true},
+		{"0", true, true},
+		{"0", false, true},
+		{"-123", true, true},
+		{"-123", false, true},
+
+		// Valid decimals
+		{"123.45", true, true},
+		{"0.5", true, true},
+		{"-123.45", true, true},
+		{"3.14159", true, true},
+
+		// Decimals when not allowed
+		{"123.45", false, false},
+		{"0.5", false, false},
+		{"-123.45", false, false},
+
+		// Invalid values
+		{"", true, false},
+		{"abc", true, false},
+		{"12.34.56", true, false},
+		{"12a34", true, false},
+		{" 123", true, false},
+		{"123 ", true, false},
+	}
+
+	for _, test := range tests {
+		result := IsValidNumber(test.value, test.decimalAllowed)
+		if result != test.expected {
+			t.Errorf("IsValidNumber(%q, %v) = %v, expected %v", test.value, test.decimalAllowed, result, test.expected)
+		}
+	}
+}
+
+func TestValidateNumberRange(t *testing.T) {
+	tests := []struct {
+		value    string
+		minValue string
+		maxValue string
+		wantErr  bool
+		errMsg   string
+	}{
+		// Valid within range
+		{"50", "0", "100", false, ""},
+		{"0", "0", "100", false, ""},
+		{"100", "0", "100", false, ""},
+		{"50.5", "0", "100", false, ""},
+
+		// No constraints
+		{"50", "", "", false, ""},
+		{"-100", "", "", false, ""},
+		{"999999", "", "", false, ""},
+
+		// Only min constraint
+		{"50", "10", "", false, ""},
+		{"10", "10", "", false, ""},
+		{"5", "10", "", true, "Value must be at least 10"},
+		{"-5", "0", "", true, "Value must be at least 0"},
+
+		// Only max constraint
+		{"50", "", "100", false, ""},
+		{"100", "", "100", false, ""},
+		{"150", "", "100", true, "Value must be at most 100"},
+
+		// Both constraints - below min
+		{"5", "10", "100", true, "Value must be at least 10"},
+		{"-1", "0", "100", true, "Value must be at least 0"},
+
+		// Both constraints - above max
+		{"150", "10", "100", true, "Value must be at most 100"},
+		{"101", "0", "100", true, "Value must be at most 100"},
+
+		// Decimal values
+		{"10.5", "10", "11", false, ""},
+		{"9.9", "10", "11", true, "Value must be at least 10"},
+		{"11.1", "10", "11", true, "Value must be at most 11"},
+
+		// Negative ranges
+		{"-50", "-100", "-10", false, ""},
+		{"-5", "-100", "-10", true, "Value must be at most -10"},
+		{"-150", "-100", "-10", true, "Value must be at least -100"},
+
+		// Invalid number
+		{"abc", "0", "100", true, "Please enter a valid number"},
+		{"", "0", "100", true, "Please enter a valid number"},
+
+		// Invalid min/max values are ignored
+		{"50", "abc", "100", false, ""},
+		{"50", "0", "abc", false, ""},
+		{"50", "abc", "abc", false, ""},
+	}
+
+	for _, test := range tests {
+		result := ValidateNumberRange(test.value, test.minValue, test.maxValue)
+		hasErr := len(result) != 0
+
+		if hasErr != test.wantErr {
+			t.Errorf("ValidateNumberRange(%q, %q, %q) error = %v, wantErr %v", test.value, test.minValue, test.maxValue, result, test.wantErr)
+		}
+
+		if test.wantErr && result != test.errMsg {
+			t.Errorf("ValidateNumberRange(%q, %q, %q) = %q, expected %q", test.value, test.minValue, test.maxValue, result, test.errMsg)
+		}
+	}
+}

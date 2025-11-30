@@ -19,6 +19,7 @@ import (
 
 const ThandNotifyTask = "notify"
 const ThandApprovalEventType = "com.thand.approval"
+const ThandFormEventType = "com.thand.form"
 
 // notifyResult holds the result of a notification operation
 type notifyResult struct {
