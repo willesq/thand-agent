@@ -21,9 +21,7 @@ providers:
     provider: email
     enabled: true
     config:
+      platform: smtp
       host: "${MAILHOG_HOST}"
       port: ${MAILHOG_PORT}
       from: test@thand.io
-      # MailHog doesn't require authentication
-      user: ""
-      pass: ""

@@ -18,6 +18,9 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/operatorservice/v1"
@@ -26,8 +29,8 @@ import (
 )
 
 const (
-	// TemporalDefaultNamespace is the default namespace used for Temporal integration tests
-	TemporalDefaultNamespace = "default"
+	// TemporalTestNamespace is the namespace used for Temporal integration tests
+	TemporalTestNamespace = "thand-test"
 	// TemporalDefaultPort is the default gRPC port for Temporal server
 	TemporalDefaultPort = "7233"
 )
@@ -351,21 +354,18 @@ system.forceSearchAttributesCacheRefreshOnRead:
 	infra.TemporalEndpoint = net.JoinHostPort(host, mappedPort.Port())
 	infra.t.Logf("Temporal started at %s", infra.TemporalEndpoint)
 
-	// Wait for Temporal to be fully ready
-	time.Sleep(5 * time.Second)
+	// Register the test namespace with custom search attributes
+	infra.registerNamespaceWithSearchAttributes(ctx)
 
-	// Create Temporal client
+	// Create Temporal client connected to our custom namespace
 	c, err := client.Dial(client.Options{
 		HostPort:  infra.TemporalEndpoint,
-		Namespace: TemporalDefaultNamespace,
+		Namespace: TemporalTestNamespace,
 	})
 	require.NoError(infra.t, err, "Failed to create Temporal client")
 
 	infra.TemporalClient = c
 	infra.t.Log("Temporal client connected")
-
-	// Register custom search attributes for workflows
-	infra.registerSearchAttributes(ctx)
 }
 
 // Teardown stops and removes all containers
@@ -406,14 +406,34 @@ func (infra *TestInfrastructure) Teardown() {
 	infra.t.Log("Test infrastructure teardown complete")
 }
 
-// registerSearchAttributes registers custom search attributes needed for workflows
-func (infra *TestInfrastructure) registerSearchAttributes(ctx context.Context) {
-	// Wait a bit for Temporal's search attribute system to be ready
-	time.Sleep(2 * time.Second)
+// registerNamespaceWithSearchAttributes creates the test namespace and registers
+// custom search attributes in a single operation, avoiding the need to wait for
+// the search attribute system to be ready.
+func (infra *TestInfrastructure) registerNamespaceWithSearchAttributes(ctx context.Context) {
+	infra.t.Log("Registering test namespace with custom search attributes...")
 
-	// Use the actual typed search attributes from models.temporal.go
-	// Each SearchAttributeKey has GetName() and GetValueType() methods
-	searchAttributes := []interface {
+	// Create a gRPC connection to Temporal for namespace registration
+	conn, err := grpc.NewClient(
+		infra.TemporalEndpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(infra.t, err, "Failed to create gRPC connection")
+	defer conn.Close()
+
+	workflowClient := workflowservice.NewWorkflowServiceClient(conn)
+	operatorClient := operatorservice.NewOperatorServiceClient(conn)
+
+	// Register the namespace
+	_, err = workflowClient.RegisterNamespace(ctx, &workflowservice.RegisterNamespaceRequest{
+		Namespace:                        TemporalTestNamespace,
+		Description:                      "Integration test namespace for thand agent",
+		WorkflowExecutionRetentionPeriod: durationpb.New(24 * time.Hour),
+	})
+	require.NoError(infra.t, err, "Failed to register namespace")
+	infra.t.Logf("Namespace '%s' registered", TemporalTestNamespace)
+
+	// Build the search attributes map from typed search attributes
+	searchAttributeTypes := []interface {
 		GetName() string
 		GetValueType() enums.IndexedValueType
 	}{
@@ -429,32 +449,25 @@ func (infra *TestInfrastructure) registerSearchAttributes(ctx context.Context) {
 		models.TypedSearchAttributeApproved,
 	}
 
-	operatorClient := infra.TemporalClient.OperatorService()
-
-	registered := 0
-	for _, attr := range searchAttributes {
-		// Try to add the search attribute - it may already exist
-		_, err := operatorClient.AddSearchAttributes(ctx, &operatorservice.AddSearchAttributesRequest{
-			Namespace: TemporalDefaultNamespace,
-			SearchAttributes: map[string]enums.IndexedValueType{
-				attr.GetName(): attr.GetValueType(),
-			},
-		})
-		if err != nil {
-			// Log but don't fail - some may already exist or hit limits
-			infra.t.Logf("Note: Search attribute '%s' (%s) registration: %v",
-				attr.GetName(), attr.GetValueType().String(), err)
-		} else {
-			registered++
-			infra.t.Logf("Registered search attribute: %s (%s)",
-				attr.GetName(), attr.GetValueType().String())
-		}
+	searchAttributes := make(map[string]enums.IndexedValueType, len(searchAttributeTypes))
+	for _, attr := range searchAttributeTypes {
+		searchAttributes[attr.GetName()] = attr.GetValueType()
 	}
 
-	infra.t.Logf("Custom search attributes registered: %d/%d", registered, len(searchAttributes))
+	// Add all search attributes in a single call
+	_, err = operatorClient.AddSearchAttributes(ctx, &operatorservice.AddSearchAttributesRequest{
+		Namespace:        TemporalTestNamespace,
+		SearchAttributes: searchAttributes,
+	})
+	require.NoError(infra.t, err, "Failed to add search attributes to namespace")
 
-	// Wait for the search attributes to propagate to the visibility store
-	time.Sleep(3 * time.Second)
+	infra.t.Logf("Registered %d custom search attributes for namespace '%s'",
+		len(searchAttributes), TemporalTestNamespace)
+
+	// Log the registered attributes
+	for name, valueType := range searchAttributes {
+		infra.t.Logf("  - %s (%s)", name, valueType.String())
+	}
 }
 
 // TestTemporalAndLocalStackSetup verifies that all containers start correctly
@@ -497,7 +510,7 @@ func TestTemporalAndLocalStackSetup(t *testing.T) {
 
 		// Try to list workflows to verify connection
 		_, err := infra.TemporalClient.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
-			Namespace: TemporalDefaultNamespace,
+			Namespace: TemporalTestNamespace,
 			PageSize:  1,
 		})
 		require.NoError(t, err, "Should be able to list workflows")

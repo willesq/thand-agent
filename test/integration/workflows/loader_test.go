@@ -190,7 +190,7 @@ func (l *TestCaseLoader) CreateConfigFromTestCase(tc *TestCase) (*config.Config,
 	cfg.Services.Temporal = &models.TemporalConfig{
 		Host:              host,
 		Port:              port,
-		Namespace:         TemporalDefaultNamespace,
+		Namespace:         TemporalTestNamespace,
 		DisableVersioning: true, // Disable versioning for integration tests
 	}
 
