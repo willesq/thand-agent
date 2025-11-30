@@ -1,4 +1,4 @@
-<div class="title-block" style="text-align: center;" align="center">
+<div align="center">
 
 # Thand Agent
 ## Distributed Just-in-Time Access Management
@@ -7,13 +7,13 @@
 **[Getting Started](#getting-started) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
 **[Architecture](#thand-architecture) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
 **[Documentation](#documentation) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
-**[Contributing](#contributing) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
-**[Thand Docs](https://docs.thand.io/) &nbsp;**
+**[Status](#status) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
+**[Thand Docs](https://docs.thand.io/) &nbsp;&nbsp;**
 
 [![Watch the Thand demo](https://github.com/thand-io/agent/blob/main/docs/assets/images/youtube_demo.png?raw=true)](https://youtu.be/WLJ1Ab0zeno)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/thand-io/agent)](https://goreportcard.com/report/github.com/thand-io/agent)
-[![Build and Release](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml/badge.svg)](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml) 
+[![Build and Release](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml/badge.svg)](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml)
 [![Slack Community](https://img.shields.io/badge/Slack-4A154B?style=plastic&logo=slack&logoColor=white)](https://join.slack.com/t/thand-community/shared_invite/zt-3hegenhb7-w~q7JG7WYIyfefGz9NrSeA)
 
 </div>
