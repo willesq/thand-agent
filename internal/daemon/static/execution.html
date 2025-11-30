@@ -152,7 +152,7 @@
                                             
                                             <!-- View Form Button for thand form tasks (replaces CURRENT badge) -->
                                             <template x-if="isCurrentTask(task) && isThandFormTask(task)">
-                                                <a :href="'/form/' + workflowId" 
+                                                <a :href="'/execution/' + workflowId + '/form'" 
                                                    class="button button-primary"
                                                    style="font-size: 0.75rem; padding: 0.375rem 0.75rem;"
                                                    @click.stop>

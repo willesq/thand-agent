@@ -501,7 +501,7 @@
                 };
                 
                 try {
-                    const response = await fetch(`${this.apiBasePath}/form/${this.workflowId}`, {
+                    const response = await fetch(`${this.apiBasePath}/execution/${this.workflowId}/form`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

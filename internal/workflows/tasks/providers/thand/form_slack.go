@@ -168,13 +168,13 @@ func (f *formNotifier) addFormActionSection(blocks *[]slack.Block, workflowTask 
 // createFormUrl creates the URL to the HTML form page
 func (f *formNotifier) createFormUrl(workflowTask *models.WorkflowTask) string {
 	// Get the form page URL from config
-	// The form page is at /form/:workflowId
+	// The form page is at /execution/:workflowId/form
 	baseURL := f.config.GetLoginServerUrl()
 	if len(baseURL) == 0 {
 		baseURL = f.config.GetLocalServerUrl()
 	}
 
-	return fmt.Sprintf("%s/form/%s", baseURL, workflowTask.WorkflowID)
+	return fmt.Sprintf("%s/execution/%s/form", baseURL, workflowTask.WorkflowID)
 }
 
 // truncateText truncates text to a maximum length with ellipsis

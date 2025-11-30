@@ -334,8 +334,8 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 		router.GET("/execution/:id/terminate", s.terminateRunningWorkflow) // Forceful termination
 
 		// Form routes for workflow task forms
-		router.GET("/form/:id", s.getFormPage)
-		router.POST("/form/:id", s.submitForm)
+		router.GET("/execution/:id/form", s.getFormPage)
+		router.POST("/execution/:id/form", s.submitForm)
 
 		router.GET("/workflow/:name", s.getWorkflowByName)
 
@@ -457,8 +457,8 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			api.GET("/execution/:id/signal", s.signalRunningWorkflow)
 
 			// Form API endpoints
-			api.GET("/form/:id", s.getFormPage)
-			api.POST("/form/:id", s.submitForm)
+			api.GET("/execution/:id/form", s.getFormPage)
+			api.POST("/execution/:id/form", s.submitForm)
 
 		}
 	}
