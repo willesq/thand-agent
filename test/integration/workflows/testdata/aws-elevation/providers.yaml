@@ -23,7 +23,7 @@ providers:
     config:
       platform: smtp
       host: "${MAILHOG_HOST}"
-      port: ${MAILHOG_PORT}
+      port: "${MAILHOG_PORT}"
       from: test@thand.io
       # MailHog doesn't require authentication
       user: ""

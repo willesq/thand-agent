@@ -11,12 +11,15 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/iam v1.52.1
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/google/uuid v1.6.0
+	github.com/serverlessworkflow/sdk-go/v3 v3.1.1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.39.0
 	github.com/testcontainers/testcontainers-go/modules/localstack v0.39.0
 	github.com/thand-io/agent v0.0.0
 	go.temporal.io/api v1.58.0
 	go.temporal.io/sdk v1.38.0
+	google.golang.org/grpc v1.77.0
+	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -212,7 +215,6 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46 // indirect
-	github.com/serverlessworkflow/sdk-go/v3 v3.1.1 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
 	github.com/simpleforce/simpleforce v0.0.0-20220429021116-acf4ac67ef68 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -261,8 +263,6 @@ require (
 	google.golang.org/genproto v0.0.0-20251111163417-95abcf5c77ba // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
-	google.golang.org/grpc v1.77.0 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df // indirect

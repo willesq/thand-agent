@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/tasks"
@@ -46,6 +47,26 @@ func (f *thandTask) GetName() string {
 
 func (f *thandTask) GetDescription() string {
 	return "This task handles approvals in the Thand workflow."
+}
+
+// resolveUserFromIdentity looks up the identity from configured providers and returns the user.
+// This handles provider-prefixed identities like "aws-prod:username"
+// and queries identity providers to get the full user object.
+// If the lookup fails, it returns a basic user with the identity as the email.
+func (t *thandTask) resolveUserFromIdentity(identity string) *models.User {
+	identityResult, err := t.config.GetIdentity(identity)
+	if err != nil {
+		logrus.WithError(err).WithField("identity", identity).Warn("Failed to lookup identity, using basic user")
+	}
+
+	// Use the looked up user or create a basic one
+	if identityResult != nil && identityResult.User != nil {
+		return identityResult.User
+	}
+
+	return &models.User{
+		Email: identity,
+	}
 }
 
 func (f *thandTask) GetVersion() string {
