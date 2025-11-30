@@ -1,8 +1,26 @@
-# Thand Agent [![Go Report Card](https://goreportcard.com/badge/github.com/thand-io/agent)](https://goreportcard.com/report/github.com/thand-io/agent) [![Build and Release](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml/badge.svg)](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml) [![Slack Community](https://img.shields.io/badge/Slack-4A154B?style=plastic&logo=slack&logoColor=white)](https://join.slack.com/t/thand-community/shared_invite/zt-3hegenhb7-w~q7JG7WYIyfefGz9NrSeA)
+<div class="title-block" style="text-align: center;" align="center">
+
+# Thand Agent
+## Distributed Just-in-Time Access Management
+
+**[Introduction](#introduction) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
+**[Getting Started](#getting-started) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
+**[Architecture](#thand-architecture) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
+**[Documentation](#documentation) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
+**[Contributing](#contributing) &nbsp;&nbsp;&bull;&nbsp;&nbsp;**
+**[Thand Docs](https://docs.thand.io/) &nbsp;**
+
+[![Watch the Thand demo](https://github.com/thand-io/agent/blob/main/docs/assets/images/youtube_demo.png?raw=true)](https://youtu.be/WLJ1Ab0zeno)
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/thand-io/agent)](https://goreportcard.com/report/github.com/thand-io/agent)
+[![Build and Release](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml/badge.svg)](https://github.com/thand-io/agent/actions/workflows/test-and-build.yml) 
+[![Slack Community](https://img.shields.io/badge/Slack-4A154B?style=plastic&logo=slack&logoColor=white)](https://join.slack.com/t/thand-community/shared_invite/zt-3hegenhb7-w~q7JG7WYIyfefGz9NrSeA)
+
+</div>
+
+## Introduction
 
 Thand is a distributed open-source agent for privileged access management (PAM) and just-in-time access (JIT) to cloud infrastructure, SaaS applications and local systems. It uses [Serverless Workflows](https://serverlessworkflow.io/) and [Temporal](https://www.temporal.io) to orchestrate and guarantee robust deterministic workflow execution and revocation, of permissions across cloud/on-prem environments and systems. It tasks “agents” to grant access where it needs to be rather than centralising permission stores. Run it locally for sudo, UAC. Or in the cloud for IAM or for individual applications. Connect to Thand Cloud for enterprise features.
-
-[![Watch the Thand demo](https://img.youtube.com/vi/WLJ1Ab0zeno/mqdefault.jpg)](https://youtu.be/WLJ1Ab0zeno)
 
 **We're keen to understand different use cases in this space**. If it looks like you could make use of the Thand agent and would like some help getting it setup and configured for your environment, [let us know](https://forms.gle/dkYzfu1Nrs33HmNM9) and we'll setup some time to work with you.
 
@@ -27,36 +45,8 @@ Thand eliminates standing access to critical infrastructure and SaaS apps. Inste
 
 Thand is licensed under the BSL 1.1 license. See [LICENSE.md](LICENSE.md) for more details.
 
-## Thand Architecture
 
-The Thand architecture breaks down into three components. Both the agent and server
-are contained within this repository. All access keys are stored on your infrastructure.
-The Thand server can be deployed ephemerally without any persistent storage, providing a
-low maintenance, high security solution. Temporal.io is used to orchestrate all workflows
-and ensure just-in-time access is granted and revoked correctly and guarantees state maintenance.
-
-- **Agent**: Runs on the user's local machine, provides session management and local callback endpoints to attest to the user's authenticity.
-- **Server**: This can run anywhere you need to provide access. This forms a "login server" to allow CLIs and other clients to request and be granted elevations.
-- **Cloud**: This is Thand's proprietary cloud service that orchestrates all your servers, agents and centralizes management and remote revocations. The cloud also provides additional features such as AI-driven insights and analytics. See thand.io for all the capabilities.
-
-```
-Your Machine             Your Infrastructure             Thand Cloud (Optional)
-─────────────            ───────────────────             ──────────────────────
-
-Thand Agent  ──HTTPS──▶  Thand Server        ──HTTPS──▶  Thand Cloud
-├─ CLI                   ├─ REST API                     ├─ Agent Management
-├─ Sessions              ├─ Session Management           ├─ Role Management
-├─ Local elevations      ├─ Workflow Worker              ├─ Workflow Management
-├─ REST API              ├─ Audit Forwarder              ├─ Audit Dashboard
-└─ Attestations          ├─ Basic Approvals              └─ etc
-                         ├─ Event collection
-                         └─ Platform Connectors
-
-```
-
-
-
-## 🚀 Quick Start - Choose Your Path
+## Getting Started
 
 ### Option 1:  Use Thand Cloud (SaaS)
 
@@ -116,6 +106,33 @@ curl -sSL https://get.thand.io | sh
 
 # Connect to your server
 thand login --login-server http://localhost:8080
+
+```
+
+## Thand Architecture
+
+The Thand architecture breaks down into three components. Both the agent and server
+are contained within this repository. All access keys are stored on your infrastructure.
+The Thand server can be deployed ephemerally without any persistent storage, providing a
+low maintenance, high security solution. Temporal.io is used to orchestrate all workflows
+and ensure just-in-time access is granted and revoked correctly and guarantees state maintenance.
+
+- **Agent**: Runs on the user's local machine, provides session management and local callback endpoints to attest to the user's authenticity.
+- **Server**: This can run anywhere you need to provide access. This forms a "login server" to allow CLIs and other clients to request and be granted elevations.
+- **Cloud**: This is Thand's proprietary cloud service that orchestrates all your servers, agents and centralizes management and remote revocations. The cloud also provides additional features such as AI-driven insights and analytics. See thand.io for all the capabilities.
+
+```
+Your Machine             Your Infrastructure             Thand Cloud (Optional)
+─────────────            ───────────────────             ──────────────────────
+
+Thand Agent  ──HTTPS──▶  Thand Server        ──HTTPS──▶  Thand Cloud
+├─ CLI                   ├─ REST API                     ├─ Agent Management
+├─ Sessions              ├─ Session Management           ├─ Role Management
+├─ Local elevations      ├─ Workflow Worker              ├─ Workflow Management
+├─ REST API              ├─ Audit Forwarder              ├─ Audit Dashboard
+└─ Attestations          ├─ Basic Approvals              └─ etc
+                         ├─ Event collection
+                         └─ Platform Connectors
 
 ```
 
