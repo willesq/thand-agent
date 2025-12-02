@@ -196,11 +196,11 @@ func TestCORSMiddleware(t *testing.T) {
 		},
 		{
 			name:                "multiple patterns - second match",
-			origin:              "https://foo.app.thand.dev",
+			origin:              "https://foo.app.thand.com",
 			method:              "GET",
 			allowedOrigins:      []string{"https://*.app.thand.io", "https://*.app.thand.com"},
 			allowCredentials:    true,
-			expectedAllowOrigin: "https://foo.app.thand.dev",
+			expectedAllowOrigin: "https://foo.app.thand.com",
 			expectedStatus:      http.StatusOK,
 			expectCORSHeaders:   true,
 		},
