@@ -30,7 +30,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -170,30 +169,19 @@ func (s *Server) Start() error {
 	))
 	router.Use(s.requestCounterMiddleware())
 
-	allowedOrigins := []string{
-		s.Config.GetLocalServerUrl(),
-	}
-
+	// Build CORS config from server security settings
+	corsConfig := s.Config.Server.Security.CORS
+	corsConfig.AllowCredentials = true
+	corsConfig.AddOrigins(s.Config.GetLocalServerUrl())
 	if len(s.Config.GetLoginServerUrl()) > 0 {
-		allowedOrigins = append(allowedOrigins, s.Config.GetLoginServerUrl())
+		corsConfig.AddOrigins(s.Config.GetLoginServerUrl())
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"allowedOrigins": allowedOrigins,
+		"allowedOrigins": corsConfig.AllowedOrigins,
 	}).Debugln("CORS configuration")
 
-	router.Use(cors.New(cors.Config{
-		AllowOrigins: allowedOrigins,
-		AllowHeaders: []string{
-			"Origin",
-			"Content-Length",
-			"Content-Type",
-			"Authorization",
-			"Accept",
-			"X-Requested-With",
-		},
-		AllowCredentials: false,
-	}))
+	router.Use(CORSMiddleware(corsConfig))
 
 	cookieNames := []string{ThandCookieName}
 

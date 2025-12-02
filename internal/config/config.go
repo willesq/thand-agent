@@ -551,7 +551,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.ready.path", "/ready")
 
 	// Security defaults
-	v.SetDefault("server.cors.allowed_origins", []string{"https://thand.io", "https://*.thand.io"})
+	v.SetDefault("server.cors.allowed_origins", []string{"https://thand.io", "https://*.thand.io", "https://app.thand.io", "https://*.app.thand.io"})
 	v.SetDefault("server.cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
 	v.SetDefault("server.cors.allowed_headers", []string{"Authorization", "Content-Type", "X-Requested-With"})
 	v.SetDefault("server.cors.max_age", 86400)

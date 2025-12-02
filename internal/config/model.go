@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
@@ -44,11 +43,11 @@ type Config struct {
 	Services models.ServicesConfig `mapstructure:"services"`
 
 	// System configuration
-	Login   LoginConfig   `mapstructure:"login"`
-	Server  ServerConfig  `mapstructure:"server"`
-	Logging LoggingConfig `mapstructure:"logging"`
-	API     APIConfig     `mapstructure:"api"`
-	Secret  string        `mapstructure:"secret"` // Secret used for signing cookies and tokens
+	Login   models.LoginConfig   `mapstructure:"login"`
+	Server  models.ServerConfig  `mapstructure:"server"`
+	Logging models.LoggingConfig `mapstructure:"logging"`
+	API     models.APIConfig     `mapstructure:"api"`
+	Secret  string               `mapstructure:"secret"` // Secret used for signing cookies and tokens
 
 	// Workflow engine config
 	Roles     RoleConfig     `mapstructure:"roles"`
@@ -209,81 +208,6 @@ func (c *Config) GetLargeLanguageModel() models.LargeLanguageModelImpl {
 
 func (c *Config) HasLargeLanguageModel() bool {
 	return c.GetServices().HasLargeLanguageModel()
-}
-
-type ServerConfig struct {
-	Host     string             `mapstructure:"host"`
-	Port     int                `mapstructure:"port"`
-	Limits   ServerLimitsConfig `mapstructure:"limits"`
-	Metrics  MetricsConfig      `mapstructure:"metrics"`
-	Health   HealthConfig       `mapstructure:"health"`
-	Ready    ReadyConfig        `mapstructure:"ready"`
-	Security SecurityConfig     `mapstructure:"security"`
-}
-
-type ServerLimitsConfig struct {
-	ReadTimeout       time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
-	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
-	RequestsPerMinute int           `mapstructure:"requests_per_minute"`
-	Burst             int           `mapstructure:"burst"`
-}
-
-type LoginConfig struct {
-	Endpoint string `mapstructure:"endpoint" default:"https://auth.thand.io/"`
-	ApiKey   string `mapstructure:"api_key"`          // API key for authenticating with the login server
-	Base     string `mapstructure:"base" default:"/"` // Base path for login endpoint e.g. /
-}
-
-type LoggingConfig struct {
-	Level  string `mapstructure:"level" default:"info"`
-	Format string `mapstructure:"format" default:"text"`
-	Output string `mapstructure:"output"`
-}
-
-type MetricsConfig struct {
-	Enabled   bool   `mapstructure:"enabled" default:"true"`
-	Path      string `mapstructure:"path" default:"/metrics"`
-	Namespace string `mapstructure:"namespace"`
-}
-
-type HealthConfig struct {
-	Enabled bool `mapstructure:"enabled" default:"true"`
-	// Don't use /healthz as it conflicts with google k8s health checks
-	Path string `mapstructure:"path" default:"/health"`
-}
-
-type ReadyConfig struct {
-	Enabled bool   `mapstructure:"enabled" default:"true"`
-	Path    string `mapstructure:"path" default:"/ready"`
-}
-
-type SecurityConfig struct {
-	CORS CORSConfig `mapstructure:"cors"`
-}
-
-type CORSConfig struct {
-	AllowedOrigins []string `mapstructure:"allowed_origins"`
-	AllowedMethods []string `mapstructure:"allowed_methods"`
-	AllowedHeaders []string `mapstructure:"allowed_headers"`
-	MaxAge         int      `mapstructure:"max_age"`
-}
-
-type APIConfig struct {
-	Version   string          `mapstructure:"version" default:"v1"`
-	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
-}
-
-func (api *APIConfig) GetVersion() string {
-	if len(api.Version) > 0 {
-		return api.Version
-	}
-	return "v1"
-}
-
-type RateLimitConfig struct {
-	RequestsPerMinute int `mapstructure:"requests_per_minute"`
-	Burst             int `mapstructure:"burst"`
 }
 
 type RoleConfig struct {
