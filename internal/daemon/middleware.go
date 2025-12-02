@@ -129,6 +129,12 @@ func matchWildcardOrigin(origin, pattern string) bool {
 	prefix := parts[0] // e.g., "https://"
 	suffix := parts[1] // e.g., ".example.com"
 
+	// Validate pattern format: suffix must start with a dot to prevent
+	// patterns like "https://*example.com" from matching "https://evilexample.com"
+	if !strings.HasPrefix(suffix, ".") {
+		return false
+	}
+
 	// Origin must start with the prefix
 	if !strings.HasPrefix(origin, prefix) {
 		return false

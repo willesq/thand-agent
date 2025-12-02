@@ -101,6 +101,24 @@ func TestMatchOrigin(t *testing.T) {
 			pattern:        "*",
 			expectedResult: true,
 		},
+		{
+			name:           "invalid pattern - missing dot after wildcard",
+			origin:         "https://evilexample.com",
+			pattern:        "https://*example.com",
+			expectedResult: false,
+		},
+		{
+			name:           "invalid pattern - missing dot should not match legitimate subdomain",
+			origin:         "https://sub.example.com",
+			pattern:        "https://*example.com",
+			expectedResult: false,
+		},
+		{
+			name:           "valid pattern with dot - should match",
+			origin:         "https://sub.example.com",
+			pattern:        "https://*.example.com",
+			expectedResult: true,
+		},
 	}
 
 	for _, tt := range tests {
