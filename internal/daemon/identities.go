@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -53,15 +52,6 @@ func (s *Server) getIdentities(c *gin.Context) {
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to get identities", err)
 		return
-	}
-
-	if len(identities) == 0 && len(filter) == 0 && (identityType == "user" || identityType == "all") {
-		logrus.WithField("user", foundUser.User.ID).Info("No identities found for user")
-		identities = append(identities, models.Identity{
-			ID:    foundUser.User.ID,
-			Label: foundUser.User.Name,
-			User:  foundUser.User,
-		})
 	}
 
 	// Return the aggregated identities

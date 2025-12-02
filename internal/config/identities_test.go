@@ -1041,6 +1041,172 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 	assert.True(t, resultIDs["unique3@example.com"])
 }
 
+// TestGetIdentitiesWithFilter_CurrentUserFallback tests that the current user is returned
+// when there are no results, no filter, and the identity type is User or All
+func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
+	currentUser := &models.User{
+		Email: "current@example.com",
+		Name:  "Current User",
+	}
+
+	t.Run("user returned when provider returns empty results - IdentityTypeUser", func(t *testing.T) {
+		// Provider returns no results
+		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+
+		config := &Config{
+			Providers: ProviderConfig{
+				Definitions: make(map[string]models.Provider),
+			},
+		}
+		p := models.Provider{
+			Name:        "test",
+			Description: "Test provider",
+			Provider:    "mock",
+			Enabled:     true,
+		}
+		p.SetClient(provider)
+		config.Providers.Definitions["test"] = p
+
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser)
+		require.NoError(t, err)
+
+		// Should return current user as fallback
+		assert.Len(t, results, 1)
+		assert.Equal(t, currentUser.Email, results[0].ID)
+	})
+
+	t.Run("user returned when provider returns empty results - IdentityTypeAll", func(t *testing.T) {
+		// Provider returns no results
+		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+
+		config := &Config{
+			Providers: ProviderConfig{
+				Definitions: make(map[string]models.Provider),
+			},
+		}
+		p := models.Provider{
+			Name:        "test",
+			Description: "Test provider",
+			Provider:    "mock",
+			Enabled:     true,
+		}
+		p.SetClient(provider)
+		config.Providers.Definitions["test"] = p
+
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeAll)
+		require.NoError(t, err)
+
+		// Should return current user as fallback
+		assert.Len(t, results, 1)
+		assert.Equal(t, currentUser.Email, results[0].ID)
+	})
+
+	t.Run("user NOT returned when provider has results", func(t *testing.T) {
+		provider := NewMockIdentityProvider("test", map[string]models.Identity{
+			"other@example.com": {
+				ID:    "other@example.com",
+				Label: "Other User",
+				User: &models.User{
+					Email:    "other@example.com",
+					Username: "other",
+				},
+			},
+		})
+
+		config := &Config{
+			Providers: ProviderConfig{
+				Definitions: make(map[string]models.Provider),
+			},
+		}
+		p := models.Provider{
+			Name:        "test",
+			Description: "Test provider",
+			Provider:    "mock",
+			Enabled:     true,
+		}
+		p.SetClient(provider)
+		config.Providers.Definitions["test"] = p
+
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser)
+		require.NoError(t, err)
+
+		// Should only have the provider result, not current user
+		assert.Len(t, results, 1)
+		assert.Equal(t, "other@example.com", results[0].ID)
+	})
+
+	t.Run("user NOT returned when IdentityTypeGroup even with empty results", func(t *testing.T) {
+		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+
+		config := &Config{
+			Providers: ProviderConfig{
+				Definitions: make(map[string]models.Provider),
+			},
+		}
+		p := models.Provider{
+			Name:        "test",
+			Description: "Test provider",
+			Provider:    "mock",
+			Enabled:     true,
+		}
+		p.SetClient(provider)
+		config.Providers.Definitions["test"] = p
+
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeGroup)
+		require.NoError(t, err)
+
+		// Should be empty, not the current user
+		assert.Len(t, results, 0)
+	})
+
+	t.Run("user NOT returned when filter is provided even with empty results", func(t *testing.T) {
+		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+
+		config := &Config{
+			Providers: ProviderConfig{
+				Definitions: make(map[string]models.Provider),
+			},
+		}
+		p := models.Provider{
+			Name:        "test",
+			Description: "Test provider",
+			Provider:    "mock",
+			Enabled:     true,
+		}
+		p.SetClient(provider)
+		config.Providers.Definitions["test"] = p
+
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, "nonexistent")
+		require.NoError(t, err)
+
+		// Should be empty because filter was provided
+		assert.Len(t, results, 0)
+	})
+
+	t.Run("nil user - no fallback, empty results", func(t *testing.T) {
+		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+
+		config := &Config{
+			Providers: ProviderConfig{
+				Definitions: make(map[string]models.Provider),
+			},
+		}
+		p := models.Provider{
+			Name:        "test",
+			Description: "Test provider",
+			Provider:    "mock",
+			Enabled:     true,
+		}
+		p.SetClient(provider)
+		config.Providers.Definitions["test"] = p
+
+		// This should not panic and should return empty
+		results, err := config.GetIdentitiesWithFilter(nil, IdentityTypeUser)
+		require.NoError(t, err)
+		assert.Len(t, results, 0)
+	})
+}
+
 // Benchmark for GetIdentitiesWithFilter with multiple providers
 func BenchmarkGetIdentitiesWithFilter_MultipleProviders(b *testing.B) {
 	// Create providers with many identities
