@@ -104,45 +104,46 @@ func (c *Config) GetIdentity(identity string) (*models.Identity, error) {
 		}(provider)
 	}
 
-	// Wait for all goroutines in a separate goroutine
+	// Wait for all goroutines to complete and then close the result channel
 	go func() {
 		wg.Wait()
 		close(resultChan)
 	}()
 
-	// Create a channel that will be closed when all goroutines are done
-	wgDoneChan := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(wgDoneChan)
-	}()
-
-	// Return the first result we get
-	select {
-	case result := <-resultChan:
-		close(doneChan)
-		return result, nil
-	case <-wgDoneChan:
-		// All goroutines finished without finding a result
-		// Return a basic identity
-		// Extract username from email if possible
-		username := ""
-		if atIdx := strings.Index(identityKey, "@"); atIdx > 0 {
-			username = identityKey[:atIdx]
+	// Try to get a result from the channel
+	// If channel is closed and empty, result will be nil and ok will be false
+	for result := range resultChan {
+		if result != nil {
+			close(doneChan)
+			return result, nil
 		}
-		return &models.Identity{
-			ID:    identity,
-			Label: identity,
-			User: &models.User{
-				Email:    identity,
-				Username: username,
-				Source:   "", // Empty source means use traditional IAM, not Identity Center
-			},
-		}, nil
 	}
+
+	// All goroutines finished without finding a result
+	// Return a basic identity
+	// Extract username from email if possible
+	username := ""
+	if atIdx := strings.Index(identityKey, "@"); atIdx > 0 {
+		username = identityKey[:atIdx]
+	}
+	return &models.Identity{
+		ID:    identity,
+		Label: identity,
+		User: &models.User{
+			Email:    identity,
+			Username: username,
+			Source:   "", // Empty source means use traditional IAM, not Identity Center
+		},
+	}, nil
 }
 
+// GetIdentitiesWithFilter retrieves identities from all identity providers that support identity listing.
+// It applies an optional filter to narrow down the results.
+// If no identity providers are found, it returns the current user as the only identity.
+// The identityType parameter can be used to filter results by type (user, group, or all).
 func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType IdentityType, filter ...string) ([]models.Identity, error) {
+
+	// the user can be nil here if there is no authenticated user context
 
 	// Find providers with identity capabilities
 	providerMap := c.GetProvidersByCapabilityWithUser(user, models.ProviderCapabilityIdentities)
@@ -160,7 +161,8 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType Identit
 			if !matchesFilter {
 				// User doesn't match filter, return empty list
 				identities = []models.Identity{}
-			} else {
+			} else if user != nil {
+				// The default user matches the filter
 				identities = []models.Identity{
 					{
 						ID:    user.Email,
@@ -168,8 +170,9 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType Identit
 						User:  user,
 					},
 				}
-			}
-		} else {
+			} // No user context, return empty list
+		} else if user != nil {
+			// No filter, return the default user
 			identities = []models.Identity{
 				{
 					ID:    user.Email,
@@ -253,6 +256,15 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType Identit
 			identities = append(identities, identity)
 		}
 
+		// If no results, no filter, and the identity type includes users,
+		// return the current user as the only result
+		if len(identities) == 0 && len(filter) == 0 && user != nil && (identityType == IdentityTypeUser || identityType == IdentityTypeAll) {
+			identities = append(identities, models.Identity{
+				ID:    user.Email,
+				Label: user.Name,
+				User:  user,
+			})
+		}
 	}
 
 	return identities, nil
