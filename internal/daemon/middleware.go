@@ -20,6 +20,151 @@ const (
 	ProviderContextKey = "provider"
 )
 
+// CORSMiddleware creates a CORS middleware that supports wildcard patterns in origins
+// Standard CORS only allows exact origins or "*", this middleware extends that to support
+// patterns like "https://*.example.com"
+func CORSMiddleware(cfg models.CORSConfig) gin.HandlerFunc {
+	// Apply defaults for any unset values
+	corsConfig := cfg.WithDefaults()
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+
+		logrus.WithFields(logrus.Fields{
+			"origin":         origin,
+			"method":         c.Request.Method,
+			"path":           c.Request.URL.Path,
+			"allowedOrigins": corsConfig.AllowedOrigins,
+		}).Debugln("CORS middleware processing request")
+
+		// Check if the origin matches any allowed pattern
+		allowedOrigin := ""
+		for _, pattern := range corsConfig.AllowedOrigins {
+			if matchOrigin(origin, pattern) {
+				allowedOrigin = origin
+				logrus.WithFields(logrus.Fields{
+					"origin":  origin,
+					"pattern": pattern,
+				}).Debugln("CORS origin matched pattern")
+				break
+			}
+		}
+
+		// If no match found, don't set CORS headers
+		if allowedOrigin == "" {
+			logrus.WithFields(logrus.Fields{
+				"origin":         origin,
+				"allowedOrigins": corsConfig.AllowedOrigins,
+			}).Warnln("CORS origin not matched - no Access-Control-Allow-Origin header will be set")
+			// For preflight requests with no matching origin, return 403
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+			c.Next()
+			return
+		}
+
+		// Set CORS headers
+		c.Header("Access-Control-Allow-Origin", allowedOrigin)
+
+		if corsConfig.AllowCredentials {
+			c.Header("Access-Control-Allow-Credentials", "true")
+		}
+
+		if len(corsConfig.ExposeHeaders) > 0 {
+			c.Header("Access-Control-Expose-Headers", strings.Join(corsConfig.ExposeHeaders, ", "))
+		}
+
+		// Handle preflight request
+		if c.Request.Method == "OPTIONS" {
+			c.Header("Access-Control-Allow-Methods", strings.Join(corsConfig.AllowedMethods, ", "))
+			c.Header("Access-Control-Allow-Headers", strings.Join(corsConfig.AllowedHeaders, ", "))
+
+			if corsConfig.MaxAge > 0 {
+				c.Header("Access-Control-Max-Age", fmt.Sprintf("%d", corsConfig.MaxAge))
+			}
+
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// matchOrigin checks if the given origin matches the pattern
+// Supports exact matches and wildcard patterns like "https://*.example.com"
+func matchOrigin(origin, pattern string) bool {
+	if origin == "" {
+		return false
+	}
+
+	// Exact match
+	if origin == pattern {
+		return true
+	}
+
+	// Allow all origins
+	if pattern == "*" {
+		return true
+	}
+
+	// Wildcard pattern matching (e.g., "https://*.example.com")
+	if strings.Contains(pattern, "*") {
+		return matchWildcardOrigin(origin, pattern)
+	}
+
+	return false
+}
+
+// matchWildcardOrigin matches an origin against a wildcard pattern
+// Pattern format: scheme://*.domain.tld or scheme://*.subdomain.domain.tld
+func matchWildcardOrigin(origin, pattern string) bool {
+	// Split pattern by "*"
+	parts := strings.SplitN(pattern, "*", 2)
+	if len(parts) != 2 {
+		return false
+	}
+
+	prefix := parts[0] // e.g., "https://"
+	suffix := parts[1] // e.g., ".example.com"
+
+	// Validate pattern format: suffix must start with a dot to prevent
+	// patterns like "https://*example.com" from matching "https://evilexample.com"
+	if !strings.HasPrefix(suffix, ".") {
+		return false
+	}
+
+	// Origin must start with the prefix
+	if !strings.HasPrefix(origin, prefix) {
+		return false
+	}
+
+	// Origin must end with the suffix
+	if !strings.HasSuffix(origin, suffix) {
+		return false
+	}
+
+	// Extract the wildcard part (the subdomain)
+	wildcardPart := origin[len(prefix) : len(origin)-len(suffix)]
+
+	// The wildcard part should not be empty and should not contain additional dots
+	// (to prevent matching nested subdomains unless explicitly allowed)
+	// e.g., "https://*.example.com" should match "https://foo.example.com"
+	// but not "https://foo.bar.example.com"
+	if wildcardPart == "" {
+		return false
+	}
+
+	// Allow nested subdomains - if you want to restrict to single level,
+	// uncomment the following:
+	// if strings.Contains(wildcardPart, ".") {
+	// 	return false
+	// }
+
+	return true
+}
+
 // SetupMiddleware this automatically detects and updates the server hostname
 // if its currently set to a default value or localhost
 func (s *Server) SetupMiddleware() gin.HandlerFunc {

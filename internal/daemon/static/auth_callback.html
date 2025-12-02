@@ -24,14 +24,13 @@
 
                 async registerSession() {
                     try {
-                        // Get API base path from health endpoint
-                        const healthResponse = await fetch(`${this.callback}/health`);
-                        if (!healthResponse.ok) {
-                            throw new Error(`Health check failed: ${healthResponse.status} ${healthResponse.statusText}`);
+                        // Get API base apiBasePath from config endpoint
+                        const configResponse = await fetch(`${this.callback}/.well-known/api-configuration`);
+                        if (!configResponse.ok) {
+                            throw new Error(`API configuration check failed: ${configResponse.status} ${configResponse.statusText}`);
                         }
-                        const healthData = await healthResponse.json();
-
-                        let apiBasePath = healthData.path || '/api/v1';
+                        const configData = await configResponse.json();
+                        let apiBasePath = configData.apiBasePath || '/api/v1';
                         apiBasePath = apiBasePath.replace(/^\/+/, '').replace(/\/+$/, '');
 
                         // Register session
@@ -101,7 +100,6 @@
             }
         }
     </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <main x-data="authCallback()" x-init="init()">
         <div class="container">
