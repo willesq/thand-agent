@@ -458,7 +458,9 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 
 	loginUrl := c.DiscoverLoginServerApiUrl()
 
-	preflightBody, err := json.Marshal(PreflightRequest{})
+	preflightBody, err := json.Marshal(PreflightRequest{
+		Identifier: common.GetClientIdentifier(),
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal registration request: %w", err)
@@ -483,8 +485,13 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 		return nil, fmt.Errorf("login server health check failed with status: %s", preflightRes.Status())
 	}
 
+	version, commit, _ := common.GetModuleBuildInfo()
+
 	reqBody, err := json.Marshal(RegistrationRequest{
 		Environment: &c.Environment,
+		Version:     version,
+		Commit:      commit,
+		Identifier:  common.GetClientIdentifier(),
 	})
 
 	if err != nil {

@@ -95,11 +95,7 @@ func (s *Server) GetConfig() *config.Config {
 }
 
 func (s *Server) GetVersion() string {
-	version, gitCommit, ok := common.GetModuleBuildInfo()
-	if ok {
-		return fmt.Sprintf("%s (git: %s)", version, gitCommit)
-	}
-	return "unknown"
+	return common.GetVersion()
 }
 
 func (s *Server) GetTemplateEngine() *template.Template {

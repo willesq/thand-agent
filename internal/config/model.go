@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config/services"
@@ -628,6 +629,7 @@ type TemplateData struct {
 }
 
 type PreflightRequest struct {
+	Identifier uuid.UUID `json:"identifier,omitempty"`
 }
 
 type PreflightResponse struct {
@@ -636,6 +638,9 @@ type PreflightResponse struct {
 
 type RegistrationRequest struct {
 	Environment *models.EnvironmentConfig `json:"environment,omitempty"`
+	Version     string                    `json:"version,omitempty"`
+	Commit      string                    `json:"commit,omitempty"`
+	Identifier  uuid.UUID                 `json:"identifier,omitempty"`
 }
 
 type RegistrationResponse struct {

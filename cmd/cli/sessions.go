@@ -279,7 +279,7 @@ func authProviderKickStart(
 				},
 			},
 			Headers: map[string]string{
-				"X-Client": clientIdentifier,
+				"X-Client": clientIdentifier.String(),
 			},
 			Query: map[string]any{
 				"callback": localCallbackUrl,
