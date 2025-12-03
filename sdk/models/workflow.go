@@ -2,6 +2,8 @@ package models
 
 import internal "github.com/thand-io/agent/internal/models"
 
+type Workflow = internal.Workflow
+
 // WorkflowTask is an alias for the internal WorkflowTask type.
 // It represents a task within a workflow execution context.
 // See internal/models.WorkflowTask for full documentation.
