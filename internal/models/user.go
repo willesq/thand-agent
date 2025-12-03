@@ -7,14 +7,24 @@ import (
 	"github.com/thand-io/agent/internal/common"
 )
 
+// User represents an individual user in the system.
+// Users can be authenticated through various identity providers and may belong
+// to one or more groups for access control purposes.
 type User struct {
-	ID       string   `json:"id,omitempty"`
-	Username string   `json:"username"`
-	Email    string   `json:"email"`
-	Name     string   `json:"name"`
-	Verified *bool    `json:"verified,omitempty"`
-	Source   string   `json:"source,omitempty"`
-	Groups   []string `json:"groups,omitempty"`
+	// ID is the unique identifier for the user.
+	ID string `json:"id,omitempty"`
+	// Username is the user's login name or handle.
+	Username string `json:"username"`
+	// Email is the user's email address, often used as a primary identifier.
+	Email string `json:"email"`
+	// Name is the user's full display name.
+	Name string `json:"name"`
+	// Verified indicates whether the user's identity has been verified.
+	Verified *bool `json:"verified,omitempty"`
+	// Source identifies the identity provider or system where this user originated.
+	Source string `json:"source,omitempty"`
+	// Groups is a list of group names or IDs that this user belongs to.
+	Groups []string `json:"groups,omitempty"`
 }
 
 func (u *User) GetName() string {
