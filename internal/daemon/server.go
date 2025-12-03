@@ -400,13 +400,17 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			// Register handlers
 			api.POST("/preflight", func(ctx *gin.Context) {
 				// Just a stub for now
-				ctx.JSON(http.StatusOK, gin.H{})
+				ctx.JSON(http.StatusOK, config.PreflightResponse{
+					Success: true,
+				})
 			})
 			api.POST("/register", s.postRegister)
 			api.POST("/postflight", func(ctx *gin.Context) {
 
 				// Just a stub for now
-				ctx.JSON(http.StatusOK, gin.H{})
+				ctx.JSON(http.StatusOK, config.PostflightResponse{
+					Success: true,
+				})
 			})
 
 			// Server endpoints
