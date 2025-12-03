@@ -1,10 +1,19 @@
 package models
 
+// Identity represents either a user or a group in the system.
+// It serves as a unified abstraction for access control subjects,
+// allowing policies to reference both users and groups consistently.
 type Identity struct {
-	ID    string `json:"id"`
+	// ID is the unique identifier for this identity.
+	ID string `json:"id"`
+	// Label is a human-readable name or description for this identity.
 	Label string `json:"label"`
 
-	User  *User  `json:"user"`
+	// User contains the user details if this identity represents a user.
+	// Will be nil if this identity represents a group.
+	User *User `json:"user"`
+	// Group contains the group details if this identity represents a group.
+	// Will be nil if this identity represents a user.
 	Group *Group `json:"group"`
 }
 

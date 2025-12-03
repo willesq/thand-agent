@@ -1,8 +1,14 @@
 package models
 
+// Group represents a collection of users that share common access permissions.
+// Groups are used to manage access control at scale by assigning permissions to
+// groups rather than individual users.
 type Group struct {
-	ID    string `json:"id,omitempty"`
-	Name  string `json:"name"`
+	// ID is the unique identifier for the group.
+	ID string `json:"id,omitempty"`
+	// Name is the human-readable name of the group.
+	Name string `json:"name"`
+	// Email is the email address associated with the group (e.g., a mailing list).
 	Email string `json:"email"`
 }
 
