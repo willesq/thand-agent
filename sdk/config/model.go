@@ -1,0 +1,32 @@
+// Package config provides public SDK types for agent configuration and registration.
+// These types are re-exported from the internal config package to provide
+// a stable public API for external consumers.
+package config
+
+import (
+	internal "github.com/thand-io/agent/internal/config"
+)
+
+// PreflightRequest represents the request sent before registration to validate
+// configuration and check prerequisites for agent setup.
+type PreflightRequest = internal.PreflightRequest
+
+// PreflightResponse contains the server's response to a preflight check,
+// including validation results and any required configuration adjustments.
+type PreflightResponse = internal.PreflightResponse
+
+// RegistrationRequest contains the data required to register an agent
+// with the server, including identity and configuration information.
+type RegistrationRequest = internal.RegistrationRequest
+
+// RegistrationResponse contains the server's response after a successful
+// agent registration, including assigned identifiers and initial credentials.
+type RegistrationResponse = internal.RegistrationResponse
+
+// PostflightRequest represents the request sent after registration to finalize
+// the setup process and confirm agent activation.
+type PostflightRequest = internal.PostflightRequest
+
+// PostflightResponse contains the server's confirmation of completed registration
+// and any final configuration or status information.
+type PostflightResponse = internal.PostflightResponse

@@ -79,7 +79,7 @@ func (a *TemporalClient) Initialize() error {
 	}
 
 	// Get agent version for Worker Build ID
-	buildID := common.GetClientIdentifier()
+	buildID := common.GetBuildIdentifier()
 
 	var workerOptions worker.Options
 

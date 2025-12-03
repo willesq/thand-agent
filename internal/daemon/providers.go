@@ -262,7 +262,7 @@ func (s *Server) postProviderAuthorizeSession(c *gin.Context) {
 		return
 	}
 
-	provider, err := s.getProvider(c, c.Param("provider"))
+	provider, err := s.getProvider(c.Param("provider"))
 
 	if err != nil {
 		s.getErrorPage(c, http.StatusNotFound, "Provider not found", err)
@@ -279,7 +279,7 @@ func (s *Server) postProviderAuthorizeSession(c *gin.Context) {
 	c.JSON(http.StatusOK, authResponse)
 }
 
-func (s *Server) getProvider(c *gin.Context, providerName string) (*models.Provider, error) {
+func (s *Server) getProvider(providerName string) (*models.Provider, error) {
 
 	provider, err := s.Config.GetProviderByName(providerName)
 
@@ -288,7 +288,7 @@ func (s *Server) getProvider(c *gin.Context, providerName string) (*models.Provi
 	}
 
 	if provider.GetClient() == nil {
-		return nil, fmt.Errorf("Provider has no client defined")
+		return nil, fmt.Errorf("provider has no client defined")
 	}
 
 	return provider, nil

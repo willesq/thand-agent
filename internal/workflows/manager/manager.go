@@ -431,7 +431,7 @@ func (m *WorkflowManager) createTemporalWorkflow(workflowTask *models.WorkflowTa
 		workflowOptions.VersioningOverride = &client.PinnedVersioningOverride{
 			Version: worker.WorkerDeploymentVersion{
 				DeploymentName: models.TemporalDeploymentName,
-				BuildID:        common.GetClientIdentifier(),
+				BuildID:        common.GetBuildIdentifier(),
 			},
 		}
 	}

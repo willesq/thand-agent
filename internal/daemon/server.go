@@ -95,11 +95,7 @@ func (s *Server) GetConfig() *config.Config {
 }
 
 func (s *Server) GetVersion() string {
-	version, gitCommit, ok := common.GetModuleBuildInfo()
-	if ok {
-		return fmt.Sprintf("%s (git: %s)", version, gitCommit)
-	}
-	return "unknown"
+	return common.GetVersion()
 }
 
 func (s *Server) GetTemplateEngine() *template.Template {
@@ -170,7 +166,7 @@ func (s *Server) Start() error {
 	router.Use(s.requestCounterMiddleware())
 
 	// Build CORS config from server security settings
-	corsConfig := s.Config.Server.Security.CORS
+	corsConfig := s.Config.Server.Security.CORS.WithDefaults()
 	corsConfig.AllowCredentials = true
 	corsConfig.AddOrigins(s.Config.GetLocalServerUrl())
 	if len(s.Config.GetLoginServerUrl()) > 0 {
@@ -398,9 +394,20 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 		} else if s.Config.IsServer() {
 
 			// Register handlers
-			api.POST("/preflight", func(ctx *gin.Context) {})
+			api.POST("/preflight", func(ctx *gin.Context) {
+				// Just a stub for now
+				ctx.JSON(http.StatusOK, config.PreflightResponse{
+					Success: true,
+				})
+			})
 			api.POST("/register", s.postRegister)
-			api.POST("/postflight", func(ctx *gin.Context) {})
+			api.POST("/postflight", func(ctx *gin.Context) {
+
+				// Just a stub for now
+				ctx.JSON(http.StatusOK, config.PostflightResponse{
+					Success: true,
+				})
+			})
 
 			// Server endpoints
 			api.GET("/roles", s.getRoles)

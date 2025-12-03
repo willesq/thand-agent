@@ -71,10 +71,10 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 			State: models.EncodingWrapper{
 				Type: models.ENCODED_AUTH,
 				Data: models.NewAuthWrapper(
-					callback, // where are we returning to
-					client,   // server identifier
-					provider, // provider name
-					code,     // the code sent by the client
+					callback,        // where are we returning to
+					client.String(), // server identifier
+					provider,        // provider name
+					code,            // the code sent by the client
 				),
 			}.EncodeAndEncrypt(
 				s.Config.GetServices().GetEncryption(),

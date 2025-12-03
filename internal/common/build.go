@@ -34,7 +34,7 @@ func GetModuleBuildInfo() (string, string, bool) {
 	return "", "", false
 }
 
-func GetClientIdentifier() string {
+func GetBuildIdentifier() string {
 	version, gitCommit, _ := GetModuleBuildInfo()
 	return fmt.Sprintf("%s-%s", version, gitCommit)
 }
