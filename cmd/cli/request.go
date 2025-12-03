@@ -50,9 +50,6 @@ var requestCmd = &cobra.Command{
 
 		fmt.Println(successStyle.Render("Generating request .."))
 
-		loginServer := strings.TrimSuffix(cfg.DiscoverLoginServerApiUrl(), "/")
-		evaluateReason := fmt.Sprintf("%s/elevate/llm", loginServer)
-
 		client := resty.New()
 
 		loginSessions, err := sessionManager.GetLoginServer(cfg.GetLoginServerHostname())
@@ -61,23 +58,36 @@ var requestCmd = &cobra.Command{
 			return
 		}
 
-		_, sesh, err := loginSessions.GetFirstActiveSession()
+		_, session, err := loginSessions.GetFirstActiveSession()
 
 		if err != nil {
 			return
 		}
 
+		loginServerUrl := cfg.GetLoginServerUrl()
+
+		if len(session.Endpoint) > 0 && !strings.EqualFold(session.Endpoint, cfg.GetLoginServerUrl()) {
+			logrus.Infof("Updating login server URL from session endpoint: %s", session.Endpoint)
+			loginServerUrl = session.Endpoint
+		}
+
+		loginServer := strings.TrimSuffix(cfg.DiscoverLoginServerApiUrl(
+			loginServerUrl,
+		), "/")
+
+		evaluateLlmUrl := fmt.Sprintf("%s/elevate/llm", loginServer)
+
 		res, err := client.R().
 			EnableTrace().
-			SetAuthToken(sesh.GetEncodedLocalSession()).
+			SetAuthToken(session.GetEncodedLocalSession()).
 			SetBody(&models.ElevateLLMRequest{
 				Reason: reason,
 			}).
-			Post(evaluateReason)
+			Post(evaluateLlmUrl)
 
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
-				"endpoint": evaluateReason,
+				"endpoint": evaluateLlmUrl,
 			}).Error("failed to send elevation request")
 			fmt.Println(errorStyle.Render("Failed to send elevation request"))
 			return
@@ -95,7 +105,7 @@ var requestCmd = &cobra.Command{
 					)))
 			} else {
 				logrus.WithError(err).WithFields(logrus.Fields{
-					"endpoint": evaluateReason,
+					"endpoint": evaluateLlmUrl,
 					"response": res.String(),
 				}).Errorf("failed to elevate access")
 			}

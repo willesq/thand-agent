@@ -318,16 +318,14 @@ func (c *Config) GetLoginServerUrl() string {
 		"/")
 }
 
-func (c *Config) DiscoverLoginServerApiUrl() string {
+func (c *Config) DiscoverLoginServerApiUrl(loginServer string) string {
 
 	// Make request to the login server to get the
 	// /.well-known/api-configuration endpoint
 	// to get the base param which is our api endpoint using resty
 
-	baseUrl := c.GetLoginServerUrl()
-
-	discoveryCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", baseUrl)
-	defaultUrl := fmt.Sprintf("%s/api/v1", baseUrl)
+	discoveryCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", loginServer)
+	defaultUrl := fmt.Sprintf("%s/api/v1", loginServer)
 
 	client := resty.New()
 	res, err := client.R().
@@ -629,6 +627,8 @@ type TemplateData struct {
 }
 
 type PreflightRequest struct {
+	Version    string    `json:"version,omitempty"`
+	Commit     string    `json:"commit,omitempty"`
 	Identifier uuid.UUID `json:"identifier,omitempty"`
 }
 
@@ -652,6 +652,9 @@ type RegistrationResponse struct {
 }
 
 type PostflightRequest struct {
+	Version    string    `json:"version,omitempty"`
+	Commit     string    `json:"commit,omitempty"`
+	Identifier uuid.UUID `json:"identifier,omitempty"`
 }
 
 type PostflightResponse struct {
