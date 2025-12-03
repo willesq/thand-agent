@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -542,7 +543,6 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	var registrationResponse RegistrationResponse
-
 	err = json.Unmarshal(registerRes.Body(), &registrationResponse)
 
 	if err != nil {
@@ -554,6 +554,37 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	logrus.Infoln("Successfully registered with login server")
+
+	// Setup OpenTelemetry remote logging if endpoint is provided
+	if registrationResponse.Logging != nil {
+
+		logrus.Debugln("Configuring remote logging from login server configuration")
+
+		loggingConfig := registrationResponse.Logging
+
+		if loggingConfig.OpenTelemetry.Endpoint.EndpointConfig != nil {
+
+			endpointConfig := loggingConfig.OpenTelemetry.Endpoint.EndpointConfig
+
+			if endpointConfig.Authentication == nil {
+				endpointConfig.Authentication = authentication
+			}
+
+			// Create context with cancellation and timeout
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Enable remote logging
+			err := c.logger.EnableRemoteLogging(
+				ctx,
+				loggingConfig.OpenTelemetry.Endpoint,
+				common.GetClientIdentifier(),
+			)
+			if err != nil {
+				logrus.WithError(err).Warn("Failed to setup remote logging, continuing without it")
+			}
+		}
+	}
 
 	return &registrationResponse, nil
 }

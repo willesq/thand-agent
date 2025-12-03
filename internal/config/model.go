@@ -646,6 +646,7 @@ type RegistrationRequest struct {
 type RegistrationResponse struct {
 	Success   bool                   `json:"success" required:"true"`
 	Services  *models.ServicesConfig `json:"services,omitempty"`
+	Logging   *models.LoggingConfig  `json:"logging,omitempty"`
 	Roles     *RoleConfig            `json:"roles,omitempty"`
 	Providers *ProviderConfig        `json:"providers,omitempty"`
 	Workflows *WorkflowConfig        `json:"workflows,omitempty"`
