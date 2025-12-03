@@ -571,6 +571,8 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 				endpointConfig.Authentication = authentication
 			}
 
+			logrus.Infof("Enabling remote logging to endpoint: %s", endpointConfig.URI.String())
+
 			// Create context with cancellation and timeout
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()

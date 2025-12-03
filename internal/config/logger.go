@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,13 +46,13 @@ func NewThandLogger() *thandLogger {
 
 // EnableRemoteLogging sets up OpenTelemetry log export after authentication
 func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.Endpoint, identifier uuid.UUID) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
 
 	loggingHeaders := map[string]string{}
 
 	// Extract endpoint URL and auth token
 	loggingEndpoint := endpoint.EndpointConfig.URI.String()
+
+	logrus.WithField("endpoint", loggingEndpoint).Infoln("Configuring OpenTelemetry")
 
 	// Get auth token from endpoint configuration
 	if endpoint.EndpointConfig.Authentication != nil && endpoint.EndpointConfig.Authentication.AuthenticationPolicy != nil {
@@ -71,10 +72,21 @@ func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.En
 		}
 	}
 
+	opts := []otlploghttp.Option{
+		otlploghttp.WithEndpointURL(loggingEndpoint),
+		otlploghttp.WithCompression(otlploghttp.GzipCompression),
+		otlploghttp.WithHeaders(loggingHeaders),
+		otlploghttp.WithTimeout(1 * time.Second),
+	}
+
+	if strings.HasPrefix(loggingEndpoint, "http://") {
+		logrus.Warnln("Insecure OpenTelemetry endpoint detected (http). Proceeding without TLS.")
+		opts = append(opts, otlploghttp.WithInsecure())
+	}
+
 	// Create OTLP HTTP exporter with authentication
 	exporter, err := otlploghttp.New(ctx,
-		otlploghttp.WithEndpoint(loggingEndpoint),
-		otlploghttp.WithHeaders(loggingHeaders),
+		opts...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create OTLP exporter: %w", err)
@@ -92,7 +104,7 @@ func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.En
 	}
 
 	// Create log provider with batching
-	t.openTelemetryProvider = sdklog.NewLoggerProvider(
+	provider := sdklog.NewLoggerProvider(
 		sdklog.WithProcessor(
 			sdklog.NewBatchProcessor(exporter,
 				sdklog.WithExportInterval(30*time.Second),
@@ -102,8 +114,14 @@ func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.En
 		sdklog.WithResource(res),
 	)
 
-	t.openTelemetryLogger = t.openTelemetryProvider.Logger("thand-agent")
+	logger := provider.Logger("thand-agent")
+
+	// Only hold the lock while updating the shared state
+	t.mu.Lock()
+	t.openTelemetryProvider = provider
+	t.openTelemetryLogger = logger
 	t.remoteEnabled = true
+	t.mu.Unlock()
 
 	logrus.Info("Remote logging enabled via OpenTelemetry")
 
