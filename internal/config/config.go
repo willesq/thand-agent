@@ -14,6 +14,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
@@ -562,7 +563,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 
 		loggingConfig := registrationResponse.Logging
 
-		if loggingConfig.OpenTelemetry.Endpoint.EndpointConfig != nil {
+		if loggingConfig.OpenTelemetry.Enabled && loggingConfig.OpenTelemetry.Endpoint.EndpointConfig != nil {
 
 			endpointConfig := loggingConfig.OpenTelemetry.Endpoint.EndpointConfig
 
@@ -571,7 +572,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 			}
 
 			// Create context with cancellation and timeout
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			// Enable remote logging

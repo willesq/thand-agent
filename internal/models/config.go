@@ -51,7 +51,7 @@ type OpenTelemetryConfig struct {
 	//       username: "user"
 	//       password: "pass"
 	// Refer to serverlessworkflow/sdk-go/model.Endpoint documentation for full details.
-	Endpoint model.Endpoint `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint" default:""` // OTLP endpoint for remote logging
+	Endpoint model.Endpoint `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint"` // OTLP endpoint for remote logging
 }
 
 type MetricsConfig struct {

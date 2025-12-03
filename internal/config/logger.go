@@ -31,8 +31,6 @@ type thandLogger struct {
 	openTelemetryProvider *sdklog.LoggerProvider
 	openTelemetryLogger   log.Logger
 	remoteEnabled         bool
-	logCtx                context.Context
-	logCtxCancel          context.CancelFunc
 }
 
 func NewThandLogger() *thandLogger {
@@ -133,14 +131,18 @@ func (t *thandLogger) Shutdown(ctx context.Context) error {
 
 	if t.openTelemetryProvider != nil {
 		t.remoteEnabled = false
-		return t.openTelemetryProvider.Shutdown(ctx)
+		err := t.openTelemetryProvider.Shutdown(ctx)
+		t.openTelemetryProvider = nil
+		t.openTelemetryLogger = nil
+		return err
 	}
 	return nil
 }
 
 // sendToOpenTelemetry sends a log entry to the OpenTelemetry exporter
+// Caller must hold t.mu lock
 func (t *thandLogger) sendToOpenTelemetry(entry *logrus.Entry) {
-	if t.openTelemetryLogger == nil {
+	if !t.remoteEnabled || t.openTelemetryLogger == nil {
 		return
 	}
 
