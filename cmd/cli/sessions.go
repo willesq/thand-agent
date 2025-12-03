@@ -258,9 +258,10 @@ func authProviderKickStart(
 ) error {
 
 	localCallbackUrl := cfg.GetLocalServerUrl()
+
 	loginServerUrl := fmt.Sprintf(
 		"%s/auth/request/%s",
-		cfg.DiscoverLoginServerApiUrl(),
+		cfg.DiscoverLoginServerApiUrl(cfg.GetLoginServerUrl()),
 		selectedProvider,
 	)
 

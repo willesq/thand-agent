@@ -99,18 +99,31 @@ func (s *Server) postSession(c *gin.Context) {
 		return
 	}
 
+	decodedSessionData, ok := sessionData.Data.(map[string]any)
+
+	if !ok {
+		s.getErrorPage(c, http.StatusBadRequest, "Invalid session token data")
+		return
+	}
+
 	var session models.LocalSession
-	err = common.ConvertMapToInterface(sessionData.Data.(map[string]any), &session)
+	err = common.ConvertMapToInterface(decodedSessionData, &session)
 
 	if err != nil {
 		s.getErrorPage(c, http.StatusBadRequest, "Failed to convert session data", err)
 		return
 	}
+	loginServer := s.Config.GetLoginServerHostname()
+
+	logrus.WithFields(logrus.Fields{
+		"loginServer": loginServer,
+		"provider":    sessionCreateRequest.Provider,
+	}).Debugln("Creating session")
 
 	// Now lets store the session in the users local session manager.
 	sessionManager := sessions.GetSessionManager()
 	err = sessionManager.AddSession(
-		s.Config.GetLoginServerHostname(),
+		loginServer,
 		sessionCreateRequest.Provider,
 		session,
 	)

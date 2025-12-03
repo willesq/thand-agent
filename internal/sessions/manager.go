@@ -3,15 +3,16 @@ package sessions
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"gopkg.in/yaml.v3"
 )
@@ -62,6 +63,8 @@ func (l LoginServer) GetFirstActiveSession(providers ...string) (string, *models
 
 func (m *SessionManager) AddSession(loginServer string, provider string, session models.LocalSession) error {
 
+	loginServer = normalizeHostname(loginServer)
+
 	logrus.WithFields(logrus.Fields{
 		"loginServer":    loginServer,
 		"provider":       provider,
@@ -78,6 +81,8 @@ func (m *SessionManager) AddSession(loginServer string, provider string, session
 
 func (m *SessionManager) RemoveSession(loginServer string, provider string) error {
 
+	loginServer = normalizeHostname(loginServer)
+
 	logrus.WithFields(logrus.Fields{
 		"loginServer": loginServer,
 		"provider":    provider,
@@ -90,6 +95,8 @@ func (m *SessionManager) RemoveSession(loginServer string, provider string) erro
 }
 
 func (m *SessionManager) GetFirstActiveSession(loginServer string, providers ...string) (string, *models.LocalSession, error) {
+
+	loginServer = normalizeHostname(loginServer)
 
 	logrus.WithFields(logrus.Fields{
 		"loginServer": loginServer,
@@ -106,6 +113,8 @@ func (m *SessionManager) GetFirstActiveSession(loginServer string, providers ...
 }
 
 func (m *SessionManager) GetSession(loginServer string, provider string) (*models.LocalSession, error) {
+
+	loginServer = normalizeHostname(loginServer)
 
 	logrus.WithFields(logrus.Fields{
 		"loginServer": loginServer,
@@ -124,10 +133,7 @@ func (m *SessionManager) GetSession(loginServer string, provider string) (*model
 
 func (m *SessionManager) GetLoginServer(loginServer string) (*LoginServer, error) {
 
-	// validate that the login server is a hostname
-	if !common.IsValidLoginServer(loginServer) {
-		return nil, fmt.Errorf("invalid login server hostname: %s", loginServer)
-	}
+	loginServer = normalizeHostname(loginServer)
 
 	logrus.WithFields(logrus.Fields{
 		"loginServer": loginServer,
@@ -142,6 +148,8 @@ func (m *SessionManager) GetLoginServer(loginServer string) (*LoginServer, error
 }
 
 func (m *SessionManager) AwaitRefresh(ctx context.Context, loginServer string) *LoginServer {
+
+	loginServer = normalizeHostname(loginServer)
 
 	logrus.WithFields(logrus.Fields{
 		"loginServer": loginServer,
@@ -191,6 +199,8 @@ func (m *SessionManager) AwaitRefresh(ctx context.Context, loginServer string) *
 
 func (m *SessionManager) AwaitProviderRefresh(ctx context.Context, loginServer string, provider string) *time.Time {
 
+	loginServer = normalizeHostname(loginServer)
+
 	// Add a timeout to the provided context if it doesn't have a deadline
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
 		var cancel context.CancelFunc
@@ -233,6 +243,9 @@ func (m *SessionManager) AwaitProviderRefresh(ctx context.Context, loginServer s
 }
 
 func (m *SessionManager) GetLastTimestamp(loginServer string, provider string) *time.Time {
+
+	loginServer = normalizeHostname(loginServer)
+
 	var lastTimestamp time.Time
 
 	// We want to check the session file date
@@ -264,6 +277,13 @@ func (m *SessionManager) GetLastTimestamp(loginServer string, provider string) *
 }
 
 func (m *SessionManager) Commit(loginServer string) error {
+
+	loginServer = normalizeHostname(loginServer)
+
+	logrus.WithFields(logrus.Fields{
+		"loginServer": loginServer,
+	}).Debugln("Committing sessions to disk")
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -296,6 +316,8 @@ func (m *SessionManager) Commit(loginServer string) error {
 }
 
 func (m *SessionManager) Load(loginServer string) error {
+
+	loginServer = normalizeHostname(loginServer)
 
 	logrus.Debugln("Checking sessions for provider:", loginServer)
 
@@ -352,17 +374,21 @@ func GetSessionManager() *SessionManager {
 
 func loadSessionFile(logonServerHostName string) *os.File {
 
-	// Get the user's home directory
-	usr, err := user.Current()
-	if err != nil {
-		logrus.Fatalf("Failed to get current user: %v", err)
+	// Determine the session path
+	var sessionPath string
+	if strings.HasPrefix(SESSION_MANAGER_PATH, "~") {
+		// Expand ~ to user's home directory
+		usr, err := user.Current()
+		if err != nil {
+			logrus.Fatalf("Failed to get current user: %v", err)
+		}
+		sessionPath = filepath.Join(usr.HomeDir, strings.TrimPrefix(SESSION_MANAGER_PATH, "~/"))
+	} else {
+		// Use SESSION_MANAGER_PATH directly (for testing)
+		sessionPath = SESSION_MANAGER_PATH
 	}
 
-	// Expand the session manager path to use the actual home directory
-	sessionPath := filepath.Join(usr.HomeDir, ".config", "thand")
-
-	// Write session data to ~/.config/thand/sessions.yaml
-	// first check if folder exists and if not then create it
+	// Ensure the directory exists
 	if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
 		err := os.MkdirAll(sessionPath, os.ModePerm)
 		if err != nil {
@@ -382,6 +408,7 @@ func loadSessionFile(logonServerHostName string) *os.File {
 }
 
 func (m *SessionManager) createLoginServer(loginServer string) {
+
 	// check if logon server exists
 	if _, ok := m.Servers[loginServer]; !ok {
 		m.Servers[loginServer] = LoginServer{
@@ -390,4 +417,20 @@ func (m *SessionManager) createLoginServer(loginServer string) {
 			Sessions:  make(map[string]models.LocalSession),
 		}
 	}
+}
+
+// normalizeHostname extracts the hostname from a URL or returns the input if it's already a hostname.
+// For example: "https://test.example.com" -> "test.example.com"
+//
+//	"test.example.com" -> "test.example.com"
+func normalizeHostname(loginServer string) string {
+	// Check if it looks like a URL (contains ://)
+	if strings.Contains(loginServer, "://") {
+		parsed, err := url.Parse(loginServer)
+		if err == nil && parsed.Hostname() != "" {
+			return parsed.Hostname()
+		}
+	}
+	// Return as-is if it's not a URL or parsing failed
+	return loginServer
 }

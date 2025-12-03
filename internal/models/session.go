@@ -32,6 +32,7 @@ func (s *Session) IsExpired() bool {
 type ExportableSession struct {
 	*Session
 	Provider string `json:"provider"`
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // Encode the remote session from the local session
@@ -44,9 +45,10 @@ func (s *ExportableSession) GetEncodedSession(encryptor EncryptionImpl) string {
 
 func (s *ExportableSession) ToLocalSession(encryptor EncryptionImpl) *LocalSession {
 	return &LocalSession{
-		Version: 1,
-		Expiry:  s.Expiry,
-		Session: s.GetEncodedSession(encryptor),
+		Version:  1,
+		Expiry:   s.Expiry,
+		Session:  s.GetEncodedSession(encryptor),
+		Endpoint: s.Endpoint,
 	}
 }
 
@@ -76,9 +78,10 @@ type SessionCreateRequest struct {
 
 // Session stored on the users local system
 type LocalSession struct {
-	Version int       `json:"version,omitempty" yaml:"version"`      // Version of the session config
-	Expiry  time.Time `json:"expiry" yaml:"expiry"`                  // Expiry time of the session
-	Session string    `json:"session,omitempty" yaml:"session,flow"` // Encoded session token
+	Version  int       `json:"version,omitempty" yaml:"version"`      // Version of the session config
+	Expiry   time.Time `json:"expiry" yaml:"expiry"`                  // Expiry time of the session
+	Session  string    `json:"session,omitempty" yaml:"session,flow"` // Encoded session token
+	Endpoint string    `json:"endpoint,omitempty" yaml:"endpoint"`    // Optional endpoint associated with the session
 }
 
 func (s *LocalSession) IsExpired() bool {

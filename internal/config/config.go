@@ -348,8 +348,6 @@ func (c *Config) SyncWithLoginServer() error {
 	// Providers need to be hard synced. Everything else
 	// can be done async
 
-	apiUrl := c.DiscoverLoginServerApiUrl()
-
 	sessionManager := sessions.GetSessionManager()
 
 	loginServer, err := sessionManager.GetLoginServer(c.GetLoginServerHostname())
@@ -367,14 +365,21 @@ func (c *Config) SyncWithLoginServer() error {
 
 	} else {
 
-		logrus.Debugf("Looking for valid session to sync with login server at: %s", apiUrl)
+		logrus.Debugf("Looking for valid session to sync with login server at: %s", c.GetLoginServerUrl())
 		localSessions := loginServer.GetSessions()
 
 		// Find the first non-expired session token
 		for providerName, session := range localSessions {
 			if !session.IsExpired() {
+
 				logrus.Debugf("Found valid session for provider '%s'", providerName)
 				localToken = session.GetEncodedLocalSession()
+
+				if len(session.Endpoint) > 0 && !strings.EqualFold(session.Endpoint, c.GetLoginServerUrl()) {
+					logrus.Infof("Updating login server URL from session endpoint: %s", session.Endpoint)
+					c.Login.Endpoint = session.Endpoint
+				}
+
 				break
 			}
 		}
@@ -384,6 +389,10 @@ func (c *Config) SyncWithLoginServer() error {
 		}
 
 	}
+
+	apiUrl := c.DiscoverLoginServerApiUrl(
+		c.GetLoginServerUrl(),
+	)
 
 	// Lets make our registration request. This will pull down our
 	// remote configuration and also register this instance with the login server
@@ -456,7 +465,9 @@ func (c *Config) SyncWithLoginServer() error {
 
 func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationResponse, error) {
 
-	loginUrl := c.DiscoverLoginServerApiUrl()
+	loginUrl := c.DiscoverLoginServerApiUrl(
+		c.GetLoginServerUrl(),
+	)
 
 	preflightBody, err := json.Marshal(PreflightRequest{
 		Identifier: common.GetClientIdentifier(),
@@ -466,23 +477,32 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 		return nil, fmt.Errorf("failed to marshal registration request: %w", err)
 	}
 
+	authentication := &model.ReferenceableAuthenticationPolicy{
+		AuthenticationPolicy: &model.AuthenticationPolicy{
+			Bearer: &model.BearerAuthenticationPolicy{
+				Token: localToken,
+			},
+		},
+	}
+
 	// Pre-flight check
 	preflightRes, err := common.InvokeHttpRequest(&model.HTTPArguments{
 		Method: http.MethodPost,
 		Endpoint: &model.Endpoint{
 			EndpointConfig: &model.EndpointConfiguration{
-				URI: &model.LiteralUri{Value: loginUrl + "/preflight"},
+				URI:            &model.LiteralUri{Value: loginUrl + "/preflight"},
+				Authentication: authentication,
 			},
 		},
 		Body: preflightBody,
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to invoke login server health check: %w", err)
+		return nil, fmt.Errorf("failed to invoke preflight: %w", err)
 	}
 
 	if preflightRes.StatusCode() != 200 {
-		return nil, fmt.Errorf("login server health check failed with status: %s", preflightRes.Status())
+		return nil, fmt.Errorf("preflight %s failed with status: %s", loginUrl+"/preflight", preflightRes.Status())
 	}
 
 	version, commit, _ := common.GetModuleBuildInfo()
@@ -504,14 +524,8 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 		Method: http.MethodPost,
 		Endpoint: &model.Endpoint{
 			EndpointConfig: &model.EndpointConfiguration{
-				URI: &model.LiteralUri{Value: loginUrl + "/register"},
-				Authentication: &model.ReferenceableAuthenticationPolicy{
-					AuthenticationPolicy: &model.AuthenticationPolicy{
-						Bearer: &model.BearerAuthenticationPolicy{
-							Token: localToken,
-						},
-					},
-				},
+				URI:            &model.LiteralUri{Value: loginUrl + "/register"},
+				Authentication: authentication,
 			},
 		},
 		Body: reqBody,
@@ -522,7 +536,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	if registerRes.StatusCode() != 200 {
-		return nil, fmt.Errorf("registration request failed with status: %s", registerRes.Status())
+		return nil, fmt.Errorf("registration request %s failed with status: %s", loginUrl+"/register", registerRes.Status())
 	}
 
 	var registrationResponse RegistrationResponse

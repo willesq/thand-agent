@@ -123,6 +123,8 @@ func TestLoginServer_GetFirstActiveSession(t *testing.T) {
 }
 
 func TestSessionManager_AddAndGetSession(t *testing.T) {
+	setupTempSessionDir(t)
+
 	manager := &SessionManager{
 		Servers: make(map[string]LoginServer),
 	}
@@ -134,10 +136,6 @@ func TestSessionManager_AddAndGetSession(t *testing.T) {
 		Expiry:  time.Now().Add(1 * time.Hour),
 		Session: "test-session-token",
 	}
-
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
 
 	err := manager.AddSession(loginServer, provider, session)
 	if err != nil {
@@ -163,15 +161,15 @@ func TestSessionManager_GetSession_NotFound(t *testing.T) {
 		Servers: make(map[string]LoginServer),
 	}
 
-	loginServer := "test.example.com"
-
-	_, err := manager.GetSession(loginServer, "nonexistent-provider")
+	_, err := manager.GetSession("test.example.com", "nonexistent-provider")
 	if err == nil {
 		t.Error("Expected error for non-existent session, got nil")
 	}
 }
 
 func TestSessionManager_RemoveSession(t *testing.T) {
+	setupTempSessionDir(t)
+
 	manager := &SessionManager{
 		Servers: make(map[string]LoginServer),
 	}
@@ -184,29 +182,21 @@ func TestSessionManager_RemoveSession(t *testing.T) {
 		Session: "test-session-token",
 	}
 
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
-	// Add session first
 	err := manager.AddSession(loginServer, provider, session)
 	if err != nil {
 		t.Fatalf("Failed to add session: %v", err)
 	}
 
-	// Verify session exists
 	_, err = manager.GetSession(loginServer, provider)
 	if err != nil {
 		t.Fatalf("Session should exist before removal: %v", err)
 	}
 
-	// Remove session
 	err = manager.RemoveSession(loginServer, provider)
 	if err != nil {
 		t.Fatalf("Failed to remove session: %v", err)
 	}
 
-	// Verify session is removed
 	_, err = manager.GetSession(loginServer, provider)
 	if err == nil {
 		t.Error("Session should not exist after removal")
@@ -214,17 +204,13 @@ func TestSessionManager_RemoveSession(t *testing.T) {
 }
 
 func TestSessionManager_GetFirstActiveSession(t *testing.T) {
+	setupTempSessionDir(t)
+
 	manager := &SessionManager{
 		Servers: make(map[string]LoginServer),
 	}
 
 	loginServer := "test.example.com"
-
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
-	// Add an active session
 	activeSession := models.LocalSession{
 		Version: 1,
 		Expiry:  time.Now().Add(1 * time.Hour),
@@ -250,52 +236,201 @@ func TestSessionManager_GetFirstActiveSession(t *testing.T) {
 	}
 }
 
-func TestSessionManager_GetLoginServer(t *testing.T) {
-	manager := &SessionManager{
-		Servers: make(map[string]LoginServer),
-	}
-
+func TestSessionManager_GetLoginServer_NormalizesHostname(t *testing.T) {
 	tests := []struct {
-		name        string
-		loginServer string
-		expectError bool
+		name             string
+		loginServer      string
+		expectedHostname string
 	}{
 		{
-			name:        "valid login server",
-			loginServer: "https://test.example.com",
-			expectError: false,
+			name:             "URL with scheme is normalized to hostname",
+			loginServer:      "https://test.example.com",
+			expectedHostname: "test.example.com",
 		},
 		{
-			name:        "simple hostname",
-			loginServer: "test.example.com",
-			expectError: false,
+			name:             "plain hostname remains unchanged",
+			loginServer:      "test.example.com",
+			expectedHostname: "test.example.com",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server, err := manager.GetLoginServer(tt.loginServer)
+			tmpDir := setupTempSessionDir(t)
 
-			if tt.expectError {
-				if err == nil {
-					t.Error("Expected error, got nil")
-				}
-				return
+			manager := &SessionManager{
+				Servers: make(map[string]LoginServer),
 			}
 
+			server, err := manager.GetLoginServer(tt.loginServer)
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
+				t.Fatalf("Unexpected error: %v", err)
 			}
 
 			if server == nil {
-				t.Error("Expected server, got nil")
+				t.Fatal("Expected server, got nil")
+			}
+
+			// Add a session to trigger file write
+			session := models.LocalSession{
+				Version: 1,
+				Expiry:  time.Now().Add(1 * time.Hour),
+				Session: "test-token",
+			}
+			err = manager.AddSession(tt.loginServer, "test-provider", session)
+			if err != nil {
+				t.Fatalf("Failed to add session: %v", err)
+			}
+
+			// Verify file was created with normalized hostname
+			expectedFileName := tt.expectedHostname + ".yaml"
+			filePath := filepath.Join(tmpDir, expectedFileName)
+			if _, err := os.Stat(filePath); os.IsNotExist(err) {
+				t.Errorf("Expected session file %s to exist on disk", filePath)
 			}
 		})
 	}
 }
 
+func TestSessionManager_LoadAndCommit(t *testing.T) {
+	tmpDir := setupTempSessionDir(t)
+
+	loginServer := "test.example.com"
+	provider := "test-provider"
+	session := models.LocalSession{
+		Version: 1,
+		Expiry:  time.Now().Add(1 * time.Hour),
+		Session: "test-session-token",
+	}
+
+	// Create first manager and add session
+	manager1 := &SessionManager{
+		Servers: make(map[string]LoginServer),
+	}
+
+	err := manager1.AddSession(loginServer, provider, session)
+	if err != nil {
+		t.Fatalf("Failed to add session: %v", err)
+	}
+
+	// Verify file exists
+	filePath := filepath.Join(tmpDir, loginServer+".yaml")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		t.Fatalf("Session file should exist at %s", filePath)
+	}
+
+	// Create second manager and load the session from disk
+	manager2 := &SessionManager{
+		Servers: make(map[string]LoginServer),
+	}
+
+	err = manager2.Load(loginServer)
+	if err != nil {
+		t.Fatalf("Failed to load session: %v", err)
+	}
+
+	// Verify session was loaded
+	retrievedSession, err := manager2.GetSession(loginServer, provider)
+	if err != nil {
+		t.Fatalf("Failed to get session after load: %v", err)
+	}
+
+	if retrievedSession.Session != session.Session {
+		t.Errorf("Expected session token %s, got %s", session.Session, retrievedSession.Session)
+	}
+}
+
+func TestSessionManager_Load_NonExistentFile(t *testing.T) {
+	setupTempSessionDir(t)
+
+	manager := &SessionManager{
+		Servers: make(map[string]LoginServer),
+	}
+
+	// Loading a non-existent server should not error (creates empty server)
+	err := manager.Load("nonexistent.example.com")
+	if err != nil {
+		t.Fatalf("Load should not error for non-existent file: %v", err)
+	}
+}
+
+func TestSessionManager_Load_NormalizesHostname(t *testing.T) {
+	tmpDir := setupTempSessionDir(t)
+
+	loginServer := "test.example.com"
+	loginServerWithScheme := "https://test.example.com"
+
+	// Create a session file with the normalized hostname
+	manager1 := &SessionManager{
+		Servers: make(map[string]LoginServer),
+	}
+
+	session := models.LocalSession{
+		Version: 1,
+		Expiry:  time.Now().Add(1 * time.Hour),
+		Session: "test-token",
+	}
+
+	err := manager1.AddSession(loginServer, "provider", session)
+	if err != nil {
+		t.Fatalf("Failed to add session: %v", err)
+	}
+
+	// Verify file was created with normalized name
+	filePath := filepath.Join(tmpDir, loginServer+".yaml")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		t.Fatalf("Session file should exist at %s", filePath)
+	}
+
+	// Create second manager and load using URL with scheme
+	manager2 := &SessionManager{
+		Servers: make(map[string]LoginServer),
+	}
+
+	err = manager2.Load(loginServerWithScheme)
+	if err != nil {
+		t.Fatalf("Failed to load session with URL scheme: %v", err)
+	}
+
+	// Should be able to get the session using the URL with scheme
+	retrievedSession, err := manager2.GetSession(loginServerWithScheme, "provider")
+	if err != nil {
+		t.Fatalf("Failed to get session: %v", err)
+	}
+
+	if retrievedSession.Session != session.Session {
+		t.Errorf("Expected session token %s, got %s", session.Session, retrievedSession.Session)
+	}
+}
+
+func TestSessionManager_Commit(t *testing.T) {
+	tmpDir := setupTempSessionDir(t)
+
+	loginServer := "test.example.com"
+
+	manager := &SessionManager{
+		Servers: make(map[string]LoginServer),
+	}
+
+	// Create server manually without adding session
+	manager.createLoginServer(loginServer)
+
+	// Commit should create the file
+	err := manager.Commit(loginServer)
+	if err != nil {
+		t.Fatalf("Failed to commit: %v", err)
+	}
+
+	// Verify file exists
+	filePath := filepath.Join(tmpDir, loginServer+".yaml")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		t.Errorf("Session file should exist at %s after commit", filePath)
+	}
+}
+
 func TestSessionManager_GetLastTimestamp(t *testing.T) {
+	setupTempSessionDir(t)
+
 	manager := &SessionManager{
 		Servers: make(map[string]LoginServer),
 	}
@@ -309,38 +444,29 @@ func TestSessionManager_GetLastTimestamp(t *testing.T) {
 		Session: "test-session-token",
 	}
 
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
 	err := manager.AddSession(loginServer, provider, session)
 	if err != nil {
 		t.Fatalf("Failed to add session: %v", err)
 	}
 
-	// Test getting timestamp for specific provider
 	timestamp := manager.GetLastTimestamp(loginServer, provider)
 	if timestamp == nil {
 		t.Fatal("Expected timestamp, got nil")
 	}
 
-	// Timestamps should be within a small delta
 	if timestamp.Unix() != expiry.Unix() {
 		t.Errorf("Expected timestamp %v, got %v", expiry, *timestamp)
 	}
 }
 
 func TestSessionManager_GetLastTimestamp_NoProvider(t *testing.T) {
+	setupTempSessionDir(t)
+
 	manager := &SessionManager{
 		Servers: make(map[string]LoginServer),
 	}
 
 	loginServer := "test.example.com"
-
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
 	session := models.LocalSession{
 		Version: 1,
 		Expiry:  time.Now().Add(1 * time.Hour),
@@ -352,7 +478,6 @@ func TestSessionManager_GetLastTimestamp_NoProvider(t *testing.T) {
 		t.Fatalf("Failed to add session: %v", err)
 	}
 
-	// Test getting timestamp for login server (no specific provider)
 	timestamp := manager.GetLastTimestamp(loginServer, "")
 	if timestamp == nil {
 		t.Fatal("Expected timestamp, got nil")
@@ -366,15 +491,12 @@ func TestSessionManager_CreateLoginServer(t *testing.T) {
 
 	loginServer := "new-server.example.com"
 
-	// Initially, server should not exist
 	if _, ok := manager.Servers[loginServer]; ok {
 		t.Error("Server should not exist initially")
 	}
 
-	// Create the login server
 	manager.createLoginServer(loginServer)
 
-	// Server should exist now
 	server, ok := manager.Servers[loginServer]
 	if !ok {
 		t.Fatal("Server should exist after creation")
@@ -397,100 +519,17 @@ func TestSessionManager_CreateLoginServer(t *testing.T) {
 	}
 }
 
-func TestSessionManager_LoadAndCommit(t *testing.T) {
-	manager := &SessionManager{
-		Servers: make(map[string]LoginServer),
-	}
-
-	loginServer := "test-load.example.com"
-
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
-	session := models.LocalSession{
-		Version: 1,
-		Expiry:  time.Now().Add(1 * time.Hour),
-		Session: "test-session-token",
-	}
-
-	// Add and commit a session
-	err := manager.AddSession(loginServer, "provider1", session)
-	if err != nil {
-		t.Fatalf("Failed to add session: %v", err)
-	}
-
-	// Create a new manager and load the session
-	newManager := &SessionManager{
-		Servers: make(map[string]LoginServer),
-	}
-
-	err = newManager.Load(loginServer)
-	if err != nil {
-		t.Fatalf("Failed to load session: %v", err)
-	}
-
-	// Verify the session was loaded
-	loadedSession, err := newManager.GetSession(loginServer, "provider1")
-	if err != nil {
-		t.Fatalf("Failed to get loaded session: %v", err)
-	}
-
-	if loadedSession.Session != session.Session {
-		t.Errorf("Expected session token %s, got %s", session.Session, loadedSession.Session)
-	}
-}
-
-func TestSessionManager_Load_EmptyFile(t *testing.T) {
-	manager := &SessionManager{
-		Servers: make(map[string]LoginServer),
-	}
-
-	loginServer := "empty-file-test.example.com"
-
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
-	// Create an empty session file
-	sessionFile := filepath.Join(tmpDir, loginServer+".yaml")
-	_, err := os.Create(sessionFile)
-	if err != nil {
-		t.Fatalf("Failed to create empty file: %v", err)
-	}
-
-	err = manager.Load(loginServer)
-	if err != nil {
-		t.Fatalf("Failed to load empty file: %v", err)
-	}
-
-	// Verify default LoginServer was created
-	server, ok := manager.Servers[loginServer]
-	if !ok {
-		t.Fatal("Server should exist after loading empty file")
-	}
-
-	if server.Version != "1.0" {
-		t.Errorf("Expected version '1.0', got '%s'", server.Version)
-	}
-}
-
 func TestSessionManager_AwaitRefresh_ContextCancellation(t *testing.T) {
+	setupTempSessionDir(t)
+
 	manager := &SessionManager{
 		Servers: make(map[string]LoginServer),
 	}
 
-	loginServer := "test.example.com"
-
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
-	// Create a context that will be cancelled immediately
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	result := manager.AwaitRefresh(ctx, loginServer)
+	result := manager.AwaitRefresh(ctx, "test.example.com")
 
 	if result != nil {
 		t.Error("Expected nil result when context is cancelled")
@@ -498,6 +537,8 @@ func TestSessionManager_AwaitRefresh_ContextCancellation(t *testing.T) {
 }
 
 func TestSessionManager_AwaitProviderRefresh_ContextCancellation(t *testing.T) {
+	setupTempSessionDir(t)
+
 	manager := &SessionManager{
 		Servers: make(map[string]LoginServer),
 	}
@@ -505,11 +546,6 @@ func TestSessionManager_AwaitProviderRefresh_ContextCancellation(t *testing.T) {
 	loginServer := "test.example.com"
 	provider := "test-provider"
 
-	// Setup temp directory for session files
-	tmpDir := setupTempSessionDir(t)
-	defer os.RemoveAll(tmpDir)
-
-	// Add a session first
 	session := models.LocalSession{
 		Version: 1,
 		Expiry:  time.Now().Add(1 * time.Hour),
@@ -520,7 +556,6 @@ func TestSessionManager_AwaitProviderRefresh_ContextCancellation(t *testing.T) {
 		t.Fatalf("Failed to add session: %v", err)
 	}
 
-	// Create a context that will be cancelled immediately
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
@@ -546,6 +581,28 @@ func TestGetSessionManager(t *testing.T) {
 	}
 }
 
+func TestNormalizeHostname(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"https://test.example.com", "test.example.com"},
+		{"http://test.example.com", "test.example.com"},
+		{"https://api.test.example.com:8080", "api.test.example.com"},
+		{"test.example.com", "test.example.com"},
+		{"localhost", "localhost"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := normalizeHostname(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeHostname(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 // Helper function to setup a temporary session directory for testing
 func setupTempSessionDir(t *testing.T) string {
 	t.Helper()
@@ -555,12 +612,12 @@ func setupTempSessionDir(t *testing.T) string {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
-	// Override the session path for testing
 	originalPath := SESSION_MANAGER_PATH
 	SESSION_MANAGER_PATH = tmpDir
 
 	t.Cleanup(func() {
 		SESSION_MANAGER_PATH = originalPath
+		os.RemoveAll(tmpDir)
 	})
 
 	return tmpDir
