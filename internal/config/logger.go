@@ -4,12 +4,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
 type thandLogger struct {
 	// Ring buffer for storing events
+	sessionUID  uuid.UUID
 	eventBuffer []*models.LogEntry
 	maxSize     int
 	currentPos  int
@@ -19,6 +21,7 @@ type thandLogger struct {
 
 func NewThandLogger() *thandLogger {
 	return &thandLogger{
+		sessionUID:  uuid.New(),
 		eventBuffer: make([]*models.LogEntry, 1000),
 		maxSize:     1000,
 		currentPos:  0,

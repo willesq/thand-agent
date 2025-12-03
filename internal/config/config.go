@@ -456,6 +456,33 @@ func (c *Config) SyncWithLoginServer() error {
 
 func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationResponse, error) {
 
+	loginUrl := c.DiscoverLoginServerApiUrl()
+
+	preflightBody, err := json.Marshal(PreflightRequest{})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal registration request: %w", err)
+	}
+
+	// Pre-flight check
+	preflightRes, err := common.InvokeHttpRequest(&model.HTTPArguments{
+		Method: http.MethodPost,
+		Endpoint: &model.Endpoint{
+			EndpointConfig: &model.EndpointConfiguration{
+				URI: &model.LiteralUri{Value: loginUrl + "/preflight"},
+			},
+		},
+		Body: preflightBody,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to invoke login server health check: %w", err)
+	}
+
+	if preflightRes.StatusCode() != 200 {
+		return nil, fmt.Errorf("login server health check failed with status: %s", preflightRes.Status())
+	}
+
 	reqBody, err := json.Marshal(RegistrationRequest{
 		Environment: &c.Environment,
 	})
@@ -466,11 +493,11 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 
 	// No need for an API key we need to use the session
 	// info
-	res, err := common.InvokeHttpRequest(&model.HTTPArguments{
+	registerRes, err := common.InvokeHttpRequest(&model.HTTPArguments{
 		Method: http.MethodPost,
 		Endpoint: &model.Endpoint{
 			EndpointConfig: &model.EndpointConfiguration{
-				URI: &model.LiteralUri{Value: c.DiscoverLoginServerApiUrl() + "/register"},
+				URI: &model.LiteralUri{Value: loginUrl + "/register"},
 				Authentication: &model.ReferenceableAuthenticationPolicy{
 					AuthenticationPolicy: &model.AuthenticationPolicy{
 						Bearer: &model.BearerAuthenticationPolicy{
@@ -487,13 +514,13 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 		return nil, fmt.Errorf("failed to invoke registration request: %w", err)
 	}
 
-	if res.StatusCode() != 200 {
-		return nil, fmt.Errorf("registration request failed with status: %s", res.Status())
+	if registerRes.StatusCode() != 200 {
+		return nil, fmt.Errorf("registration request failed with status: %s", registerRes.Status())
 	}
 
 	var registrationResponse RegistrationResponse
 
-	err = json.Unmarshal(res.Body(), &registrationResponse)
+	err = json.Unmarshal(registerRes.Body(), &registrationResponse)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal registration response: %w", err)

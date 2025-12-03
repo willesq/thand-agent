@@ -627,6 +627,13 @@ type TemplateData struct {
 	Status      string
 }
 
+type PreflightRequest struct {
+}
+
+type PreflightResponse struct {
+	Success bool `json:"success" required:"true"`
+}
+
 type RegistrationRequest struct {
 	Environment *models.EnvironmentConfig `json:"environment,omitempty"`
 }
@@ -637,4 +644,11 @@ type RegistrationResponse struct {
 	Roles     *RoleConfig            `json:"roles,omitempty"`
 	Providers *ProviderConfig        `json:"providers,omitempty"`
 	Workflows *WorkflowConfig        `json:"workflows,omitempty"`
+}
+
+type PostflightRequest struct {
+}
+
+type PostflightResponse struct {
+	Success bool `json:"success" required:"true"`
 }
