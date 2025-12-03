@@ -469,7 +469,11 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 		c.GetLoginServerUrl(),
 	)
 
+	version, commit, _ := common.GetModuleBuildInfo()
+
 	preflightBody, err := json.Marshal(PreflightRequest{
+		Version:    version,
+		Commit:     commit,
 		Identifier: common.GetClientIdentifier(),
 	})
 
@@ -504,8 +508,6 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	if preflightRes.StatusCode() != 200 {
 		return nil, fmt.Errorf("preflight %s failed with status: %s", loginUrl+"/preflight", preflightRes.Status())
 	}
-
-	version, commit, _ := common.GetModuleBuildInfo()
 
 	reqBody, err := json.Marshal(RegistrationRequest{
 		Environment: &c.Environment,

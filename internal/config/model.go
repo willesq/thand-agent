@@ -627,6 +627,8 @@ type TemplateData struct {
 }
 
 type PreflightRequest struct {
+	Version    string    `json:"version,omitempty"`
+	Commit     string    `json:"commit,omitempty"`
 	Identifier uuid.UUID `json:"identifier,omitempty"`
 }
 
@@ -650,6 +652,9 @@ type RegistrationResponse struct {
 }
 
 type PostflightRequest struct {
+	Version    string    `json:"version,omitempty"`
+	Commit     string    `json:"commit,omitempty"`
+	Identifier uuid.UUID `json:"identifier,omitempty"`
 }
 
 type PostflightResponse struct {
