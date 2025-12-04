@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/log"
@@ -19,6 +20,12 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
+
+const LoggerSystemAttributeAgentID = "agent.id"
+const LoggerSystemAttributeSessionID = "agent.session_id"
+const LoggerSystemAttributeFields = "fields"
+
+var LoggerSystemAttributeError = logrus.ErrorKey
 
 type thandLogger struct {
 	// Ring buffer for storing events
@@ -137,7 +144,7 @@ func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.En
 	// The logger reference is safe to use here since we set it above and
 	// OpenTelemetry's Logger.Emit is safe for concurrent use.
 	for _, entry := range existingLogs {
-		emitLogRecord(logger, entry)
+		emitLogRecord(logger, entry, t.sessionUID)
 	}
 
 	// ForceFlush can be slow; execute outside the lock
@@ -181,16 +188,47 @@ func (t *thandLogger) Shutdown(ctx context.Context) error {
 // This function is safe to call without holding t.mu as it only uses the
 // provided logger reference and the entry data (which should be a copy or
 // otherwise safe to read).
-func emitLogRecord(logger log.Logger, entry *models.LogEntry) {
+func emitLogRecord(logger log.Logger, entry *models.LogEntry, sessionUID uuid.UUID) {
 	var record log.Record
 	record.SetTimestamp(entry.Time)
 	record.SetBody(log.StringValue(entry.Message))
 	record.SetSeverity(logrusToOTelSeverity(entry.Level))
+	// e.g. user_lgoin, system_error etc
+	record.SetEventName("log.record")
+
+	// Add system attributes
+	record.AddAttributes(
+		log.String(LoggerSystemAttributeAgentID, common.GetClientIdentifier().String()),
+		log.String(LoggerSystemAttributeSessionID, sessionUID.String()),
+	)
+
+	fields := []log.KeyValue{}
 
 	// Add logrus fields as attributes
 	for key, value := range entry.Data {
-		record.AddAttributes(log.String(key, fmt.Sprintf("%v", value)))
+
+		// Detect value and convert accordingly
+		switch v := value.(type) {
+		case error:
+			fields = append(fields, log.String(key, v.Error()))
+		case string:
+			fields = append(fields, log.String(key, v))
+		case int:
+			fields = append(fields, log.Int(key, v))
+		case int64:
+			fields = append(fields, log.Int64(key, v))
+		case float64:
+			fields = append(fields, log.Float64(key, v))
+		case bool:
+			fields = append(fields, log.Bool(key, v))
+		default:
+			fields = append(fields, log.String(key, fmt.Sprintf("%v", value)))
+		}
 	}
+
+	record.AddAttributes(
+		log.Map(LoggerSystemAttributeFields, fields...),
+	)
 
 	logger.Emit(context.Background(), record)
 }
@@ -203,7 +241,7 @@ func (t *thandLogger) sendToOpenTelemetryLocked(entry *models.LogEntry) {
 		return
 	}
 
-	emitLogRecord(t.openTelemetryLogger, entry)
+	emitLogRecord(t.openTelemetryLogger, entry, t.sessionUID)
 }
 
 // logrusToOTelSeverity converts logrus levels to OpenTelemetry severity
