@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -144,6 +145,9 @@ func (c *Config) GetIdentity(identity string) (*models.Identity, error) {
 func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType IdentityType, filter ...string) ([]models.Identity, error) {
 
 	// the user can be nil here if there is no authenticated user context
+
+	// Filter out empty strings from the filter
+	filter = common.FilterEmpty(filter...)
 
 	// Find providers with identity capabilities
 	providerMap := c.GetProvidersByCapabilityWithUser(user, models.ProviderCapabilityIdentities)

@@ -1183,6 +1183,32 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		assert.Len(t, results, 0)
 	})
 
+	t.Run("user returned when filter is empty string", func(t *testing.T) {
+		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+
+		config := &Config{
+			Providers: ProviderConfig{
+				Definitions: make(map[string]models.Provider),
+			},
+		}
+		p := models.Provider{
+			Name:        "test",
+			Description: "Test provider",
+			Provider:    "mock",
+			Enabled:     true,
+		}
+		p.SetClient(provider)
+		config.Providers.Definitions["test"] = p
+
+		// Pass an empty string as filter - this simulates ?q= in the URL
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, "")
+		require.NoError(t, err)
+
+		// Should return current user as fallback because "" filter should be ignored
+		assert.Len(t, results, 1)
+		assert.Equal(t, currentUser.Email, results[0].ID)
+	})
+
 	t.Run("nil user - no fallback, empty results", func(t *testing.T) {
 		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
 
