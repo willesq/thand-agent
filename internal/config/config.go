@@ -474,6 +474,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	version, commit, _ := common.GetModuleBuildInfo()
 
 	preflightBody, err := json.Marshal(PreflightRequest{
+		Mode:	    c.GetMode(),
 		Version:    version,
 		Commit:     commit,
 		Identifier: common.GetClientIdentifier(),
@@ -512,6 +513,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	reqBody, err := json.Marshal(RegistrationRequest{
+		Mode: 	   c.GetMode(),
 		Environment: &c.Environment,
 		Version:     version,
 		Commit:      commit,

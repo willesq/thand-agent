@@ -82,8 +82,8 @@ func (p *awsProvider) shouldUseIdentityCenter(user *models.User) bool {
 	if len(user.Email) == 0 && len(user.Username) > 0 {
 		// We only have a username, likely IAM
 		useIC = false
-	} else if len(user.Source) > 0 && user.Source == "iam" {
-		// If the source is 'iam'
+	} else if user.Source == "iam" || user.Source == "" {
+		// If the source is 'iam' or empty (default to traditional IAM)
 		useIC = false
 	}
 	logrus.WithFields(logrus.Fields{

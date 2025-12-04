@@ -627,6 +627,7 @@ type TemplateData struct {
 }
 
 type PreflightRequest struct {
+	Mode       Mode      `json:"mode,omitempty"`
 	Version    string    `json:"version,omitempty"`
 	Commit     string    `json:"commit,omitempty"`
 	Identifier uuid.UUID `json:"identifier,omitempty"`
@@ -637,6 +638,7 @@ type PreflightResponse struct {
 }
 
 type RegistrationRequest struct {
+	Mode        Mode                      `json:"mode,omitempty"`
 	Environment *models.EnvironmentConfig `json:"environment,omitempty"`
 	Version     string                    `json:"version,omitempty"`
 	Commit      string                    `json:"commit,omitempty"`
@@ -653,6 +655,7 @@ type RegistrationResponse struct {
 }
 
 type PostflightRequest struct {
+	Mode       Mode      `json:"mode,omitempty"`
 	Version    string    `json:"version,omitempty"`
 	Commit     string    `json:"commit,omitempty"`
 	Identifier uuid.UUID `json:"identifier,omitempty"`
