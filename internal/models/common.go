@@ -11,7 +11,7 @@ import (
 	"maps"
 	"strconv"
 
-	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 )
 
 var ENCODED_WORKFLOW_TASK = "workflow_task"
@@ -55,13 +55,15 @@ func (e EncodingWrapper) encode(modifiers ...EncryptionImpl) string {
 	finalData := compressed.Bytes()
 	ctx := context.Background()
 
+	// Filter out empty modifiers
+	modifiers = common.FilterEmpty(modifiers...)
+
 	if len(modifiers) > 0 {
 
 		for _, encryptor := range modifiers {
 
 			if encryptor == nil {
-				logrus.Warningln("No valid encryptor provided")
-				continue
+				panic("No valid encryptor provided")
 			}
 
 			// Now encrypt data
@@ -101,13 +103,15 @@ func (e EncodingWrapper) decode(input string, modifiers ...EncryptionImpl) (*Enc
 	decodedData := decoded
 	ctx := context.Background()
 
+	// Filter out empty modifiers
+	modifiers = common.FilterEmpty(modifiers...)
+
 	if len(modifiers) > 0 {
 
 		for _, decryptor := range modifiers {
 
 			if decryptor == nil {
-				logrus.Warningln("No valid decryptor provided")
-				continue
+				panic("No valid decryptor provided")
 			}
 
 			// Now decrypt data
