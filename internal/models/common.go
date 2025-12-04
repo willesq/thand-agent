@@ -11,6 +11,7 @@ import (
 	"maps"
 	"strconv"
 
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 )
 
@@ -63,7 +64,8 @@ func (e EncodingWrapper) encode(modifiers ...EncryptionImpl) string {
 		for _, encryptor := range modifiers {
 
 			if encryptor == nil {
-				panic("No valid encryptor provided")
+				logrus.Warningln("No valid encryptor provided")
+				continue
 			}
 
 			// Now encrypt data
@@ -111,7 +113,8 @@ func (e EncodingWrapper) decode(input string, modifiers ...EncryptionImpl) (*Enc
 		for _, decryptor := range modifiers {
 
 			if decryptor == nil {
-				panic("No valid decryptor provided")
+				logrus.Warningln("No valid decryptor provided")
+				continue
 			}
 
 			// Now decrypt data

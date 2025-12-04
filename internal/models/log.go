@@ -12,7 +12,7 @@ type LogEntry struct {
 	Data logrus.Fields `json:"data,omitempty"`
 
 	// Time at which the log entry was created
-	Time time.Time `json:"time,omitempty"`
+	Time time.Time `json:"time"`
 
 	// Level the log entry was logged at: Trace, Debug, Info, Warn, Error, Fatal or Panic
 	// This field will be set on entry firing and the value will be equal to the one in Logger struct field.
