@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
+	"github.com/sirupsen/logrus"
 )
 
 type Workflow struct {
@@ -34,17 +35,20 @@ func (w *Workflow) GetWorkflow() *model.Workflow {
 // Create a clone of the workflow to avoid mutations
 func (w *Workflow) GetWorkflowClone() *model.Workflow {
 	if w.Workflow == nil {
+		logrus.Errorln("Failed to clone workflow. Base workflow not provided")
 		return nil
 	}
 
 	// Deep copy via JSON marshaling
 	data, err := json.Marshal(w.Workflow)
 	if err != nil {
+		logrus.WithError(err).Errorln("Failed to marshal workflow for cloning")
 		return nil
 	}
 
 	clone := &model.Workflow{}
 	if err := json.Unmarshal(data, clone); err != nil {
+		logrus.WithError(err).Errorln("Failed to unmarshal workflow for cloning")
 		return nil
 	}
 	return clone
