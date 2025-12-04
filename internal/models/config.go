@@ -1,65 +1,87 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/serverlessworkflow/sdk-go/v3/model"
+)
 
 type ServerConfig struct {
-	Host     string             `mapstructure:"host"`
-	Port     int                `mapstructure:"port"`
-	Limits   ServerLimitsConfig `mapstructure:"limits"`
-	Metrics  MetricsConfig      `mapstructure:"metrics"`
-	Health   HealthConfig       `mapstructure:"health"`
-	Ready    ReadyConfig        `mapstructure:"ready"`
-	Security SecurityConfig     `mapstructure:"security"`
+	Host     string             `json:"host" yaml:"host" mapstructure:"host"`
+	Port     int                `json:"port" yaml:"port" mapstructure:"port"`
+	Limits   ServerLimitsConfig `json:"limits" yaml:"limits" mapstructure:"limits"`
+	Metrics  MetricsConfig      `json:"metrics" yaml:"metrics" mapstructure:"metrics"`
+	Health   HealthConfig       `json:"health" yaml:"health" mapstructure:"health"`
+	Ready    ReadyConfig        `json:"ready" yaml:"ready" mapstructure:"ready"`
+	Security SecurityConfig     `json:"security" yaml:"security" mapstructure:"security"`
 }
 
 type ServerLimitsConfig struct {
-	ReadTimeout       time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
-	IdleTimeout       time.Duration `mapstructure:"idle_timeout"`
-	RequestsPerMinute int           `mapstructure:"requests_per_minute"`
-	Burst             int           `mapstructure:"burst"`
+	ReadTimeout       time.Duration `json:"read_timeout" yaml:"read_timeout" mapstructure:"read_timeout"`
+	WriteTimeout      time.Duration `json:"write_timeout" yaml:"write_timeout" mapstructure:"write_timeout"`
+	IdleTimeout       time.Duration `json:"idle_timeout" yaml:"idle_timeout" mapstructure:"idle_timeout"`
+	RequestsPerMinute int           `json:"requests_per_minute" yaml:"requests_per_minute" mapstructure:"requests_per_minute"`
+	Burst             int           `json:"burst" yaml:"burst" mapstructure:"burst"`
 }
 
 type LoginConfig struct {
-	Endpoint string `mapstructure:"endpoint" default:"https://auth.thand.io/"`
-	ApiKey   string `mapstructure:"api_key"`          // API key for authenticating with the login server
-	Base     string `mapstructure:"base" default:"/"` // Base path for login endpoint e.g. /
+	Endpoint string `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint" default:"https://auth.thand.io/"`
+	ApiKey   string `json:"api_key" yaml:"api_key" mapstructure:"api_key"`    // API key for authenticating with the login server
+	Base     string `json:"base" yaml:"base" mapstructure:"base" default:"/"` // Base path for login endpoint e.g. /
 }
 
 type LoggingConfig struct {
-	Level  string `mapstructure:"level" default:"info"`
-	Format string `mapstructure:"format" default:"text"`
-	Output string `mapstructure:"output"`
+	Level  string `json:"level" yaml:"level" mapstructure:"level" default:"info"`
+	Format string `json:"format" yaml:"format" mapstructure:"format" default:"text"`
+	Output string `json:"output" yaml:"output" mapstructure:"output"`
+
+	OpenTelemetry OpenTelemetryConfig `json:"open_telemetry" yaml:"open_telemetry" mapstructure:"open_telemetry"`
+}
+
+type OpenTelemetryConfig struct {
+	Enabled bool `json:"enabled" yaml:"enabled" mapstructure:"enabled" default:"false"`
+	// Endpoint specifies the OTLP endpoint for remote logging.
+	// The structure of model.Endpoint may include fields such as URL, protocol, and authentication.
+	// Example YAML:
+	//   endpoint:
+	//     url: "https://otel-collector.example.com:4317"
+	//     protocol: "grpc"
+	//     auth:
+	//       type: "basic"
+	//       username: "user"
+	//       password: "pass"
+	// Refer to serverlessworkflow/sdk-go/model.Endpoint documentation for full details.
+	Endpoint model.Endpoint `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint"` // OTLP endpoint for remote logging
 }
 
 type MetricsConfig struct {
-	Enabled   bool   `mapstructure:"enabled" default:"true"`
-	Path      string `mapstructure:"path" default:"/metrics"`
-	Namespace string `mapstructure:"namespace"`
+	Enabled   bool   `json:"enabled" yaml:"enabled" mapstructure:"enabled" default:"true"`
+	Path      string `json:"path" yaml:"path" mapstructure:"path" default:"/metrics"`
+	Namespace string `json:"namespace" yaml:"namespace" mapstructure:"namespace"`
 }
 
 type HealthConfig struct {
-	Enabled bool `mapstructure:"enabled" default:"true"`
+	Enabled bool `json:"enabled" yaml:"enabled" mapstructure:"enabled" default:"true"`
 	// Don't use /healthz as it conflicts with google k8s health checks
-	Path string `mapstructure:"path" default:"/health"`
+	Path string `json:"path" yaml:"path" mapstructure:"path" default:"/health"`
 }
 
 type ReadyConfig struct {
-	Enabled bool   `mapstructure:"enabled" default:"true"`
-	Path    string `mapstructure:"path" default:"/ready"`
+	Enabled bool   `json:"enabled" yaml:"enabled" mapstructure:"enabled" default:"true"`
+	Path    string `json:"path" yaml:"path" mapstructure:"path" default:"/ready"`
 }
 
 type SecurityConfig struct {
-	CORS CORSConfig `mapstructure:"cors"`
+	CORS CORSConfig `json:"cors" yaml:"cors" mapstructure:"cors"`
 }
 
 type CORSConfig struct {
-	AllowedOrigins   []string `mapstructure:"allowed_origins"`
-	AllowedMethods   []string `mapstructure:"allowed_methods"`
-	AllowedHeaders   []string `mapstructure:"allowed_headers"`
-	ExposeHeaders    []string `mapstructure:"expose_headers"`
-	AllowCredentials bool     `mapstructure:"allow_credentials"`
-	MaxAge           int      `mapstructure:"max_age"`
+	AllowedOrigins   []string `json:"allowed_origins" yaml:"allowed_origins" mapstructure:"allowed_origins"`
+	AllowedMethods   []string `json:"allowed_methods" yaml:"allowed_methods" mapstructure:"allowed_methods"`
+	AllowedHeaders   []string `json:"allowed_headers" yaml:"allowed_headers" mapstructure:"allowed_headers"`
+	ExposeHeaders    []string `json:"expose_headers" yaml:"expose_headers" mapstructure:"expose_headers"`
+	AllowCredentials bool     `json:"allow_credentials" yaml:"allow_credentials" mapstructure:"allow_credentials"`
+	MaxAge           int      `json:"max_age" yaml:"max_age" mapstructure:"max_age"`
 }
 
 // WithDefaults returns a CORSConfig with default values applied for any unset fields
@@ -89,8 +111,8 @@ func (c *CORSConfig) AddOrigins(origins ...string) {
 }
 
 type APIConfig struct {
-	Version   string          `mapstructure:"version" default:"v1"`
-	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
+	Version   string          `json:"version" yaml:"version" mapstructure:"version" default:"v1"`
+	RateLimit RateLimitConfig `json:"rate_limit" yaml:"rate_limit" mapstructure:"rate_limit"`
 }
 
 func (api *APIConfig) GetVersion() string {
@@ -101,6 +123,6 @@ func (api *APIConfig) GetVersion() string {
 }
 
 type RateLimitConfig struct {
-	RequestsPerMinute int `mapstructure:"requests_per_minute"`
-	Burst             int `mapstructure:"burst"`
+	RequestsPerMinute int `json:"requests_per_minute" yaml:"requests_per_minute" mapstructure:"requests_per_minute"`
+	Burst             int `json:"burst" yaml:"burst" mapstructure:"burst"`
 }

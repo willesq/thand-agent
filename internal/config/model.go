@@ -627,6 +627,7 @@ type TemplateData struct {
 }
 
 type PreflightRequest struct {
+	Mode       Mode      `json:"mode,omitempty"`
 	Version    string    `json:"version,omitempty"`
 	Commit     string    `json:"commit,omitempty"`
 	Identifier uuid.UUID `json:"identifier,omitempty"`
@@ -637,6 +638,7 @@ type PreflightResponse struct {
 }
 
 type RegistrationRequest struct {
+	Mode        Mode                      `json:"mode,omitempty"`
 	Environment *models.EnvironmentConfig `json:"environment,omitempty"`
 	Version     string                    `json:"version,omitempty"`
 	Commit      string                    `json:"commit,omitempty"`
@@ -646,12 +648,14 @@ type RegistrationRequest struct {
 type RegistrationResponse struct {
 	Success   bool                   `json:"success" required:"true"`
 	Services  *models.ServicesConfig `json:"services,omitempty"`
+	Logging   *models.LoggingConfig  `json:"logging,omitempty"`
 	Roles     *RoleConfig            `json:"roles,omitempty"`
 	Providers *ProviderConfig        `json:"providers,omitempty"`
 	Workflows *WorkflowConfig        `json:"workflows,omitempty"`
 }
 
 type PostflightRequest struct {
+	Mode       Mode      `json:"mode,omitempty"`
 	Version    string    `json:"version,omitempty"`
 	Commit     string    `json:"commit,omitempty"`
 	Identifier uuid.UUID `json:"identifier,omitempty"`

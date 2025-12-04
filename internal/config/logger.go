@@ -1,12 +1,23 @@
 package config
 
 import (
+	"context"
+	"encoding/base64"
+	"fmt"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/log"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
 type thandLogger struct {
@@ -17,6 +28,11 @@ type thandLogger struct {
 	currentPos  int
 	isFull      bool
 	mu          sync.RWMutex
+
+	// OpenTelemetry remote logging
+	openTelemetryProvider *sdklog.LoggerProvider
+	openTelemetryLogger   log.Logger
+	remoteEnabled         bool
 }
 
 func NewThandLogger() *thandLogger {
@@ -29,16 +45,206 @@ func NewThandLogger() *thandLogger {
 	}
 }
 
+// EnableRemoteLogging sets up OpenTelemetry log export after authentication
+func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.Endpoint, identifier uuid.UUID) error {
+
+	loggingHeaders := map[string]string{}
+
+	// Extract endpoint URL and auth token
+	loggingEndpoint := endpoint.EndpointConfig.URI.String()
+
+	checkUrl, err := url.Parse(loggingEndpoint)
+
+	if err != nil || (checkUrl.Scheme != "http" && checkUrl.Scheme != "https") {
+		return fmt.Errorf("invalid OpenTelemetry endpoint URL: %s", loggingEndpoint)
+	}
+
+	logrus.WithField("hostname", checkUrl.Host).Infoln("Configuring OpenTelemetry")
+
+	// Get auth token from endpoint configuration
+	if endpoint.EndpointConfig.Authentication != nil && endpoint.EndpointConfig.Authentication.AuthenticationPolicy != nil {
+		auth := endpoint.EndpointConfig.Authentication.AuthenticationPolicy
+
+		switch {
+		case auth.Basic != nil:
+			credentials := base64.StdEncoding.EncodeToString([]byte(auth.Basic.Username + ":" + auth.Basic.Password))
+			loggingHeaders["Authorization"] = "Basic " + credentials
+		case auth.Bearer != nil:
+			loggingHeaders["Authorization"] = "Bearer " + auth.Bearer.Token
+		case auth.Digest != nil:
+			// Digest auth not directly supported in headers; skipping
+			fallthrough
+		default:
+			return fmt.Errorf("unsupported authentication type for OpenTelemetry endpoint")
+		}
+	}
+
+	opts := []otlploghttp.Option{
+		otlploghttp.WithEndpointURL(loggingEndpoint),
+		otlploghttp.WithCompression(otlploghttp.GzipCompression),
+		otlploghttp.WithHeaders(loggingHeaders),
+		otlploghttp.WithTimeout(1 * time.Second),
+	}
+
+	if strings.HasPrefix(loggingEndpoint, "http://") {
+		logrus.Warnln("Insecure OpenTelemetry endpoint detected (http). Proceeding without TLS.")
+		opts = append(opts, otlploghttp.WithInsecure())
+	}
+
+	// Create OTLP HTTP exporter with authentication
+	exporter, err := otlploghttp.New(ctx,
+		opts...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create OTLP exporter: %w", err)
+	}
+
+	// Create resource with service info
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceName("thand-agent"),
+			semconv.ServiceInstanceID(identifier.String()),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create log provider with batching
+	provider := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(
+			sdklog.NewBatchProcessor(exporter,
+				sdklog.WithExportInterval(30*time.Second),
+				sdklog.WithExportMaxBatchSize(100),
+			),
+		),
+		sdklog.WithResource(res),
+	)
+
+	logger := provider.Logger("thand-agent")
+
+	// Hold the lock only while updating shared state and copying buffered logs
+	t.mu.Lock()
+	t.openTelemetryProvider = provider
+	t.openTelemetryLogger = logger
+	t.remoteEnabled = true
+
+	// Copy existing buffered logs while holding the lock
+	existingLogs := t.getEventsInternal()
+	t.mu.Unlock()
+
+	// Send existing logs outside the lock to avoid blocking other operations.
+	// The logger reference is safe to use here since we set it above and
+	// OpenTelemetry's Logger.Emit is safe for concurrent use.
+	for _, entry := range existingLogs {
+		emitLogRecord(logger, entry)
+	}
+
+	// ForceFlush can be slow; execute outside the lock
+	provider.ForceFlush(ctx)
+
+	logrus.Info("Remote logging enabled via OpenTelemetry")
+
+	return nil
+}
+
+// DisableRemoteLogging stops the OpenTelemetry exporter
+func (t *thandLogger) DisableRemoteLogging() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.remoteEnabled = false
+}
+
+// IsRemoteLoggingEnabled returns whether remote logging is active
+func (t *thandLogger) IsRemoteLoggingEnabled() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.remoteEnabled
+}
+
+// Shutdown gracefully shuts down the OpenTelemetry exporter
+func (t *thandLogger) Shutdown(ctx context.Context) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.openTelemetryProvider != nil {
+		t.remoteEnabled = false
+		err := t.openTelemetryProvider.Shutdown(ctx)
+		t.openTelemetryProvider = nil
+		t.openTelemetryLogger = nil
+		return err
+	}
+	return nil
+}
+
+// emitLogRecord converts a log entry to an OpenTelemetry record and emits it.
+// This function is safe to call without holding t.mu as it only uses the
+// provided logger reference and the entry data (which should be a copy or
+// otherwise safe to read).
+func emitLogRecord(logger log.Logger, entry *models.LogEntry) {
+	var record log.Record
+	record.SetTimestamp(entry.Time)
+	record.SetBody(log.StringValue(entry.Message))
+	record.SetSeverity(logrusToOTelSeverity(entry.Level))
+
+	// Add logrus fields as attributes
+	for key, value := range entry.Data {
+		record.AddAttributes(log.String(key, fmt.Sprintf("%v", value)))
+	}
+
+	logger.Emit(context.Background(), record)
+}
+
+// sendToOpenTelemetryLocked sends a log entry to the OpenTelemetry exporter.
+// Caller must hold t.mu lock. Use Go's race detector (-race) during testing
+// to verify proper synchronization.
+func (t *thandLogger) sendToOpenTelemetryLocked(entry *models.LogEntry) {
+	if !t.remoteEnabled || t.openTelemetryLogger == nil {
+		return
+	}
+
+	emitLogRecord(t.openTelemetryLogger, entry)
+}
+
+// logrusToOTelSeverity converts logrus levels to OpenTelemetry severity
+func logrusToOTelSeverity(level logrus.Level) log.Severity {
+	switch level {
+	case logrus.PanicLevel:
+		return log.SeverityFatal4
+	case logrus.FatalLevel:
+		return log.SeverityFatal
+	case logrus.ErrorLevel:
+		return log.SeverityError
+	case logrus.WarnLevel:
+		return log.SeverityWarn
+	case logrus.InfoLevel:
+		return log.SeverityInfo
+	case logrus.DebugLevel:
+		return log.SeverityDebug
+	case logrus.TraceLevel:
+		return log.SeverityTrace
+	default:
+		return log.SeverityInfo
+	}
+}
+
 func (t *thandLogger) Fire(entry *logrus.Entry) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// Add to ring buffer
-	t.eventBuffer[t.currentPos] = models.NewLogEntry(entry)
+	thandLog := models.NewLogEntry(entry)
+
+	// Add to ring buffer for local queries
+	t.eventBuffer[t.currentPos] = thandLog
 	t.currentPos = (t.currentPos + 1) % t.maxSize
 
 	if t.currentPos == 0 {
 		t.isFull = true
+	}
+
+	// Send to OpenTelemetry if remote logging is enabled
+	if t.remoteEnabled {
+		t.sendToOpenTelemetryLocked(thandLog)
 	}
 
 	return nil

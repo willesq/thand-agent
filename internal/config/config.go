@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
@@ -472,6 +474,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	version, commit, _ := common.GetModuleBuildInfo()
 
 	preflightBody, err := json.Marshal(PreflightRequest{
+		Mode:	    c.GetMode(),
 		Version:    version,
 		Commit:     commit,
 		Identifier: common.GetClientIdentifier(),
@@ -510,6 +513,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	reqBody, err := json.Marshal(RegistrationRequest{
+		Mode: 	   c.GetMode(),
 		Environment: &c.Environment,
 		Version:     version,
 		Commit:      commit,
@@ -542,7 +546,6 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	var registrationResponse RegistrationResponse
-
 	err = json.Unmarshal(registerRes.Body(), &registrationResponse)
 
 	if err != nil {
@@ -554,6 +557,39 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	logrus.Infoln("Successfully registered with login server")
+
+	// Setup OpenTelemetry remote logging if endpoint is provided
+	if registrationResponse.Logging != nil {
+
+		logrus.Debugln("Configuring remote logging from login server configuration")
+
+		loggingConfig := registrationResponse.Logging
+
+		if loggingConfig.OpenTelemetry.Enabled && loggingConfig.OpenTelemetry.Endpoint.EndpointConfig != nil {
+
+			endpointConfig := loggingConfig.OpenTelemetry.Endpoint.EndpointConfig
+
+			if endpointConfig.Authentication == nil {
+				endpointConfig.Authentication = authentication
+			}
+
+			logrus.Infof("Enabling remote logging to endpoint: %s", endpointConfig.URI.String())
+
+			// Create context with cancellation and timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			// Enable remote logging
+			err := c.logger.EnableRemoteLogging(
+				ctx,
+				loggingConfig.OpenTelemetry.Endpoint,
+				common.GetClientIdentifier(),
+			)
+			if err != nil {
+				logrus.WithError(err).Warn("Failed to setup remote logging, continuing without it")
+			}
+		}
+	}
 
 	return &registrationResponse, nil
 }

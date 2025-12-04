@@ -394,19 +394,25 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 		} else if s.Config.IsServer() {
 
 			// Register handlers
-			api.POST("/preflight", func(ctx *gin.Context) {
+			api.POST("/preflight", func(c *gin.Context) {
 				// Just a stub for now
-				ctx.JSON(http.StatusOK, config.PreflightResponse{
+				c.JSON(http.StatusOK, config.PreflightResponse{
 					Success: true,
 				})
 			})
 			api.POST("/register", s.postRegister)
-			api.POST("/postflight", func(ctx *gin.Context) {
+			api.POST("/postflight", func(c *gin.Context) {
 
 				// Just a stub for now
-				ctx.JSON(http.StatusOK, config.PostflightResponse{
+				c.JSON(http.StatusOK, config.PostflightResponse{
 					Success: true,
 				})
+			})
+
+			api.POST("/logs", func(c *gin.Context) {
+
+				// Just a stub for now
+				c.JSON(http.StatusOK, gin.H{})
 			})
 
 			// Server endpoints

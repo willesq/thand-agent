@@ -1,94 +1,5 @@
 basePath: /api/v1
 definitions:
-  config.APIConfig:
-    properties:
-      rateLimit:
-        $ref: '#/definitions/config.RateLimitConfig'
-      version:
-        default: v1
-        type: string
-    type: object
-  config.CORSConfig:
-    properties:
-      allowedHeaders:
-        items:
-          type: string
-        type: array
-      allowedMethods:
-        items:
-          type: string
-        type: array
-      allowedOrigins:
-        items:
-          type: string
-        type: array
-      maxAge:
-        type: integer
-    type: object
-  config.HealthConfig:
-    properties:
-      enabled:
-        default: true
-        type: boolean
-      path:
-        default: /health
-        description: Don't use /healthz as it conflicts with google k8s health checks
-        type: string
-    type: object
-  config.LoggingConfig:
-    properties:
-      format:
-        default: text
-        type: string
-      level:
-        default: info
-        type: string
-      output:
-        type: string
-    type: object
-  config.LoginConfig:
-    properties:
-      apiKey:
-        description: API key for authenticating with the login server
-        type: string
-      base:
-        default: /
-        description: Base path for login endpoint e.g. /
-        type: string
-      endpoint:
-        default: https://auth.thand.io/
-        type: string
-    type: object
-  config.MetricsConfig:
-    properties:
-      enabled:
-        default: true
-        type: boolean
-      namespace:
-        type: string
-      path:
-        default: /metrics
-        type: string
-    type: object
-  config.ProviderConfig:
-    properties:
-      definitions:
-        additionalProperties:
-          $ref: '#/definitions/models.Provider'
-        description: Load providers directly from config using mapstructure:",remain"
-        type: object
-      path:
-        type: string
-      plugins:
-        allOf:
-        - $ref: '#/definitions/config.ProviderPluginConfig'
-        description: Load dynamic provider configs
-      url:
-        $ref: '#/definitions/model.Endpoint'
-      vault:
-        description: vault secret / path to use
-        type: string
-    type: object
   config.ProviderPlugin:
     type: object
   config.ProviderPluginConfig:
@@ -101,109 +12,6 @@ definitions:
       path:
         type: string
       url:
-        type: string
-    type: object
-  config.RateLimitConfig:
-    properties:
-      burst:
-        type: integer
-      requestsPerMinute:
-        type: integer
-    type: object
-  config.ReadyConfig:
-    properties:
-      enabled:
-        default: true
-        type: boolean
-      path:
-        default: /ready
-        type: string
-    type: object
-  config.RegistrationRequest:
-    properties:
-      environment:
-        $ref: '#/definitions/models.EnvironmentConfig'
-    type: object
-  config.RegistrationResponse:
-    properties:
-      providers:
-        $ref: '#/definitions/config.ProviderConfig'
-      roles:
-        $ref: '#/definitions/config.RoleConfig'
-      services:
-        $ref: '#/definitions/models.ServicesConfig'
-      success:
-        type: boolean
-      workflows:
-        $ref: '#/definitions/config.WorkflowConfig'
-    type: object
-  config.RoleConfig:
-    properties:
-      definitions:
-        additionalProperties:
-          $ref: '#/definitions/models.Role'
-        description: Store everything in memory
-        type: object
-      path:
-        type: string
-      url:
-        $ref: '#/definitions/model.Endpoint'
-      vault:
-        description: vault secret / path to use
-        type: string
-    type: object
-  config.SecurityConfig:
-    properties:
-      cors:
-        $ref: '#/definitions/config.CORSConfig'
-    type: object
-  config.ServerConfig:
-    properties:
-      health:
-        $ref: '#/definitions/config.HealthConfig'
-      host:
-        type: string
-      limits:
-        $ref: '#/definitions/config.ServerLimitsConfig'
-      metrics:
-        $ref: '#/definitions/config.MetricsConfig'
-      port:
-        type: integer
-      ready:
-        $ref: '#/definitions/config.ReadyConfig'
-      security:
-        $ref: '#/definitions/config.SecurityConfig'
-    type: object
-  config.ServerLimitsConfig:
-    properties:
-      burst:
-        type: integer
-      idleTimeout:
-        $ref: '#/definitions/time.Duration'
-      readTimeout:
-        $ref: '#/definitions/time.Duration'
-      requestsPerMinute:
-        type: integer
-      writeTimeout:
-        $ref: '#/definitions/time.Duration'
-    type: object
-  config.WorkflowConfig:
-    properties:
-      definitions:
-        additionalProperties:
-          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Workflow'
-        description: Store everything in memory
-        type: object
-      path:
-        type: string
-      plugins:
-        allOf:
-        - $ref: '#/definitions/config.WorkflowPluginConfig'
-        description: Load dynamic plugin registry for custom call tools
-      url:
-        $ref: '#/definitions/model.Endpoint'
-      vault:
-        description: vault secret / path to use
         type: string
     type: object
   config.WorkflowPlugin:
@@ -236,13 +44,13 @@ definitions:
     properties:
       role:
         allOf:
-        - $ref: '#/definitions/models.Role'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
         description: The evaluated composite role
     type: object
   daemon.ExecutionStatePageData:
     properties:
       execution:
-        $ref: '#/definitions/models.WorkflowExecutionInfo'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.WorkflowExecutionInfo'
       workflow:
         $ref: '#/definitions/model.Workflow'
     type: object
@@ -254,7 +62,7 @@ definitions:
         $ref: '#/definitions/models.EnvironmentConfig'
       executions:
         items:
-          $ref: '#/definitions/models.WorkflowExecutionInfo'
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.WorkflowExecutionInfo'
         type: array
       provider:
         type: string
@@ -270,56 +78,441 @@ definitions:
   github_com_thand-io_agent_internal_config.Config:
     properties:
       api:
-        $ref: '#/definitions/config.APIConfig'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.APIConfig'
       environment:
         allOf:
         - $ref: '#/definitions/models.EnvironmentConfig'
         description: Environment configuration and core services
       logging:
-        $ref: '#/definitions/config.LoggingConfig'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.LoggingConfig'
       login:
         allOf:
-        - $ref: '#/definitions/config.LoginConfig'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.LoginConfig'
         description: System configuration
       providers:
         allOf:
-        - $ref: '#/definitions/config.ProviderConfig'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_config.ProviderConfig'
         description: These are integration providers like AWS, GCP, etc.
       roles:
         allOf:
-        - $ref: '#/definitions/config.RoleConfig'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_config.RoleConfig'
         description: Workflow engine config
       secret:
         description: Secret used for signing cookies and tokens
         type: string
       server:
-        $ref: '#/definitions/config.ServerConfig'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.ServerConfig'
       services:
         allOf:
-        - $ref: '#/definitions/models.ServicesConfig'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.ServicesConfig'
         description: External services / non-core services
       workflows:
         allOf:
-        - $ref: '#/definitions/config.WorkflowConfig'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_config.WorkflowConfig'
         description: These are workflows to run for role associated workflows
     type: object
-  github_com_thand-io_agent_internal_models.User:
+  github_com_thand-io_agent_internal_config.ProviderConfig:
     properties:
-      email:
+      definitions:
+        additionalProperties:
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Provider'
+        description: Load providers directly from config using mapstructure:",remain"
+        type: object
+      path:
         type: string
+      plugins:
+        allOf:
+        - $ref: '#/definitions/config.ProviderPluginConfig'
+        description: Load dynamic provider configs
+      url:
+        $ref: '#/definitions/model.Endpoint'
+      vault:
+        description: vault secret / path to use
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_config.RegistrationRequest:
+    properties:
+      commit:
+        type: string
+      environment:
+        $ref: '#/definitions/models.EnvironmentConfig'
+      identifier:
+        type: string
+      version:
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_config.RegistrationResponse:
+    properties:
+      logging:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.LoggingConfig'
+      providers:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_config.ProviderConfig'
+      roles:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_config.RoleConfig'
+      services:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.ServicesConfig'
+      success:
+        type: boolean
+      workflows:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_config.WorkflowConfig'
+    type: object
+  github_com_thand-io_agent_internal_config.RoleConfig:
+    properties:
+      definitions:
+        additionalProperties:
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
+        description: Store everything in memory
+        type: object
+      path:
+        type: string
+      url:
+        $ref: '#/definitions/model.Endpoint'
+      vault:
+        description: vault secret / path to use
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_config.WorkflowConfig:
+    properties:
+      definitions:
+        additionalProperties:
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Workflow'
+        description: Store everything in memory
+        type: object
+      path:
+        type: string
+      plugins:
+        allOf:
+        - $ref: '#/definitions/config.WorkflowPluginConfig'
+        description: Load dynamic plugin registry for custom call tools
+      url:
+        $ref: '#/definitions/model.Endpoint'
+      vault:
+        description: vault secret / path to use
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_models.APIConfig:
+    properties:
+      rate_limit:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.RateLimitConfig'
+      version:
+        default: v1
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_models.BasicConfig:
+    additionalProperties: {}
+    type: object
+  github_com_thand-io_agent_internal_models.CORSConfig:
+    properties:
+      allow_credentials:
+        type: boolean
+      allowed_headers:
+        items:
+          type: string
+        type: array
+      allowed_methods:
+        items:
+          type: string
+        type: array
+      allowed_origins:
+        items:
+          type: string
+        type: array
+      expose_headers:
+        items:
+          type: string
+        type: array
+      max_age:
+        type: integer
+    type: object
+  github_com_thand-io_agent_internal_models.Groups:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_thand-io_agent_internal_models.HealthConfig:
+    properties:
+      enabled:
+        default: true
+        type: boolean
+      path:
+        default: /health
+        description: Don't use /healthz as it conflicts with google k8s health checks
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_models.LocalSession:
+    properties:
+      endpoint:
+        description: Optional endpoint associated with the session
+        type: string
+      expiry:
+        description: Expiry time of the session
+        type: string
+      session:
+        description: Encoded session token
+        type: string
+      version:
+        description: Version of the session config
+        type: integer
+    type: object
+  github_com_thand-io_agent_internal_models.LoggingConfig:
+    properties:
+      format:
+        default: text
+        type: string
+      level:
+        default: info
+        type: string
+      open_telemetry:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.OpenTelemetryConfig'
+      output:
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_models.LoginConfig:
+    properties:
+      api_key:
+        description: API key for authenticating with the login server
+        type: string
+      base:
+        default: /
+        description: Base path for login endpoint e.g. /
+        type: string
+      endpoint:
+        default: https://auth.thand.io/
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_models.MetricsConfig:
+    properties:
+      enabled:
+        default: true
+        type: boolean
+      namespace:
+        type: string
+      path:
+        default: /metrics
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_models.OpenTelemetryConfig:
+    properties:
+      enabled:
+        default: false
+        type: boolean
+      endpoint:
+        allOf:
+        - $ref: '#/definitions/model.Endpoint'
+        description: |-
+          Endpoint specifies the OTLP endpoint for remote logging.
+          The structure of model.Endpoint may include fields such as URL, protocol, and authentication.
+          Example YAML:
+            endpoint:
+              url: "https://otel-collector.example.com:4317"
+              protocol: "grpc"
+              auth:
+                type: "basic"
+                username: "user"
+                password: "pass"
+          Refer to serverlessworkflow/sdk-go/model.Endpoint documentation for full details.
+    type: object
+  github_com_thand-io_agent_internal_models.Permissions:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_thand-io_agent_internal_models.Provider:
+    properties:
+      config:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.BasicConfig'
+        description: Provider-specific configuration
+      description:
+        type: string
+      enabled:
+        description: Whether this provider is enabled
+        type: boolean
+      name:
+        type: string
+      provider:
+        description: e.g. aws, gcp, azure
+        type: string
+      role:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
+        description: The base role for this provider
+    type: object
+  github_com_thand-io_agent_internal_models.RateLimitConfig:
+    properties:
+      burst:
+        type: integer
+      requests_per_minute:
+        type: integer
+    type: object
+  github_com_thand-io_agent_internal_models.ReadyConfig:
+    properties:
+      enabled:
+        default: true
+        type: boolean
+      path:
+        default: /ready
+        type: string
+    type: object
+  github_com_thand-io_agent_internal_models.Role:
+    properties:
+      authenticators:
+        description: All the auth providers that the role can use. If empty then any
+          provider can be used
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      enabled:
+        default: true
+        description: By default enable the role
+        type: boolean
+      groups:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Groups'
+        description: groups to add the user to
+      inherits:
+        description: roles to inherit from or provider specific roles/policies etc
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      permissions:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Permissions'
+        description: granular permissions for the role
+      providers:
+        description: providers that can assign this role
+        items:
+          type: string
+        type: array
+      resources:
+        allOf:
+        - $ref: '#/definitions/models.Resources'
+        description: resource access rules, apis, files, systems etc
+      scopes:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
+        description: scope of who can be assigned this role
+      workflows:
+        description: The workflows to execute
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_thand-io_agent_internal_models.RoleScopes:
+    properties:
+      domains:
+        items:
+          type: string
+        type: array
       groups:
         items:
           type: string
         type: array
+      users:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_thand-io_agent_internal_models.SecurityConfig:
+    properties:
+      cors:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.CORSConfig'
+    type: object
+  github_com_thand-io_agent_internal_models.ServerConfig:
+    properties:
+      health:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.HealthConfig'
+      host:
+        type: string
+      limits:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.ServerLimitsConfig'
+      metrics:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.MetricsConfig'
+      port:
+        type: integer
+      ready:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.ReadyConfig'
+      security:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.SecurityConfig'
+    type: object
+  github_com_thand-io_agent_internal_models.ServerLimitsConfig:
+    properties:
+      burst:
+        type: integer
+      idle_timeout:
+        $ref: '#/definitions/time.Duration'
+      read_timeout:
+        $ref: '#/definitions/time.Duration'
+      requests_per_minute:
+        type: integer
+      write_timeout:
+        $ref: '#/definitions/time.Duration'
+    type: object
+  github_com_thand-io_agent_internal_models.ServicesConfig:
+    properties:
+      encryption:
+        allOf:
+        - $ref: '#/definitions/models.ServiceConfig'
+        description: Encryption - used for encrypting sensitive data
+      largeLanguageModel:
+        allOf:
+        - $ref: '#/definitions/models.LargeLanguageModelConfig'
+        description: LLM - used for large language model interactions
+      scheduler:
+        allOf:
+        - $ref: '#/definitions/models.ServiceConfig'
+        description: Scheduler - used for scheduling tasks
+      temporal:
+        allOf:
+        - $ref: '#/definitions/models.TemporalConfig'
+        description: Temporal - used for workflow processing and orchestration
+      vault:
+        allOf:
+        - $ref: '#/definitions/models.ServiceConfig'
+        description: Vault - used for storing sensitive data
+    type: object
+  github_com_thand-io_agent_internal_models.User:
+    properties:
+      email:
+        description: Email is the user's email address, often used as a primary identifier.
+        type: string
+      groups:
+        description: Groups is a list of group names or IDs that this user belongs
+          to.
+        items:
+          type: string
+        type: array
       id:
+        description: ID is the unique identifier for the user.
         type: string
       name:
+        description: Name is the user's full display name.
         type: string
       source:
+        description: Source identifies the identity provider or system where this
+          user originated.
         type: string
       username:
+        description: Username is the user's login name or handle.
         type: string
       verified:
+        description: Verified indicates whether the user's identity has been verified.
         type: boolean
     type: object
   github_com_thand-io_agent_internal_models.Workflow:
@@ -334,6 +527,54 @@ definitions:
         type: string
       workflow:
         $ref: '#/definitions/model.Workflow'
+    type: object
+  github_com_thand-io_agent_internal_models.WorkflowExecutionInfo:
+    properties:
+      approved:
+        description: nil = pending approval, true = approved, false = denied
+        type: boolean
+      context: {}
+      duration:
+        description: Duration in seconds
+        type: integer
+      finished_at:
+        type: string
+      history:
+        description: History of state transitions
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      identities:
+        items:
+          type: string
+        type: array
+      input:
+        description: Context
+      name:
+        description: SearchAttributes are the custom search attributes associated
+          with the workflow
+        type: string
+      output: {}
+      providers:
+        items:
+          type: string
+        type: array
+      reason:
+        type: string
+      role:
+        type: string
+      run:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      task:
+        type: string
+      user:
+        type: string
     type: object
   model.AuthenticationPolicy:
     properties:
@@ -831,9 +1072,6 @@ definitions:
       state:
         type: string
     type: object
-  models.BasicConfig:
-    additionalProperties: {}
-    type: object
   models.ElevateLLMRequest:
     properties:
       reason:
@@ -861,9 +1099,9 @@ definitions:
       reason:
         type: string
       role:
-        $ref: '#/definitions/models.Role'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
       session:
-        $ref: '#/definitions/models.LocalSession'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.LocalSession'
       workflow:
         type: string
     type: object
@@ -875,7 +1113,7 @@ definitions:
         type: string
       config:
         allOf:
-        - $ref: '#/definitions/models.BasicConfig'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.BasicConfig'
         description: Settings for the platform
       ephemeral:
         default: false
@@ -886,7 +1124,7 @@ definitions:
         type: string
       metaData:
         allOf:
-        - $ref: '#/definitions/models.BasicConfig'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.BasicConfig'
         description: Metadata for the environment
       name:
         default: development
@@ -920,17 +1158,6 @@ definitions:
     - Azure
     - Kubernetes
     - Local
-  models.Groups:
-    properties:
-      allow:
-        items:
-          type: string
-        type: array
-      deny:
-        items:
-          type: string
-        type: array
-    type: object
   models.HealthResponse:
     properties:
       path:
@@ -974,18 +1201,6 @@ definitions:
         - anthropic
         type: string
     type: object
-  models.LocalSession:
-    properties:
-      expiry:
-        description: Expiry time of the session
-        type: string
-      session:
-        description: Encoded session token
-        type: string
-      version:
-        description: Version of the session config
-        type: integer
-    type: object
   models.MetricsInfo:
     properties:
       elevate_requests:
@@ -1000,38 +1215,6 @@ definitions:
         type: string
       workflows_count:
         type: integer
-    type: object
-  models.Permissions:
-    properties:
-      allow:
-        items:
-          type: string
-        type: array
-      deny:
-        items:
-          type: string
-        type: array
-    type: object
-  models.Provider:
-    properties:
-      config:
-        allOf:
-        - $ref: '#/definitions/models.BasicConfig'
-        description: Provider-specific configuration
-      description:
-        type: string
-      enabled:
-        description: Whether this provider is enabled
-        type: boolean
-      name:
-        type: string
-      provider:
-        description: e.g. aws, gcp, azure
-        type: string
-      role:
-        allOf:
-        - $ref: '#/definitions/models.Role'
-        description: The base role for this provider
     type: object
   models.ProviderPermission:
     properties:
@@ -1107,54 +1290,6 @@ definitions:
           type: string
         type: array
     type: object
-  models.Role:
-    properties:
-      authenticators:
-        description: All the auth providers that the role can use. If empty then any
-          provider can be used
-        items:
-          type: string
-        type: array
-      description:
-        type: string
-      enabled:
-        default: true
-        description: By default enable the role
-        type: boolean
-      groups:
-        allOf:
-        - $ref: '#/definitions/models.Groups'
-        description: groups to add the user to
-      inherits:
-        description: roles to inherit from or provider specific roles/policies etc
-        items:
-          type: string
-        type: array
-      name:
-        type: string
-      permissions:
-        allOf:
-        - $ref: '#/definitions/models.Permissions'
-        description: granular permissions for the role
-      providers:
-        description: providers that can assign this role
-        items:
-          type: string
-        type: array
-      resources:
-        allOf:
-        - $ref: '#/definitions/models.Resources'
-        description: resource access rules, apis, files, systems etc
-      scopes:
-        allOf:
-        - $ref: '#/definitions/models.RoleScopes'
-        description: scope of who can be assigned this role
-      workflows:
-        description: The workflows to execute
-        items:
-          type: string
-        type: array
-    type: object
   models.RoleResponse:
     properties:
       authenticators:
@@ -1171,7 +1306,7 @@ definitions:
         type: boolean
       groups:
         allOf:
-        - $ref: '#/definitions/models.Groups'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Groups'
         description: groups to add the user to
       inherits:
         description: roles to inherit from or provider specific roles/policies etc
@@ -1182,7 +1317,7 @@ definitions:
         type: string
       permissions:
         allOf:
-        - $ref: '#/definitions/models.Permissions'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Permissions'
         description: granular permissions for the role
       providers:
         description: providers that can assign this role
@@ -1195,25 +1330,10 @@ definitions:
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
-        - $ref: '#/definitions/models.RoleScopes'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
       workflows:
         description: The workflows to execute
-        items:
-          type: string
-        type: array
-    type: object
-  models.RoleScopes:
-    properties:
-      domains:
-        items:
-          type: string
-        type: array
-      groups:
-        items:
-          type: string
-        type: array
-      users:
         items:
           type: string
         type: array
@@ -1230,34 +1350,11 @@ definitions:
   models.ServiceConfig:
     properties:
       config:
-        $ref: '#/definitions/models.BasicConfig'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.BasicConfig'
       provider:
         default: local
         description: aws|gcp|azure|local
         type: string
-    type: object
-  models.ServicesConfig:
-    properties:
-      encryption:
-        allOf:
-        - $ref: '#/definitions/models.ServiceConfig'
-        description: Encryption - used for encrypting sensitive data
-      largeLanguageModel:
-        allOf:
-        - $ref: '#/definitions/models.LargeLanguageModelConfig'
-        description: LLM - used for large language model interactions
-      scheduler:
-        allOf:
-        - $ref: '#/definitions/models.ServiceConfig'
-        description: Scheduler - used for scheduling tasks
-      temporal:
-        allOf:
-        - $ref: '#/definitions/models.TemporalConfig'
-        description: Temporal - used for workflow processing and orchestration
-      vault:
-        allOf:
-        - $ref: '#/definitions/models.ServiceConfig'
-        description: Vault - used for storing sensitive data
     type: object
   models.SessionCreateRequest:
     properties:
@@ -1279,6 +1376,11 @@ definitions:
     properties:
       apiKey:
         type: string
+      disableVersioning:
+        default: false
+        description: DisableVersioning disables worker versioning/deployments for
+          testing
+        type: boolean
       host:
         default: localhost
         type: string
@@ -1292,54 +1394,6 @@ definitions:
       port:
         default: 7233
         type: integer
-    type: object
-  models.WorkflowExecutionInfo:
-    properties:
-      approved:
-        description: nil = pending approval, true = approved, false = denied
-        type: boolean
-      context: {}
-      duration:
-        description: Duration in seconds
-        type: integer
-      finished_at:
-        type: string
-      history:
-        description: History of state transitions
-        items:
-          type: string
-        type: array
-      id:
-        type: string
-      identities:
-        items:
-          type: string
-        type: array
-      input:
-        description: Context
-      name:
-        description: SearchAttributes are the custom search attributes associated
-          with the workflow
-        type: string
-      output: {}
-      providers:
-        items:
-          type: string
-        type: array
-      reason:
-        type: string
-      role:
-        type: string
-      run:
-        type: string
-      started_at:
-        type: string
-      status:
-        type: string
-      task:
-        type: string
-      user:
-        type: string
     type: object
   models.WorkflowResponse:
     properties:
@@ -1363,7 +1417,7 @@ definitions:
     properties:
       sessions:
         additionalProperties:
-          $ref: '#/definitions/models.LocalSession'
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.LocalSession'
         type: object
       timestamp:
         type: string
@@ -2265,14 +2319,14 @@ paths:
         name: registration
         required: true
         schema:
-          $ref: '#/definitions/config.RegistrationRequest'
+          $ref: '#/definitions/github_com_thand-io_agent_internal_config.RegistrationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Registration successful
           schema:
-            $ref: '#/definitions/config.RegistrationResponse'
+            $ref: '#/definitions/github_com_thand-io_agent_internal_config.RegistrationResponse'
         "400":
           description: Bad request
           schema:

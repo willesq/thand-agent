@@ -78,7 +78,14 @@ func (p *awsProvider) GetAuthorizedAccessUrl(
 func (p *awsProvider) shouldUseIdentityCenter(user *models.User) bool {
 	// For now, assume Identity Center if user source suggests SSO
 	// You could also check for specific configuration flags
-	useIC := len(user.Source) != 0 && user.Source != "iam"
+	useIC := true
+	if len(user.Email) == 0 && len(user.Username) > 0 {
+		// We only have a username, likely IAM
+		useIC = false
+	} else if user.Source == "iam" || user.Source == "" {
+		// If the source is 'iam' or empty (default to traditional IAM)
+		useIC = false
+	}
 	logrus.WithFields(logrus.Fields{
 		"user_source":         user.Source,
 		"user_email":          user.Email,

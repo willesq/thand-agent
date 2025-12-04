@@ -30,3 +30,15 @@ type PostflightRequest = internal.PostflightRequest
 // PostflightResponse contains the server's confirmation of completed registration
 // and any final configuration or status information.
 type PostflightResponse = internal.PostflightResponse
+
+// RoleConfig defines a role configuration that specifies access permissions
+// and constraints for users requesting access through the agent.
+type RoleConfig = internal.RoleConfig
+
+// ProviderConfig defines the configuration for a provider integration,
+// specifying how the agent connects to and manages external services.
+type ProviderConfig = internal.ProviderConfig
+
+// WorkflowConfig defines a workflow configuration that specifies the
+// approval process and steps for handling access requests.
+type WorkflowConfig = internal.WorkflowConfig

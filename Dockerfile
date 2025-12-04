@@ -9,7 +9,7 @@ ARG COMMIT=unknown
 WORKDIR /app
 
 # Install necessary packages for building (including gcc for CGO)
-RUN apk --no-cache add git ca-certificates wget gcompat gcc musl-dev sqlite-dev
+RUN apk update && apk --no-cache add git ca-certificates wget gcompat gcc musl-dev sqlite-dev
 
 # Copy go mod and sum files
 COPY go.mod go.sum ./
@@ -46,7 +46,7 @@ LABEL org.opencontainers.image.description="Thand Agent - Open-source agent for 
 LABEL org.opencontainers.image.licenses=BSL-1.1
 
 # Install ca-certificates for HTTPS calls
-RUN apk --no-cache add ca-certificates gcompat
+RUN apk update && apk --no-cache add ca-certificates gcompat
 
 # Create a non-root user
 RUN addgroup -S thand && adduser -S thand -G thand

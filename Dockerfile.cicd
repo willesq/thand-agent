@@ -11,7 +11,7 @@ ARG VERSION=dev
 ARG COMMIT=unknown
 
 # Install ca-certificates for HTTPS calls
-RUN apk --no-cache add ca-certificates gcompat
+RUN apk update && apk --no-cache add ca-certificates gcompat
 
 # Create a non-root user
 RUN addgroup -S thand && adduser -S thand -G thand
