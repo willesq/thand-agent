@@ -27,6 +27,7 @@ type thandLogger struct {
 	currentPos  int
 	isFull      bool
 	mu          sync.RWMutex
+	muHeld      bool // Debug flag to assert lock is held
 
 	// OpenTelemetry remote logging
 	openTelemetryProvider *sdklog.LoggerProvider
@@ -118,9 +119,22 @@ func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.En
 
 	// Only hold the lock while updating the shared state
 	t.mu.Lock()
+	t.muHeld = true
 	t.openTelemetryProvider = provider
 	t.openTelemetryLogger = logger
 	t.remoteEnabled = true
+
+	// Flush existing buffered logs to OpenTelemetry
+	existingLogs := t.getEventsInternal()
+
+	// Send existing logs outside the lock to avoid blocking
+	for _, entry := range existingLogs {
+		t.sendToOpenTelemetry(entry)
+	}
+
+	provider.ForceFlush(ctx)
+
+	t.muHeld = false
 	t.mu.Unlock()
 
 	logrus.Info("Remote logging enabled via OpenTelemetry")
@@ -159,7 +173,12 @@ func (t *thandLogger) Shutdown(ctx context.Context) error {
 
 // sendToOpenTelemetry sends a log entry to the OpenTelemetry exporter
 // Caller must hold t.mu lock
-func (t *thandLogger) sendToOpenTelemetry(entry *logrus.Entry) {
+func (t *thandLogger) sendToOpenTelemetry(entry *models.LogEntry) {
+	// Assert that lock is held by caller
+	if !t.muHeld {
+		panic("sendToOpenTelemetry must be called with t.mu lock held")
+	}
+
 	if !t.remoteEnabled || t.openTelemetryLogger == nil {
 		return
 	}
@@ -201,10 +220,16 @@ func logrusToOTelSeverity(level logrus.Level) log.Severity {
 
 func (t *thandLogger) Fire(entry *logrus.Entry) error {
 	t.mu.Lock()
-	defer t.mu.Unlock()
+	t.muHeld = true
+	defer func() {
+		t.muHeld = false
+		t.mu.Unlock()
+	}()
+
+	thandLog := models.NewLogEntry(entry)
 
 	// Add to ring buffer for local queries
-	t.eventBuffer[t.currentPos] = models.NewLogEntry(entry)
+	t.eventBuffer[t.currentPos] = thandLog
 	t.currentPos = (t.currentPos + 1) % t.maxSize
 
 	if t.currentPos == 0 {
@@ -213,7 +238,7 @@ func (t *thandLogger) Fire(entry *logrus.Entry) error {
 
 	// Send to OpenTelemetry if remote logging is enabled
 	if t.remoteEnabled {
-		t.sendToOpenTelemetry(entry)
+		t.sendToOpenTelemetry(thandLog)
 	}
 
 	return nil
