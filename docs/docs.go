@@ -1864,7 +1864,7 @@ const docTemplate = `{
                     "description": "The evaluated composite role",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.Role"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Role"
                         }
                     ]
                 }
@@ -1986,7 +1986,7 @@ const docTemplate = `{
                     "description": "Load providers directly from config using mapstructure:\",remain\"",
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/models.Provider"
+                        "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Provider"
                     }
                 },
                 "path": {
@@ -2056,7 +2056,7 @@ const docTemplate = `{
                     "description": "Store everything in memory",
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/models.Role"
+                        "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Role"
                     }
                 },
                 "path": {
@@ -2149,6 +2149,23 @@ const docTemplate = `{
                 },
                 "max_age": {
                     "type": "integer"
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.Groups": {
+            "type": "object",
+            "properties": {
+                "allow": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "deny": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2257,6 +2274,58 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_thand-io_agent_internal_models.Permissions": {
+            "type": "object",
+            "properties": {
+                "allow": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "deny": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.Provider": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "description": "Provider-specific configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.BasicConfig"
+                        }
+                    ]
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "description": "Whether this provider is enabled",
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "provider": {
+                    "description": "e.g. aws, gcp, azure",
+                    "type": "string"
+                },
+                "role": {
+                    "description": "The base role for this provider",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Role"
+                        }
+                    ]
+                }
+            }
+        },
         "github_com_thand-io_agent_internal_models.RateLimitConfig": {
             "type": "object",
             "properties": {
@@ -2278,6 +2347,105 @@ const docTemplate = `{
                 "path": {
                     "type": "string",
                     "default": "/ready"
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.Role": {
+            "type": "object",
+            "properties": {
+                "authenticators": {
+                    "description": "All the auth providers that the role can use. If empty then any provider can be used",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "description": "By default enable the role",
+                    "type": "boolean",
+                    "default": true
+                },
+                "groups": {
+                    "description": "groups to add the user to",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Groups"
+                        }
+                    ]
+                },
+                "inherits": {
+                    "description": "roles to inherit from or provider specific roles/policies etc",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "description": "granular permissions for the role",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Permissions"
+                        }
+                    ]
+                },
+                "providers": {
+                    "description": "providers that can assign this role",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "resources": {
+                    "description": "resource access rules, apis, files, systems etc",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Resources"
+                        }
+                    ]
+                },
+                "scopes": {
+                    "description": "scope of who can be assigned this role",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.RoleScopes"
+                        }
+                    ]
+                },
+                "workflows": {
+                    "description": "The workflows to execute",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.RoleScopes": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -3284,7 +3452,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "role": {
-                    "$ref": "#/definitions/models.Role"
+                    "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Role"
                 },
                 "session": {
                     "$ref": "#/definitions/github_com_thand-io_agent_internal_models.LocalSession"
@@ -3370,23 +3538,6 @@ const docTemplate = `{
                 "Local"
             ]
         },
-        "models.Groups": {
-            "type": "object",
-            "properties": {
-                "allow": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "deny": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
         "models.HealthResponse": {
             "type": "object",
             "properties": {
@@ -3468,58 +3619,6 @@ const docTemplate = `{
                 },
                 "workflows_count": {
                     "type": "integer"
-                }
-            }
-        },
-        "models.Permissions": {
-            "type": "object",
-            "properties": {
-                "allow": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "deny": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "models.Provider": {
-            "type": "object",
-            "properties": {
-                "config": {
-                    "description": "Provider-specific configuration",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.BasicConfig"
-                        }
-                    ]
-                },
-                "description": {
-                    "type": "string"
-                },
-                "enabled": {
-                    "description": "Whether this provider is enabled",
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "provider": {
-                    "description": "e.g. aws, gcp, azure",
-                    "type": "string"
-                },
-                "role": {
-                    "description": "The base role for this provider",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.Role"
-                        }
-                    ]
                 }
             }
         },
@@ -3637,82 +3736,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Role": {
-            "type": "object",
-            "properties": {
-                "authenticators": {
-                    "description": "All the auth providers that the role can use. If empty then any provider can be used",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "description": {
-                    "type": "string"
-                },
-                "enabled": {
-                    "description": "By default enable the role",
-                    "type": "boolean",
-                    "default": true
-                },
-                "groups": {
-                    "description": "groups to add the user to",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.Groups"
-                        }
-                    ]
-                },
-                "inherits": {
-                    "description": "roles to inherit from or provider specific roles/policies etc",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "permissions": {
-                    "description": "granular permissions for the role",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.Permissions"
-                        }
-                    ]
-                },
-                "providers": {
-                    "description": "providers that can assign this role",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "resources": {
-                    "description": "resource access rules, apis, files, systems etc",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.Resources"
-                        }
-                    ]
-                },
-                "scopes": {
-                    "description": "scope of who can be assigned this role",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/models.RoleScopes"
-                        }
-                    ]
-                },
-                "workflows": {
-                    "description": "The workflows to execute",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
         "models.RoleResponse": {
             "type": "object",
             "properties": {
@@ -3735,7 +3758,7 @@ const docTemplate = `{
                     "description": "groups to add the user to",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.Groups"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Groups"
                         }
                     ]
                 },
@@ -3753,7 +3776,7 @@ const docTemplate = `{
                     "description": "granular permissions for the role",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.Permissions"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Permissions"
                         }
                     ]
                 },
@@ -3776,35 +3799,12 @@ const docTemplate = `{
                     "description": "scope of who can be assigned this role",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.RoleScopes"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.RoleScopes"
                         }
                     ]
                 },
                 "workflows": {
                     "description": "The workflows to execute",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "models.RoleScopes": {
-            "type": "object",
-            "properties": {
-                "domains": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "groups": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "users": {
                     "type": "array",
                     "items": {
                         "type": "string"

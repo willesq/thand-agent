@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +28,6 @@ type thandLogger struct {
 	currentPos  int
 	isFull      bool
 	mu          sync.RWMutex
-	muHeld      bool // Debug flag to assert lock is held
 
 	// OpenTelemetry remote logging
 	openTelemetryProvider *sdklog.LoggerProvider
@@ -53,7 +53,13 @@ func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.En
 	// Extract endpoint URL and auth token
 	loggingEndpoint := endpoint.EndpointConfig.URI.String()
 
-	logrus.WithField("endpoint", loggingEndpoint).Infoln("Configuring OpenTelemetry")
+	checkUrl, err := url.Parse(loggingEndpoint)
+
+	if err != nil || (checkUrl.Scheme != "http" && checkUrl.Scheme != "https") {
+		return fmt.Errorf("invalid OpenTelemetry endpoint URL: %s", loggingEndpoint)
+	}
+
+	logrus.WithField("hostname", checkUrl.Host).Infoln("Configuring OpenTelemetry")
 
 	// Get auth token from endpoint configuration
 	if endpoint.EndpointConfig.Authentication != nil && endpoint.EndpointConfig.Authentication.AuthenticationPolicy != nil {
@@ -117,25 +123,25 @@ func (t *thandLogger) EnableRemoteLogging(ctx context.Context, endpoint model.En
 
 	logger := provider.Logger("thand-agent")
 
-	// Only hold the lock while updating the shared state
+	// Hold the lock only while updating shared state and copying buffered logs
 	t.mu.Lock()
-	t.muHeld = true
 	t.openTelemetryProvider = provider
 	t.openTelemetryLogger = logger
 	t.remoteEnabled = true
 
-	// Flush existing buffered logs to OpenTelemetry
+	// Copy existing buffered logs while holding the lock
 	existingLogs := t.getEventsInternal()
+	t.mu.Unlock()
 
-	// Send existing logs outside the lock to avoid blocking
+	// Send existing logs outside the lock to avoid blocking other operations.
+	// The logger reference is safe to use here since we set it above and
+	// OpenTelemetry's Logger.Emit is safe for concurrent use.
 	for _, entry := range existingLogs {
-		t.sendToOpenTelemetry(entry)
+		emitLogRecord(logger, entry)
 	}
 
+	// ForceFlush can be slow; execute outside the lock
 	provider.ForceFlush(ctx)
-
-	t.muHeld = false
-	t.mu.Unlock()
 
 	logrus.Info("Remote logging enabled via OpenTelemetry")
 
@@ -171,18 +177,11 @@ func (t *thandLogger) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// sendToOpenTelemetry sends a log entry to the OpenTelemetry exporter
-// Caller must hold t.mu lock
-func (t *thandLogger) sendToOpenTelemetry(entry *models.LogEntry) {
-	// Assert that lock is held by caller
-	if !t.muHeld {
-		panic("sendToOpenTelemetry must be called with t.mu lock held")
-	}
-
-	if !t.remoteEnabled || t.openTelemetryLogger == nil {
-		return
-	}
-
+// emitLogRecord converts a log entry to an OpenTelemetry record and emits it.
+// This function is safe to call without holding t.mu as it only uses the
+// provided logger reference and the entry data (which should be a copy or
+// otherwise safe to read).
+func emitLogRecord(logger log.Logger, entry *models.LogEntry) {
 	var record log.Record
 	record.SetTimestamp(entry.Time)
 	record.SetBody(log.StringValue(entry.Message))
@@ -193,7 +192,18 @@ func (t *thandLogger) sendToOpenTelemetry(entry *models.LogEntry) {
 		record.AddAttributes(log.String(key, fmt.Sprintf("%v", value)))
 	}
 
-	t.openTelemetryLogger.Emit(context.Background(), record)
+	logger.Emit(context.Background(), record)
+}
+
+// sendToOpenTelemetryLocked sends a log entry to the OpenTelemetry exporter.
+// Caller must hold t.mu lock. Use Go's race detector (-race) during testing
+// to verify proper synchronization.
+func (t *thandLogger) sendToOpenTelemetryLocked(entry *models.LogEntry) {
+	if !t.remoteEnabled || t.openTelemetryLogger == nil {
+		return
+	}
+
+	emitLogRecord(t.openTelemetryLogger, entry)
 }
 
 // logrusToOTelSeverity converts logrus levels to OpenTelemetry severity
@@ -220,11 +230,7 @@ func logrusToOTelSeverity(level logrus.Level) log.Severity {
 
 func (t *thandLogger) Fire(entry *logrus.Entry) error {
 	t.mu.Lock()
-	t.muHeld = true
-	defer func() {
-		t.muHeld = false
-		t.mu.Unlock()
-	}()
+	defer t.mu.Unlock()
 
 	thandLog := models.NewLogEntry(entry)
 
@@ -238,7 +244,7 @@ func (t *thandLogger) Fire(entry *logrus.Entry) error {
 
 	// Send to OpenTelemetry if remote logging is enabled
 	if t.remoteEnabled {
-		t.sendToOpenTelemetry(thandLog)
+		t.sendToOpenTelemetryLocked(thandLog)
 	}
 
 	return nil

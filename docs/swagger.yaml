@@ -44,7 +44,7 @@ definitions:
     properties:
       role:
         allOf:
-        - $ref: '#/definitions/models.Role'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
         description: The evaluated composite role
     type: object
   daemon.ExecutionStatePageData:
@@ -115,7 +115,7 @@ definitions:
     properties:
       definitions:
         additionalProperties:
-          $ref: '#/definitions/models.Provider'
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Provider'
         description: Load providers directly from config using mapstructure:",remain"
         type: object
       path:
@@ -160,7 +160,7 @@ definitions:
     properties:
       definitions:
         additionalProperties:
-          $ref: '#/definitions/models.Role'
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
         description: Store everything in memory
         type: object
       path:
@@ -223,6 +223,17 @@ definitions:
         type: array
       max_age:
         type: integer
+    type: object
+  github_com_thand-io_agent_internal_models.Groups:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
     type: object
   github_com_thand-io_agent_internal_models.HealthConfig:
     properties:
@@ -307,6 +318,38 @@ definitions:
                 password: "pass"
           Refer to serverlessworkflow/sdk-go/model.Endpoint documentation for full details.
     type: object
+  github_com_thand-io_agent_internal_models.Permissions:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_thand-io_agent_internal_models.Provider:
+    properties:
+      config:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.BasicConfig'
+        description: Provider-specific configuration
+      description:
+        type: string
+      enabled:
+        description: Whether this provider is enabled
+        type: boolean
+      name:
+        type: string
+      provider:
+        description: e.g. aws, gcp, azure
+        type: string
+      role:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
+        description: The base role for this provider
+    type: object
   github_com_thand-io_agent_internal_models.RateLimitConfig:
     properties:
       burst:
@@ -322,6 +365,69 @@ definitions:
       path:
         default: /ready
         type: string
+    type: object
+  github_com_thand-io_agent_internal_models.Role:
+    properties:
+      authenticators:
+        description: All the auth providers that the role can use. If empty then any
+          provider can be used
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      enabled:
+        default: true
+        description: By default enable the role
+        type: boolean
+      groups:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Groups'
+        description: groups to add the user to
+      inherits:
+        description: roles to inherit from or provider specific roles/policies etc
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      permissions:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Permissions'
+        description: granular permissions for the role
+      providers:
+        description: providers that can assign this role
+        items:
+          type: string
+        type: array
+      resources:
+        allOf:
+        - $ref: '#/definitions/models.Resources'
+        description: resource access rules, apis, files, systems etc
+      scopes:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
+        description: scope of who can be assigned this role
+      workflows:
+        description: The workflows to execute
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_thand-io_agent_internal_models.RoleScopes:
+    properties:
+      domains:
+        items:
+          type: string
+        type: array
+      groups:
+        items:
+          type: string
+        type: array
+      users:
+        items:
+          type: string
+        type: array
     type: object
   github_com_thand-io_agent_internal_models.SecurityConfig:
     properties:
@@ -993,7 +1099,7 @@ definitions:
       reason:
         type: string
       role:
-        $ref: '#/definitions/models.Role'
+        $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
       session:
         $ref: '#/definitions/github_com_thand-io_agent_internal_models.LocalSession'
       workflow:
@@ -1052,17 +1158,6 @@ definitions:
     - Azure
     - Kubernetes
     - Local
-  models.Groups:
-    properties:
-      allow:
-        items:
-          type: string
-        type: array
-      deny:
-        items:
-          type: string
-        type: array
-    type: object
   models.HealthResponse:
     properties:
       path:
@@ -1120,38 +1215,6 @@ definitions:
         type: string
       workflows_count:
         type: integer
-    type: object
-  models.Permissions:
-    properties:
-      allow:
-        items:
-          type: string
-        type: array
-      deny:
-        items:
-          type: string
-        type: array
-    type: object
-  models.Provider:
-    properties:
-      config:
-        allOf:
-        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.BasicConfig'
-        description: Provider-specific configuration
-      description:
-        type: string
-      enabled:
-        description: Whether this provider is enabled
-        type: boolean
-      name:
-        type: string
-      provider:
-        description: e.g. aws, gcp, azure
-        type: string
-      role:
-        allOf:
-        - $ref: '#/definitions/models.Role'
-        description: The base role for this provider
     type: object
   models.ProviderPermission:
     properties:
@@ -1227,54 +1290,6 @@ definitions:
           type: string
         type: array
     type: object
-  models.Role:
-    properties:
-      authenticators:
-        description: All the auth providers that the role can use. If empty then any
-          provider can be used
-        items:
-          type: string
-        type: array
-      description:
-        type: string
-      enabled:
-        default: true
-        description: By default enable the role
-        type: boolean
-      groups:
-        allOf:
-        - $ref: '#/definitions/models.Groups'
-        description: groups to add the user to
-      inherits:
-        description: roles to inherit from or provider specific roles/policies etc
-        items:
-          type: string
-        type: array
-      name:
-        type: string
-      permissions:
-        allOf:
-        - $ref: '#/definitions/models.Permissions'
-        description: granular permissions for the role
-      providers:
-        description: providers that can assign this role
-        items:
-          type: string
-        type: array
-      resources:
-        allOf:
-        - $ref: '#/definitions/models.Resources'
-        description: resource access rules, apis, files, systems etc
-      scopes:
-        allOf:
-        - $ref: '#/definitions/models.RoleScopes'
-        description: scope of who can be assigned this role
-      workflows:
-        description: The workflows to execute
-        items:
-          type: string
-        type: array
-    type: object
   models.RoleResponse:
     properties:
       authenticators:
@@ -1291,7 +1306,7 @@ definitions:
         type: boolean
       groups:
         allOf:
-        - $ref: '#/definitions/models.Groups'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Groups'
         description: groups to add the user to
       inherits:
         description: roles to inherit from or provider specific roles/policies etc
@@ -1302,7 +1317,7 @@ definitions:
         type: string
       permissions:
         allOf:
-        - $ref: '#/definitions/models.Permissions'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Permissions'
         description: granular permissions for the role
       providers:
         description: providers that can assign this role
@@ -1315,25 +1330,10 @@ definitions:
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
-        - $ref: '#/definitions/models.RoleScopes'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
       workflows:
         description: The workflows to execute
-        items:
-          type: string
-        type: array
-    type: object
-  models.RoleScopes:
-    properties:
-      domains:
-        items:
-          type: string
-        type: array
-      groups:
-        items:
-          type: string
-        type: array
-      users:
         items:
           type: string
         type: array
