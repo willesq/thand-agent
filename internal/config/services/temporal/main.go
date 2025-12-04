@@ -116,7 +116,6 @@ func (a *TemporalClient) Initialize() error {
 	)
 
 	go func() {
-
 		logrus.Infof("Starting Temporal worker with Build ID: %s", buildID)
 
 		err := a.worker.Run(worker.InterruptCh())
@@ -168,8 +167,14 @@ func (c *TemporalClient) IsVersioningDisabled() bool {
 }
 
 func (c *TemporalClient) Shutdown() error {
-	c.client.Close()
-	c.worker.Stop()
+	// Stop worker first before closing the client
+	// The worker depends on the client connection
+	if c.worker != nil {
+		c.worker.Stop()
+	}
+	if c.client != nil {
+		c.client.Close()
+	}
 	return nil
 }
 
