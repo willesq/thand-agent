@@ -233,6 +233,7 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType Identit
 					// Use identity ID as key to avoid duplicates
 					// If the same identity exists from multiple providers, keep the first one
 					if foundIdentity, exists := identityMap[identity.GetId()]; !exists {
+						identity.AddProvider(&p)
 						identityMap[identity.GetId()] = identity
 					} else {
 						// Add provider to identity

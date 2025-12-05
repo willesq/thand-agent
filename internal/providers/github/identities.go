@@ -181,7 +181,7 @@ func (p *githubProvider) refreshTeams(ctx context.Context, orgName string) ([]mo
 
 			// Use slug as label if available, else name
 			label := name
-			if slug != "" {
+			if len(slug) != 0 {
 				label = slug
 			}
 
