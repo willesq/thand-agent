@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -211,7 +212,9 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType Identit
 				identities, err = p.GetClient().ListIdentities(ctx, filter...)
 
 				if err != nil {
-					logrus.WithError(err).WithField("provider", p.Name).Error("Failed to get identities from provider")
+					logrus.WithError(err).
+						WithField("provider", p.Name).
+						Error("Failed to get identities from provider")
 					errorChan <- err
 					return
 				}
@@ -229,8 +232,22 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType Identit
 
 					// Use identity ID as key to avoid duplicates
 					// If the same identity exists from multiple providers, keep the first one
-					if _, exists := identityMap[identity.GetId()]; !exists {
+					if foundIdentity, exists := identityMap[identity.GetId()]; !exists {
+						identity.AddProvider(&p)
 						identityMap[identity.GetId()] = identity
+					} else {
+						// Add provider to identity
+						foundIdentity.AddProvider(&p)
+
+						// Also check if we need to update User or Group info
+						// with any missing details
+						if identity.User != nil && foundIdentity.User == nil {
+							foundIdentity.User = identity.User
+						}
+						if identity.Group != nil && foundIdentity.Group == nil {
+							foundIdentity.Group = identity.Group
+						}
+						identityMap[identity.GetId()] = foundIdentity
 					}
 				}
 				mu.Unlock()
@@ -242,16 +259,17 @@ func (c *Config) GetIdentitiesWithFilter(user *models.User, identityType Identit
 		close(errorChan)
 
 		// Collect all errors
-		var errors []error
+		var foundErrors []error
 		for err := range errorChan {
 			if err != nil {
-				errors = append(errors, err)
+				foundErrors = append(foundErrors, err)
 			}
 		}
 
-		// If there were errors, return them
-		if len(errors) > 0 {
-			return nil, fmt.Errorf("errors occurred while retrieving identities: %v", errors)
+		// If there were errors, just log them
+		if len(foundErrors) > 0 {
+			logrus.WithError(errors.Join(foundErrors...)).
+				Error("Errors occurred while retrieving identities")
 		}
 
 		// Convert map to slice

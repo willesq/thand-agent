@@ -14,6 +14,7 @@ The GitHub provider enables integration with GitHub, providing authentication an
 
 - **Authentication**: OAuth-based user authentication with GitHub
 - **Role-Based Access Control (RBAC)**: Repository and organization-level access management
+- **Identity Synchronization**: Sync users and teams from a GitHub organization
 - **Repository Management**: Access to GitHub repositories and organizational data
 - **User and Organization Integration**: Support for GitHub users and organization membership
 
@@ -87,6 +88,20 @@ providers:
       endpoint: https://your-github-enterprise.com/api/v3
 ```
 
+## Identity Synchronization
+
+The GitHub provider can synchronize users and teams from a specified GitHub organization. This allows you to use GitHub identities in your policies and workflows.
+
+To enable identity synchronization:
+1. Configure the `organization` parameter in your provider configuration.
+2. Ensure your `token` has the `read:org` scope.
+
+The provider will fetch:
+- **Users**: All members of the organization.
+- **Teams**: All teams in the organization.
+
+These identities are cached and refreshed periodically.
+
 ## Configuration Options
 
 | Option | Type | Required | Default | Description |
@@ -95,10 +110,11 @@ providers:
 | `client_id` | string | Yes* | - | OAuth application client ID |
 | `client_secret` | string | Yes* | - | OAuth application client secret |
 | `endpoint` | string | No | `https://api.github.com` | GitHub API endpoint URL |
-| `organization` | string | No | - | GitHub organization name (optional) |
+| `organization` | string | No** | - | GitHub organization name (required for identity sync) |
 | `scopes` | array | No | `["repo", "user", "read:org"]` | OAuth scopes for authentication |
 
-*Either `token` or both `client_id` and `client_secret` are required.
+\* Either `token` or `client_id`/`client_secret` pair is required.
+\** `organization` is required if you want to sync users and teams from a GitHub organization.
 
 ## Getting Credentials
 

@@ -50,7 +50,7 @@ func CORSMiddleware(cfg models.CORSConfig) gin.HandlerFunc {
 		}
 
 		// If no match found, don't set CORS headers
-		if allowedOrigin == "" {
+		if len(allowedOrigin) == 0 {
 			logrus.WithFields(logrus.Fields{
 				"origin":         origin,
 				"allowedOrigins": corsConfig.AllowedOrigins,
@@ -95,7 +95,7 @@ func CORSMiddleware(cfg models.CORSConfig) gin.HandlerFunc {
 // matchOrigin checks if the given origin matches the pattern
 // Supports exact matches and wildcard patterns like "https://*.example.com"
 func matchOrigin(origin, pattern string) bool {
-	if origin == "" {
+	if len(origin) == 0 {
 		return false
 	}
 
@@ -152,7 +152,7 @@ func matchWildcardOrigin(origin, pattern string) bool {
 	// (to prevent matching nested subdomains unless explicitly allowed)
 	// e.g., "https://*.example.com" should match "https://foo.example.com"
 	// but not "https://foo.bar.example.com"
-	if wildcardPart == "" {
+	if len(wildcardPart) == 0 {
 		return false
 	}
 

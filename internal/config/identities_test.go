@@ -6,8 +6,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -15,6 +18,7 @@ import (
 type MockIdentityProvider struct {
 	*models.BaseProvider
 	identities    map[string]models.Identity
+	index         bleve.Index
 	listFunc      func(ctx context.Context, filters ...string) ([]Identity, error)
 	getIdentityFn func(ctx context.Context, identity string) (*models.Identity, error)
 	mu            sync.RWMutex
@@ -31,9 +35,17 @@ func NewMockIdentityProvider(name string, identities map[string]models.Identity)
 		Enabled:     true,
 	}
 
+	mapping := bleve.NewIndexMapping()
+	index, _ := bleve.NewMemOnly(mapping)
+
+	for _, id := range identities {
+		_ = index.Index(id.ID, id)
+	}
+
 	return &MockIdentityProvider{
 		BaseProvider: models.NewBaseProvider(provider, models.ProviderCapabilityIdentities),
 		identities:   identities,
+		index:        index,
 	}
 }
 
@@ -63,67 +75,18 @@ func (m *MockIdentityProvider) ListIdentities(ctx context.Context, filters ...st
 		return m.listFunc(ctx, filters...)
 	}
 
-	var results []models.Identity
+	var identities []models.Identity
 	for _, id := range m.identities {
-		// Apply filter if provided
-		if len(filters) > 0 {
-			filter := filters[0]
-			matched := false
-			if id.User != nil {
-				if contains(id.User.Email, filter) || contains(id.User.Name, filter) || contains(id.User.Username, filter) {
-					matched = true
-				}
-			}
-			if id.Group != nil {
-				if contains(id.Group.Name, filter) || contains(id.Group.Email, filter) {
-					matched = true
-				}
-			}
-			if matched {
-				results = append(results, id)
-			}
-		} else {
-			results = append(results, id)
-		}
+		identities = append(identities, id)
 	}
-	return results, nil
+
+	return common.BleveListSearch(ctx, m.index, func(a *search.DocumentMatch, b models.Identity) bool {
+		return a.ID == b.ID
+	}, identities, filters...)
 }
 
 func (m *MockIdentityProvider) RefreshIdentities(ctx context.Context) error {
 	return nil
-}
-
-func contains(s, substr string) bool {
-	return len(substr) == 0 || (len(s) >= len(substr) && (s == substr || containsLower(s, substr)))
-}
-
-func containsLower(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if equalFoldSlice(s[i:i+len(substr)], substr) {
-			return true
-		}
-	}
-	return false
-}
-
-func equalFoldSlice(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := 0; i < len(a); i++ {
-		ac := a[i]
-		bc := b[i]
-		if ac >= 'A' && ac <= 'Z' {
-			ac += 'a' - 'A'
-		}
-		if bc >= 'A' && bc <= 'Z' {
-			bc += 'a' - 'A'
-		}
-		if ac != bc {
-			return false
-		}
-	}
-	return true
 }
 
 // TestGetIdentity tests the GetIdentity function
@@ -506,7 +469,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 				Name:  "Admin User",
 			},
 			identityType: IdentityTypeGroup,
-			filter:       []string{"dev"},
+			filter:       []string{"dev*"},
 			providers: map[string]*MockIdentityProvider{
 				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
 					"developers": {
@@ -724,9 +687,10 @@ func TestGetIdentitiesWithFilter_ProviderError(t *testing.T) {
 		Name:  "Admin",
 	}
 
-	_, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "errors occurred while retrieving identities")
+	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, user.Email, results[0].ID)
 }
 
 // TestGetIdentitiesWithFilter_MixedUserAndGroup tests filtering by identity type

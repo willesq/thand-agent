@@ -82,7 +82,7 @@ func (p *awsProvider) shouldUseIdentityCenter(user *models.User) bool {
 	if len(user.Email) == 0 && len(user.Username) > 0 {
 		// We only have a username, likely IAM
 		useIC = false
-	} else if user.Source == "iam" || user.Source == "" {
+	} else if user.Source == "iam" || len(user.Source) == 0 {
 		// If the source is 'iam' or empty (default to traditional IAM)
 		useIC = false
 	}

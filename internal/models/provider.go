@@ -235,6 +235,18 @@ func (p *BaseProvider) HasAnyCapability(capabilities ...ProviderCapability) bool
 	return slices.ContainsFunc(capabilities, p.HasCapability)
 }
 
+func (p *BaseProvider) EnableCapability(capability ProviderCapability) {
+	if !p.HasCapability(capability) {
+		p.capabilities = append(p.capabilities, capability)
+	}
+}
+
+func (p *BaseProvider) DisableCapability(capability ProviderCapability) {
+	p.capabilities = slices.DeleteFunc(p.capabilities, func(c ProviderCapability) bool {
+		return c == capability
+	})
+}
+
 func (p *BaseProvider) Initialize(provider Provider) error {
 	// Initialize the provider
 	return nil
