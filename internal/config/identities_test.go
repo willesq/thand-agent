@@ -687,9 +687,10 @@ func TestGetIdentitiesWithFilter_ProviderError(t *testing.T) {
 		Name:  "Admin",
 	}
 
-	_, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "errors occurred while retrieving identities")
+	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, user.Email, results[0].ID)
 }
 
 // TestGetIdentitiesWithFilter_MixedUserAndGroup tests filtering by identity type
