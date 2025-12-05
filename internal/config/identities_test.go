@@ -7,10 +7,8 @@ import (
 	"testing"
 
 	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/search"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -43,49 +41,13 @@ func NewMockIdentityProvider(name string, identities map[string]models.Identity)
 	}
 
 	return &MockIdentityProvider{
-		BaseProvider: models.NewBaseProvider(provider, models.ProviderCapabilityIdentities),
+		BaseProvider: models.NewBaseProvider(name, provider, models.ProviderCapabilityIdentities),
 		identities:   identities,
 		index:        index,
 	}
 }
 
-func (m *MockIdentityProvider) Initialize(provider models.Provider) error {
-	return nil
-}
-
-func (m *MockIdentityProvider) GetIdentity(ctx context.Context, identity string) (*models.Identity, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.getIdentityFn != nil {
-		return m.getIdentityFn(ctx, identity)
-	}
-
-	if id, exists := m.identities[identity]; exists {
-		return &id, nil
-	}
-	return nil, fmt.Errorf("identity not found: %s", identity)
-}
-
-func (m *MockIdentityProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.listFunc != nil {
-		return m.listFunc(ctx, filters...)
-	}
-
-	var identities []models.Identity
-	for _, id := range m.identities {
-		identities = append(identities, id)
-	}
-
-	return common.BleveListSearch(ctx, m.index, func(a *search.DocumentMatch, b models.Identity) bool {
-		return a.ID == b.ID
-	}, identities, filters...)
-}
-
-func (m *MockIdentityProvider) RefreshIdentities(ctx context.Context) error {
+func (m *MockIdentityProvider) Initialize(identifier string, provider models.Provider) error {
 	return nil
 }
 

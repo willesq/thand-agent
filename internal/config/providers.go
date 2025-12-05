@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -181,6 +182,8 @@ func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[strin
 		}
 		// The provider returned from the goroutine already has the client set
 		results[result.key] = *result.provider
+
+		c.synchronizeProvider(result.provider)
 	}
 
 	logrus.Debugln("All providers initialized successfully")
@@ -206,7 +209,7 @@ func (c *Config) initializeSingleProvider(providerKey string, p *models.Provider
 		return fmt.Errorf("failed to resolve environment variables for provider %s: %w", providerKey, err)
 	}
 
-	if err := impl.Initialize(*p); err != nil {
+	if err := impl.Initialize(providerKey, *p); err != nil {
 		return err
 	}
 
@@ -230,4 +233,40 @@ func (c *Config) getProviderImplementation(providerKey string, providerName stri
 	}
 
 	return nil, fmt.Errorf("unknown config mode, cannot load providers")
+}
+
+func (c *Config) synchronizeProvider(p *models.Provider) {
+
+	impl := p.GetClient()
+
+	if impl == nil {
+		logrus.Warningln("Provider client is nil, cannot synchronize:", p.Name)
+		return
+	}
+
+	var temporalClient models.TemporalImpl
+
+	// First check if we have temporal capabilities
+	services := c.GetServices()
+
+	if services != nil {
+		temporalClient = services.GetTemporal()
+	}
+
+	go func() {
+
+		err := p.GetClient().Synchronize(
+			context.Background(),
+			temporalClient,
+		)
+
+		if err != nil {
+			logrus.WithError(err).Errorln("Failed to synchronize provider:", p.Name)
+			return
+		}
+
+		logrus.Infoln("Synchronized provider successfully:", p.Name)
+
+	}()
+
 }

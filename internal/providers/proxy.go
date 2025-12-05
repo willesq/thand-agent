@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/sirupsen/logrus"
@@ -26,9 +27,10 @@ func NewRemoteProviderProxy(providerKey, endpoint string) models.ProviderImpl {
 	}
 }
 
-func (p *remoteProviderProxy) Initialize(provider models.Provider) error {
+func (p *remoteProviderProxy) Initialize(identifier string, provider models.Provider) error {
 
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 	)
@@ -56,7 +58,7 @@ func (p *remoteProviderProxy) AuthorizeSession(ctx context.Context, user *models
 		return nil, err
 	}
 
-	if resp.StatusCode() == 404 {
+	if resp.StatusCode() == http.StatusNotFound {
 		return nil, fmt.Errorf("provider %s does not exist", p.providerKey)
 	}
 

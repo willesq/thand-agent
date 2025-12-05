@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/blevesearch/bleve/v2"
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/option"
 
@@ -19,16 +18,14 @@ const GsuiteProviderName = "gsuite"
 type gsuiteProvider struct {
 	*models.BaseProvider
 
-	adminService    *admin.Service
-	domain          string
-	adminEmail      string
-	identityCache   map[string]*models.Identity
-	identities      []models.Identity
-	identitiesIndex bleve.Index
+	adminService *admin.Service
+	domain       string
+	adminEmail   string
 }
 
-func (p *gsuiteProvider) Initialize(provider models.Provider) error {
+func (p *gsuiteProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityIdentities,
 	)
@@ -54,7 +51,6 @@ func (p *gsuiteProvider) Initialize(provider models.Provider) error {
 
 	p.domain = domain
 	p.adminEmail = adminEmail
-	p.identityCache = make(map[string]*models.Identity)
 
 	// Create admin service with domain-wide delegation
 	ctx := context.Background()
@@ -85,33 +81,7 @@ func (p *gsuiteProvider) Initialize(provider models.Provider) error {
 
 	p.adminService = adminService
 
-	// Initialize Bleve index for identities
-	if err := p.initializeIdentitiesIndex(); err != nil {
-		return fmt.Errorf("failed to initialize identities index: %w", err)
-	}
-
-	// Initialize identity cache
-	if err := p.refreshIdentities(); err != nil {
-		return fmt.Errorf("failed to initialize identity cache: %w", err)
-	}
-
 	return nil
-}
-
-// initializeIdentitiesIndex creates a new Bleve index for identities
-func (p *gsuiteProvider) initializeIdentitiesIndex() error {
-	mapping := bleve.NewIndexMapping()
-	index, err := bleve.NewMemOnly(mapping)
-	if err != nil {
-		return fmt.Errorf("failed to create identities index: %w", err)
-	}
-	p.identitiesIndex = index
-	return nil
-}
-
-// Refresh updates the cached identities by re-fetching from GSuite
-func (p *gsuiteProvider) Refresh() error {
-	return p.refreshIdentities()
 }
 
 func init() {

@@ -12,8 +12,6 @@ import (
 )
 
 func TestAWSProviderPermissions(t *testing.T) {
-	// Create a test provider instance
-	provider := &awsProvider{}
 
 	// Create minimal config for initialization
 	testConfig := models.Provider{
@@ -30,7 +28,8 @@ func TestAWSProviderPermissions(t *testing.T) {
 	}
 
 	// Initialize the provider
-	err := provider.Initialize(testConfig)
+	provider := NewMockAwsProvider()
+	err := provider.Initialize("aws", testConfig)
 	require.NoError(t, err, "Failed to initialize AWS provider")
 
 	ctx := context.Background()
@@ -131,7 +130,7 @@ func TestAWSProviderRoles(t *testing.T) {
 	}
 
 	// Initialize the provider
-	err := provider.Initialize(testConfig)
+	err := provider.Initialize("aws", testConfig)
 	require.NoError(t, err, "Failed to initialize AWS provider")
 
 	ctx := context.Background()

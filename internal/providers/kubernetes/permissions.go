@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 
@@ -16,7 +15,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-func (p *kubernetesProvider) LoadPermissions() error {
+func (p *kubernetesProvider) SynchronizePermissions(ctx context.Context, req models.SynchronizePermissionsRequest) (*models.SynchronizePermissionsResponse, error) {
 	// Discover permissions dynamically from Kubernetes API server
 	permissions, err := p.discoverPermissionsFromAPI()
 	if err != nil {
@@ -25,28 +24,13 @@ func (p *kubernetesProvider) LoadPermissions() error {
 		permissions = p.getStaticPermissions()
 	}
 
-	// Create in-memory Bleve index
-	mapping := bleve.NewIndexMapping()
-	index, err := bleve.NewMemOnly(mapping)
-	if err != nil {
-		return fmt.Errorf("failed to create search index: %w", err)
-	}
-
-	// Index permissions
-	for _, perm := range permissions {
-		if err := index.Index(perm.Name, perm); err != nil {
-			return fmt.Errorf("failed to index permission %s: %w", perm.Name, err)
-		}
-	}
-
-	p.permissions = permissions
-	p.permissionsIndex = index
-
 	logrus.WithFields(logrus.Fields{
 		"permissions": len(permissions),
-	}).Debug("Loaded and indexed Kubernetes permissions")
+	}).Debug("Loaded Kubernetes permissions")
 
-	return nil
+	return &models.SynchronizePermissionsResponse{
+		Permissions: permissions,
+	}, nil
 }
 
 // discoverPermissionsFromAPI dynamically discovers available API resources and verbs from K8s API
@@ -225,76 +209,4 @@ func (p *kubernetesProvider) extractPermissionsFromBuiltinRoles() []models.Provi
 	}
 
 	return permissions
-}
-
-func (p *kubernetesProvider) GetPermission(ctx context.Context, permission string) (*models.ProviderPermission, error) {
-	// First try exact match
-	for _, perm := range p.permissions {
-		if perm.Name == permission {
-			return &perm, nil
-		}
-	}
-
-	return nil, fmt.Errorf("permission %s not found", permission)
-}
-
-func (p *kubernetesProvider) ListPermissions(ctx context.Context, filters ...string) ([]models.ProviderPermission, error) {
-	if len(filters) == 0 {
-		return p.permissions, nil
-	}
-
-	query := strings.Join(filters, " ")
-	searchQuery := bleve.NewMatchQuery(query)
-	searchRequest := bleve.NewSearchRequest(searchQuery)
-	searchRequest.Size = len(p.permissions) // Return all matches
-
-	searchResult, err := p.permissionsIndex.Search(searchRequest)
-	if err != nil {
-		return nil, fmt.Errorf("search failed: %w", err)
-	}
-
-	var results []models.ProviderPermission
-	for _, hit := range searchResult.Hits {
-		// Find the permission by ID
-		for _, perm := range p.permissions {
-			if perm.Name == hit.ID {
-				results = append(results, perm)
-				break
-			}
-		}
-	}
-
-	return results, nil
-}
-
-func (p *kubernetesProvider) GetResource(ctx context.Context, resource string) (*models.ProviderResource, error) {
-	// Kubernetes resources are derived from permissions
-	// Extract resource name from permission format: "k8s:resource:verb"
-	parts := strings.Split(resource, ":")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid resource format: %s", resource)
-	}
-
-	return &models.ProviderResource{}, nil
-}
-
-func (p *kubernetesProvider) ListResources(ctx context.Context, filters ...string) ([]models.ProviderResource, error) {
-	// Extract unique resources from permissions
-	resourceMap := make(map[string]bool)
-
-	for _, perm := range p.permissions {
-		parts := strings.Split(perm.Name, ":")
-		if len(parts) >= 2 {
-			resourceName := parts[1]
-			resourceMap[resourceName] = true
-		}
-	}
-
-	var resources []models.ProviderResource
-	for range resourceMap {
-		// Apply filters if provided
-		resources = append(resources, models.ProviderResource{})
-	}
-
-	return resources, nil
 }

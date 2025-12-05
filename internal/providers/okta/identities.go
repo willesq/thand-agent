@@ -3,110 +3,36 @@ package okta
 import (
 	"context"
 	"fmt"
-	"strings"
-	"sync"
 	"time"
 
+	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
 
-// RefreshIdentities fetches and caches user and group identities from Okta
-func (p *oktaProvider) RefreshIdentities(ctx context.Context) error {
+// SynchronizeUsers fetches and caches user identities from Okta
+func (p *oktaProvider) SynchronizeUsers(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
-		logrus.Debugf("Refreshed Okta identities in %s", elapsed)
+		logrus.Debugf("Refreshed Okta user identities in %s", elapsed)
 	}()
 
-	var identities []models.Identity
-	identitiesMap := make(map[string]*models.Identity)
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var errs []error
-	var userCount, groupCount int
-
-	// Fetch users in parallel with groups
-	wg.Add(2)
-
-	// Fetch users
-	go func() {
-		defer wg.Done()
-		userIdentities, err := p.fetchUserIdentities(ctx)
-		if err != nil {
-			mu.Lock()
-			errs = append(errs, fmt.Errorf("failed to fetch users: %w", err))
-			mu.Unlock()
-			return
-		}
-
-		mu.Lock()
-		identities = append(identities, userIdentities...)
-		userCount = len(userIdentities)
-		mu.Unlock()
-	}()
-
-	// Fetch groups
-	go func() {
-		defer wg.Done()
-		groupIdentities, err := p.fetchGroupIdentities(ctx)
-		if err != nil {
-			mu.Lock()
-			errs = append(errs, fmt.Errorf("failed to fetch groups: %w", err))
-			mu.Unlock()
-			return
-		}
-
-		mu.Lock()
-		identities = append(identities, groupIdentities...)
-		groupCount = len(groupIdentities)
-		mu.Unlock()
-	}()
-
-	wg.Wait()
-
-	if len(errs) > 0 {
-		return fmt.Errorf("errors refreshing identities: %v", errs)
-	}
-
-	// Build the identities map
-	for i := range identities {
-
-		identity := &identities[i]
-
-		// Map by ID (lowercase)
-		identitiesMap[strings.ToLower(identity.ID)] = identity
-		// Map by label (lowercase)
-		identitiesMap[strings.ToLower(identity.Label)] = identity
-
-		// For users, also map by email
-		if identity.User != nil && len(identity.User.Email) != 0 {
-			identitiesMap[strings.ToLower(identity.User.Email)] = identity
-		}
-		// For groups, also map by name
-		if identity.Group != nil && len(identity.Group.Name) != 0 {
-			identitiesMap[strings.ToLower(identity.Group.Name)] = identity
+	if req.Pagination == nil {
+		req.Pagination = &models.PaginationOptions{
+			PageSize: 100,
 		}
 	}
 
-	p.indexMu.Lock()
-	p.identities = identities
-	p.identitiesMap = identitiesMap
-	p.indexMu.Unlock()
+	queryParams := &query.Params{
+		Limit: int64(req.Pagination.PageSize),
+	}
 
-	logrus.WithFields(logrus.Fields{
-		"users":  userCount,
-		"groups": groupCount,
-		"total":  len(identities),
-	}).Debug("Refreshed Okta identities")
+	if req.Pagination.Token != "" {
+		queryParams.After = req.Pagination.Token
+	}
 
-	return nil
-}
-
-// fetchUserIdentities retrieves all users from Okta
-func (p *oktaProvider) fetchUserIdentities(ctx context.Context) ([]models.Identity, error) {
-	users, _, err := p.client.User.ListUsers(ctx, nil)
+	users, resp, err := p.client.User.ListUsers(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
@@ -145,12 +71,48 @@ func (p *oktaProvider) fetchUserIdentities(ctx context.Context) ([]models.Identi
 		identities = append(identities, identity)
 	}
 
-	return identities, nil
+	response := models.SynchronizeUsersResponse{
+		Identities: identities,
+	}
+
+	// Handle pagination
+	if resp.NextPage != "" {
+		response.Pagination = &models.PaginationOptions{
+			Token:    resp.NextPage,
+			PageSize: req.Pagination.PageSize,
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"count": len(identities),
+	}).Debug("Refreshed Okta user identities")
+
+	return &response, nil
 }
 
-// fetchGroupIdentities retrieves all groups from Okta
-func (p *oktaProvider) fetchGroupIdentities(ctx context.Context) ([]models.Identity, error) {
-	groups, _, err := p.client.Group.ListGroups(ctx, nil)
+// SynchronizeGroups fetches and caches group identities from Okta
+func (p *oktaProvider) SynchronizeGroups(ctx context.Context, req models.SynchronizeGroupsRequest) (*models.SynchronizeGroupsResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Refreshed Okta group identities in %s", elapsed)
+	}()
+
+	if req.Pagination == nil {
+		req.Pagination = &models.PaginationOptions{
+			PageSize: 100,
+		}
+	}
+
+	queryParams := &query.Params{
+		Limit: int64(req.Pagination.PageSize),
+	}
+
+	if req.Pagination.Token != "" {
+		queryParams.After = req.Pagination.Token
+	}
+
+	groups, resp, err := p.client.Group.ListGroups(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list groups: %w", err)
 	}
@@ -169,103 +131,21 @@ func (p *oktaProvider) fetchGroupIdentities(ctx context.Context) ([]models.Ident
 		identities = append(identities, identity)
 	}
 
-	return identities, nil
-}
+	response := models.SynchronizeGroupsResponse{
+		Identities: identities,
+	}
 
-// GetIdentity retrieves a specific identity (user or group) from Okta
-func (p *oktaProvider) GetIdentity(ctx context.Context, identity string) (*models.Identity, error) {
-	// Try to get from cache first
-	p.indexMu.RLock()
-	identitiesMap := p.identitiesMap
-	p.indexMu.RUnlock()
-
-	if identitiesMap != nil {
-		if id, exists := identitiesMap[strings.ToLower(identity)]; exists {
-			return id, nil
+	// Handle pagination
+	if resp.NextPage != "" {
+		response.Pagination = &models.PaginationOptions{
+			Token:    resp.NextPage,
+			PageSize: req.Pagination.PageSize,
 		}
 	}
 
-	// If not in cache, try to fetch directly from API
-	// First try as user
-	user, _, err := p.client.User.GetUser(ctx, identity)
-	if err == nil && user != nil {
-		email := ""
-		name := ""
-		if user.Profile != nil {
-			if emailVal, ok := (*user.Profile)["email"].(string); ok {
-				email = emailVal
-			}
-			if nameVal, ok := (*user.Profile)["firstName"].(string); ok {
-				name = nameVal
-			}
-			if lastNameVal, ok := (*user.Profile)["lastName"].(string); ok {
-				if len(name) != 0 {
-					name = name + " " + lastNameVal
-				} else {
-					name = lastNameVal
-				}
-			}
-		}
+	logrus.WithFields(logrus.Fields{
+		"count": len(identities),
+	}).Debug("Refreshed Okta group identities")
 
-		return &models.Identity{
-			ID:    user.Id,
-			Label: email,
-			User: &models.User{
-				ID:     user.Id,
-				Email:  email,
-				Name:   name,
-				Source: "okta",
-			},
-		}, nil
-	}
-
-	// Try as group
-	group, _, err := p.client.Group.GetGroup(ctx, identity)
-	if err == nil && group != nil {
-		return &models.Identity{
-			ID:    group.Id,
-			Label: group.Profile.Name,
-			Group: &models.Group{
-				ID:   group.Id,
-				Name: group.Profile.Name,
-			},
-		}, nil
-	}
-
-	return nil, fmt.Errorf("identity not found: %s", identity)
-}
-
-// ListIdentities lists all identities (users and groups) from Okta
-func (p *oktaProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
-	// Ensure we have fresh data
-	err := p.RefreshIdentities(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to refresh identities: %w", err)
-	}
-
-	p.indexMu.RLock()
-	identities := p.identities
-	p.indexMu.RUnlock()
-
-	// If no filters, return all identities
-	if len(filters) == 0 {
-		return identities, nil
-	}
-
-	// Apply filters
-	var filtered []models.Identity
-	filterText := strings.ToLower(strings.Join(filters, " "))
-
-	for _, identity := range identities {
-		// Check if any filter matches the identity
-		if strings.Contains(strings.ToLower(identity.Label), filterText) ||
-			strings.Contains(strings.ToLower(identity.ID), filterText) ||
-			(identity.User != nil && strings.Contains(strings.ToLower(identity.User.Email), filterText)) ||
-			(identity.User != nil && strings.Contains(strings.ToLower(identity.User.Name), filterText)) ||
-			(identity.Group != nil && strings.Contains(strings.ToLower(identity.Group.Name), filterText)) {
-			filtered = append(filtered, identity)
-		}
-	}
-
-	return filtered, nil
+	return &response, nil
 }

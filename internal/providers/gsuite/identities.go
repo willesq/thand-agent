@@ -4,172 +4,132 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
-// refreshIdentities fetches all users and groups from GSuite and caches them
-func (p *gsuiteProvider) refreshIdentities() error {
-	logrus.Info("Refreshing GSuite identities...")
+// SynchronizeUsers fetches and caches user identities from GSuite
+func (p *gsuiteProvider) SynchronizeUsers(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Refreshed GSuite user identities in %s", elapsed)
+	}()
 
-	// Clear existing cache and slice
-	p.identityCache = make(map[string]*models.Identity)
-	p.identities = []models.Identity{}
-
-	// Fetch users
-	if err := p.fetchUsers(); err != nil {
-		return fmt.Errorf("failed to fetch users: %w", err)
+	if req.Pagination == nil {
+		req.Pagination = &models.PaginationOptions{
+			PageSize: 100,
+		}
 	}
 
-	// Fetch groups
-	if err := p.fetchGroups(); err != nil {
-		return fmt.Errorf("failed to fetch groups: %w", err)
+	call := p.adminService.Users.List().
+		Domain(p.domain).
+		MaxResults(int64(req.Pagination.PageSize)).
+		OrderBy("email")
+
+	if req.Pagination.Token != "" {
+		call = call.PageToken(req.Pagination.Token)
 	}
 
-	// Index identities for search
-	if err := p.indexIdentities(); err != nil {
-		return fmt.Errorf("failed to index identities: %w", err)
+	resp, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
-	logrus.WithField("count", len(p.identityCache)).Info("GSuite identities refreshed")
-	return nil
+	var identities []models.Identity
+	for _, user := range resp.Users {
+		identity := models.Identity{
+			ID:    user.PrimaryEmail,
+			Label: user.Name.FullName,
+			User: &models.User{
+				ID:       user.Id,
+				Username: strings.Split(user.PrimaryEmail, "@")[0],
+				Email:    user.PrimaryEmail,
+				Name:     user.Name.FullName,
+				Source:   "gsuite",
+			},
+		}
+
+		identities = append(identities, identity)
+	}
+
+	response := models.SynchronizeUsersResponse{
+		Identities: identities,
+	}
+
+	if resp.NextPageToken != "" {
+		response.Pagination = &models.PaginationOptions{
+			Token:    resp.NextPageToken,
+			PageSize: req.Pagination.PageSize,
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"count": len(identities),
+	}).Debug("Refreshed GSuite user identities")
+
+	return &response, nil
 }
 
-// fetchUsers retrieves all users from GSuite
-func (p *gsuiteProvider) fetchUsers() error {
-	pageToken := ""
-	userCount := 0
+// SynchronizeGroups fetches and caches group identities from GSuite
+func (p *gsuiteProvider) SynchronizeGroups(ctx context.Context, req models.SynchronizeGroupsRequest) (*models.SynchronizeGroupsResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Refreshed GSuite group identities in %s", elapsed)
+	}()
 
-	for {
-		call := p.adminService.Users.List().
-			Domain(p.domain).
-			MaxResults(500).
-			OrderBy("email")
-
-		if len(pageToken) > 0 {
-			call = call.PageToken(pageToken)
-		}
-
-		resp, err := call.Do()
-		if err != nil {
-			return fmt.Errorf("failed to list users: %w", err)
-		}
-
-		for _, user := range resp.Users {
-			identity := &models.Identity{
-				ID:    user.PrimaryEmail,
-				Label: user.Name.FullName,
-				User: &models.User{
-					ID:       user.Id,
-					Username: strings.Split(user.PrimaryEmail, "@")[0],
-					Email:    user.PrimaryEmail,
-					Name:     user.Name.FullName,
-					Source:   "gsuite",
-				},
-			}
-
-			p.identityCache[user.Name.DisplayName] = identity
-			p.identityCache[user.PrimaryEmail] = identity  // Also cache by email
-			p.identities = append(p.identities, *identity) // Add to slice for search
-			userCount++
-		}
-
-		if len(resp.NextPageToken) == 0 {
-			break
-		}
-		pageToken = resp.NextPageToken
-	}
-
-	logrus.WithField("count", userCount).Info("Fetched GSuite users")
-	return nil
-}
-
-// fetchGroups retrieves all groups from GSuite
-func (p *gsuiteProvider) fetchGroups() error {
-	pageToken := ""
-	groupCount := 0
-
-	for {
-		call := p.adminService.Groups.List().
-			Domain(p.domain).
-			MaxResults(200).
-			OrderBy("email")
-
-		if len(pageToken) > 0 {
-			call = call.PageToken(pageToken)
-		}
-
-		resp, err := call.Do()
-		if err != nil {
-			return fmt.Errorf("failed to list groups: %w", err)
-		}
-
-		for _, group := range resp.Groups {
-			identity := &models.Identity{
-				ID:    group.Email,
-				Label: group.Name,
-				Group: &models.Group{
-					ID:    group.Id,
-					Name:  group.Name,
-					Email: group.Email,
-				},
-			}
-
-			p.identityCache[group.Name] = identity
-			p.identityCache[group.Email] = identity        // Also cache by email
-			p.identities = append(p.identities, *identity) // Add to slice for search
-			groupCount++
-		}
-
-		if len(resp.NextPageToken) == 0 {
-			break
-		}
-		pageToken = resp.NextPageToken
-	}
-
-	logrus.WithField("count", groupCount).Info("Fetched GSuite groups")
-	return nil
-}
-
-// indexIdentities indexes all identities in the Bleve search index
-func (p *gsuiteProvider) indexIdentities() error {
-	batch := p.identitiesIndex.NewBatch()
-
-	for _, identity := range p.identities {
-		err := batch.Index(identity.GetLabel(), identity)
-		if err != nil {
-			return fmt.Errorf("failed to index identity %s: %w", identity.GetLabel(), err)
+	if req.Pagination == nil {
+		req.Pagination = &models.PaginationOptions{
+			PageSize: 100,
 		}
 	}
 
-	return p.identitiesIndex.Batch(batch)
-}
+	call := p.adminService.Groups.List().
+		Domain(p.domain).
+		MaxResults(int64(req.Pagination.PageSize)).
+		OrderBy("email")
 
-// GetIdentity retrieves a specific identity by ID or email
-func (p *gsuiteProvider) GetIdentity(ctx context.Context, identity string) (*models.Identity, error) {
-	if cachedIdentity, exists := p.identityCache[identity]; exists {
-		// Return a copy to prevent modification
-		identityCopy := *cachedIdentity
-		if cachedIdentity.User != nil {
-			userCopy := *cachedIdentity.User
-			identityCopy.User = &userCopy
-		}
-		if cachedIdentity.Group != nil {
-			groupCopy := *cachedIdentity.Group
-			identityCopy.Group = &groupCopy
-		}
-		return &identityCopy, nil
+	if req.Pagination.Token != "" {
+		call = call.PageToken(req.Pagination.Token)
 	}
 
-	return nil, fmt.Errorf("identity %s not found", identity)
-}
+	resp, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list groups: %w", err)
+	}
 
-// ListIdentities returns all cached identities with optional filtering
-func (p *gsuiteProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
-	return common.BleveListSearch(ctx, p.identitiesIndex, func(a *search.DocumentMatch, b models.Identity) bool {
-		return strings.Compare(a.ID, b.GetLabel()) == 0
-	}, p.identities, filters...)
+	var identities []models.Identity
+	for _, group := range resp.Groups {
+		identity := models.Identity{
+			ID:    group.Email,
+			Label: group.Name,
+			Group: &models.Group{
+				ID:    group.Id,
+				Name:  group.Name,
+				Email: group.Email,
+			},
+		}
+
+		identities = append(identities, identity)
+	}
+
+	response := models.SynchronizeGroupsResponse{
+		Identities: identities,
+	}
+
+	if resp.NextPageToken != "" {
+		response.Pagination = &models.PaginationOptions{
+			Token:    resp.NextPageToken,
+			PageSize: req.Pagination.PageSize,
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"count": len(identities),
+	}).Debug("Refreshed GSuite group identities")
+
+	return &response, nil
 }

@@ -437,7 +437,12 @@ func (m *WorkflowManager) createTemporalWorkflow(workflowTask *models.WorkflowTa
 	}
 
 	// Create new workflow
-	we, err := temporalClient.ExecuteWorkflow(ctx, workflowOptions, models.TemporalExecuteElevationWorkflowName, workflowTask)
+	we, err := temporalClient.ExecuteWorkflow(
+		ctx,
+		workflowOptions,
+		models.TemporalExecuteElevationWorkflowName,
+		workflowTask,
+	)
 
 	if err != nil {
 		return fmt.Errorf("failed to start workflow: %w", err)

@@ -19,9 +19,10 @@ type emailProvider struct {
 	proxy models.ProviderImpl
 }
 
-func (p *emailProvider) Initialize(provider models.Provider) error {
+func (p *emailProvider) Initialize(identifier string, provider models.Provider) error {
 
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityNotifier,
 	)
@@ -49,7 +50,7 @@ func (p *emailProvider) Initialize(provider models.Provider) error {
 		return fmt.Errorf("failed to initialize email proxy for platform: %s", platformType)
 	}
 
-	return p.proxy.Initialize(provider)
+	return p.proxy.Initialize(identifier, provider)
 }
 func (p *emailProvider) SendNotification(
 	ctx context.Context, notification models.NotificationRequest,

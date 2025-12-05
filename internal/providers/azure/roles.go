@@ -4,15 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
-	"github.com/blevesearch/bleve/v2/search"
 	"github.com/google/uuid"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/common"
-	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -190,132 +186,13 @@ func (p *azureProvider) getScope() string {
 	return fmt.Sprintf("/subscriptions/%s", p.subscriptionID)
 }
 
-// GetRole retrieves a specific role by name
-func (p *azureProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
-	role = strings.ToLower(role)
-	// Fast map lookup for built-in roles
-	if r, exists := p.rolesMap[role]; exists {
-		return r, nil
-	}
-
-	// If not found in built-in roles and we have an Azure client, try to get custom role definition
-	if p.roleDefClient != nil {
-		roleDefinition, err := p.getRoleDefinition(ctx, role)
-		if err != nil {
-			return nil, fmt.Errorf("role '%s' not found", role)
-		}
-
-		roleInfo := &models.ProviderRole{
-			Name:        *roleDefinition.Properties.RoleName,
-			Description: *roleDefinition.Properties.Description,
-		}
-
-		return roleInfo, nil
-	}
-
-	// Role not found in built-in roles and no client available
-	return nil, fmt.Errorf("role '%s' not found", role)
-}
-
-// ListRoles returns all available roles
-func (p *azureProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
-	// If no filters, return all roles
-	if len(filters) == 0 {
-		return p.roles, nil
-	}
-
-	// Check if search index is ready
-	p.indexMu.RLock()
-	rolesIndex := p.rolesIndex
-	p.indexMu.RUnlock()
-
-	if rolesIndex != nil {
-		// Use Bleve search for better search capabilities
-		return common.BleveListSearch(ctx, rolesIndex, func(a *search.DocumentMatch, b models.ProviderRole) bool {
-			return strings.Compare(a.ID, b.Name) == 0
-		}, p.roles, filters...)
-	}
-
-	// Fallback to simple substring filtering while index is being built
-	var filtered []models.ProviderRole
-	filterText := strings.ToLower(strings.Join(filters, " "))
-
-	for _, role := range p.roles {
-		// Check if any filter matches the role name or description
-		if strings.Contains(strings.ToLower(role.Name), filterText) ||
-			strings.Contains(strings.ToLower(role.Description), filterText) {
-			filtered = append(filtered, role)
-		}
-	}
-
-	return filtered, nil
-}
-
-// LoadRoles loads Azure built-in roles from the embedded roles data
-func (p *azureProvider) LoadRoles() error {
+func (p *azureProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
 	data, err := getSharedData()
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to get shared Azure data: %w", err)
 	}
-	p.roles = data.roles
-	p.rolesMap = data.rolesMap
-	return nil
+
+	return &models.SynchronizeRolesResponse{
+		Roles: data.roles,
+	}, nil
 }
-
-func loadRoles() ([]models.ProviderRole, map[string]*models.ProviderRole, error) {
-
-	startTime := time.Now()
-	defer func() {
-		elapsed := time.Since(startTime)
-		logrus.Debugf("Parsed Azure roles in %s", elapsed)
-	}()
-
-	// Get pre-parsed Azure roles from data package
-	azureRoles, err := data.GetParsedAzureRoles()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get parsed Azure roles: %w", err)
-	}
-
-	var roles []models.ProviderRole
-	rolesMap := make(map[string]*models.ProviderRole, len(azureRoles))
-
-	for _, role := range azureRoles {
-		r := models.ProviderRole{
-			Name:        role.Name,
-			Description: role.Description,
-		}
-		roles = append(roles, r)
-		rolesMap[strings.ToLower(role.Name)] = &roles[len(roles)-1] // Reference to the slice element
-	}
-
-	return roles, rolesMap, nil
-}
-
-/*
-// Start with built-in roles
-	allRoles := make([]models.ProviderRole, len(p.roles))
-	copy(allRoles, p.roles)
-
-	// Add custom roles from Azure (this could be expensive, so we might want to cache)
-	scope := p.getScope()
-	pager := p.roleDefClient.NewListPager(scope, nil)
-	for pager.More() {
-		page, err := pager.NextPage(ctx)
-		if err != nil {
-			logrus.WithError(err).Warn("Failed to list custom role definitions")
-			break
-		}
-
-		for _, roleDef := range page.Value {
-			if roleDef.Properties != nil && roleDef.Properties.RoleName != nil {
-				roleInfo := models.ProviderRole{
-					Name: *roleDef.Properties.RoleName,
-				}
-				if roleDef.Properties.Description != nil {
-					roleInfo.Description = *roleDef.Properties.Description
-				}
-				allRoles = append(allRoles, roleInfo)
-			}
-		}
-	}
-*/

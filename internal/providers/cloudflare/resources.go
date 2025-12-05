@@ -3,7 +3,6 @@ package cloudflare
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cloudflare/cloudflare-go"
@@ -23,7 +22,6 @@ func (p *cloudflareProvider) LoadResources(ctx context.Context) error {
 	}()
 
 	var resourcesData []models.ProviderResource
-	resourcesMap := make(map[string]*models.ProviderResource)
 
 	// Load zones
 	zoneResources, err := p.loadZoneResources(ctx)
@@ -39,17 +37,7 @@ func (p *cloudflareProvider) LoadResources(ctx context.Context) error {
 	}
 	resourcesData = append(resourcesData, accountResources...)
 
-	// Build the resource map
-	for i := range resourcesData {
-		resource := &resourcesData[i]
-		// Map by type:name (lowercase)
-		resourcesMap[fmt.Sprintf("%s:%s", resource.Type, strings.ToLower(resource.Name))] = resource
-		// Map by type:id (lowercase)
-		resourcesMap[fmt.Sprintf("%s:%s", resource.Type, strings.ToLower(resource.Id))] = resource
-	}
-
-	p.resources = resourcesData
-	p.resourcesMap = resourcesMap
+	p.SetResources(resourcesData)
 
 	logrus.WithFields(logrus.Fields{
 		"resources": len(resourcesData),
@@ -104,39 +92,4 @@ func (p *cloudflareProvider) loadAccountResources(ctx context.Context) ([]models
 	}
 
 	return resources, nil
-}
-
-// GetResource retrieves a specific resource by name or ID
-func (p *cloudflareProvider) GetResource(ctx context.Context, resource string) (*models.ProviderResource, error) {
-	resourceKey := strings.ToLower(resource)
-
-	// Try lookup by name or ID
-	if r, exists := p.resourcesMap[resourceKey]; exists {
-		return r, nil
-	}
-
-	return nil, fmt.Errorf("resource not found: %s", resource)
-}
-
-// ListResources lists all resources, optionally filtered by search terms
-func (p *cloudflareProvider) ListResources(ctx context.Context, filters ...string) ([]models.ProviderResource, error) {
-	// If no filters, return all resources
-	if len(filters) == 0 {
-		return p.resources, nil
-	}
-
-	// Fallback to simple substring filtering
-	var filtered []models.ProviderResource
-	filterText := strings.ToLower(strings.Join(filters, " "))
-
-	for _, resource := range p.resources {
-		// Check if any filter matches the resource name, type, or description
-		if strings.Contains(strings.ToLower(resource.Name), filterText) ||
-			strings.Contains(strings.ToLower(resource.Type), filterText) ||
-			strings.Contains(strings.ToLower(resource.Description), filterText) {
-			filtered = append(filtered, resource)
-		}
-	}
-
-	return filtered, nil
 }

@@ -21,8 +21,9 @@ type salesForceProvider struct {
 	rolesIndex bleve.Index
 }
 
-func (p *salesForceProvider) Initialize(provider models.Provider) error {
+func (p *salesForceProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 	)
