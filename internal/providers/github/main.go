@@ -1,9 +1,12 @@
 package github
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
 
@@ -20,6 +23,10 @@ type githubProvider struct {
 	oauthClient *oauth2.Config
 	permissions []models.ProviderPermission
 	roles       []models.ProviderRole
+
+	identities    []models.Identity
+	identitiesMap map[string]*models.Identity
+	indexMu       sync.RWMutex
 }
 
 // GitHubUser represents the GitHub user response
@@ -44,6 +51,7 @@ func (p *githubProvider) Initialize(provider models.Provider) error {
 		provider,
 		models.ProviderCapabilityAuthorizer,
 		models.ProviderCapabilityRBAC,
+		models.ProviderCapabilityIdentities,
 	)
 
 	// Right lets figure out how to initialize the GitHub SDK
@@ -92,10 +100,20 @@ func (p *githubProvider) Initialize(provider models.Provider) error {
 		}
 
 		p.oauthClient = conf
+	} else {
+		logrus.Debugln("GitHub OAuth client_id or client_secret not provided; skipping OAuth setup")
+		p.DisableCapability(models.ProviderCapabilityAuthorizer)
 	}
 
 	p.permissions = GitHubPermissions
 	p.roles = GitHubRoles
+
+	// Refresh identities in background
+	go func() {
+		if err := p.RefreshIdentities(context.Background()); err != nil {
+			logrus.Warnf("Failed to refresh GitHub identities: %v", err)
+		}
+	}()
 
 	return nil
 }
