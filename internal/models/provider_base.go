@@ -13,13 +13,16 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"go.temporal.io/sdk/client"
-	temporal "go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 )
 
 type BaseProvider struct {
 	identifier   string
-	provider     Provider
+	name         string
+	description  string
+	provider     string
+	config       *BasicConfig
+	role         *Role
 	capabilities []ProviderCapability
 
 	// Add other common fields if necessary
@@ -31,9 +34,9 @@ type IdentitySupport struct {
 	mu sync.RWMutex
 
 	// Identity management
-	identities       []Identity
-	identitiesMap    map[string]*Identity
-	indentitiesIndex bleve.Index
+	identities      []Identity
+	identitiesMap   map[string]*Identity
+	identitiesIndex bleve.Index
 }
 
 type RBACSupport struct {
@@ -58,7 +61,11 @@ type RBACSupport struct {
 func NewBaseProvider(identifier string, provider Provider, capabilities ...ProviderCapability) *BaseProvider {
 	base := BaseProvider{
 		identifier:   identifier,
-		provider:     provider,
+		name:         provider.Name,
+		description:  provider.Description,
+		provider:     provider.Provider,
+		config:       provider.Config,
+		role:         provider.Role,
 		capabilities: capabilities,
 	}
 
@@ -85,11 +92,11 @@ func NewBaseProvider(identifier string, provider Provider, capabilities ...Provi
 }
 
 func (p *BaseProvider) GetConfig() *BasicConfig {
-	return p.provider.Config
+	return p.config
 }
 
 func (p *BaseProvider) SetConfig(config *BasicConfig) {
-	p.provider.Config = config
+	p.config = config
 }
 
 func (p *BaseProvider) SetPermissions(permissions []ProviderPermission) {
@@ -120,7 +127,7 @@ func (p *BaseProvider) SetPermissionsWithKey(
 
 	// Trigger reindex
 	go func() {
-		err := p.buildRbacIndices()
+		err := p.buildPermissionIndices()
 		if err != nil {
 			logrus.WithError(err).Error("Failed to build rbac search indices")
 			return
@@ -151,6 +158,15 @@ func (p *BaseProvider) SetRolesWithKey(
 		keyName := keyFunc(role)
 		p.rbac.rolesMap[strings.ToLower(keyName)] = role
 	}
+
+	// Trigger reindex
+	go func() {
+		err := p.buildRoleIndices()
+		if err != nil {
+			logrus.WithError(err).Error("Failed to build role search indices")
+			return
+		}
+	}()
 }
 
 func (p *BaseProvider) SetResources(resources []ProviderResource) {
@@ -177,6 +193,15 @@ func (p *BaseProvider) SetResourcesWithKey(
 		keyName := keyFunc(resource)
 		p.rbac.resourcesMap[strings.ToLower(keyName)] = resource
 	}
+
+	// Trigger reindex
+	go func() {
+		err := p.buildResourceIndices()
+		if err != nil {
+			logrus.WithError(err).Error("Failed to build resources search indices")
+			return
+		}
+	}()
 }
 
 func (p *BaseProvider) SetIdentities(identities []Identity) {
@@ -225,7 +250,7 @@ func (p *BaseProvider) SetIdentitiesWithKey(
 
 	// Trigger reindex
 	go func() {
-		err := p.buildIdentityIndices()
+		err := p.buildIdentitiyIndices()
 		if err != nil {
 			logrus.WithError(err).Error("Failed to build identity search indices")
 			return
@@ -238,15 +263,15 @@ func (p *BaseProvider) GetIdentifier() string {
 }
 
 func (p *BaseProvider) GetName() string {
-	return p.provider.Name
+	return p.name
 }
 
 func (p *BaseProvider) GetDescription() string {
-	return p.provider.Description
+	return p.description
 }
 
 func (p *BaseProvider) GetProvider() string {
-	return p.provider.Provider
+	return p.provider
 }
 
 func (p *BaseProvider) GetCapabilities() []ProviderCapability {
@@ -273,94 +298,34 @@ func (p *BaseProvider) DisableCapability(capability ProviderCapability) {
 	})
 }
 
-func (p *BaseProvider) Initialize(provider Provider) error {
+func (p *BaseProvider) Initialize(identifier string, provider Provider) error {
 	// Initialize the provider
 	return nil
 }
 
-func (p *BaseProvider) buildRbacIndices() error {
-	// Placeholder for building indices
-	startTime := time.Now()
-	defer func() {
-		elapsed := time.Since(startTime)
-		logrus.Debugf("Built AWS search indices in %s", elapsed)
-	}()
-
-	// Create in-memory Bleve indices
-	permissionsMapping := bleve.NewIndexMapping()
-	permissionsIndex, err := bleve.NewMemOnly(permissionsMapping)
-	if err != nil {
-		return fmt.Errorf("failed to create permissions search index: %v", err)
-	}
-
-	rolesMapping := bleve.NewIndexMapping()
-	rolesIndex, err := bleve.NewMemOnly(rolesMapping)
-	if err != nil {
-		return fmt.Errorf("failed to create roles search index: %v", err)
-	}
-
-	// Index permissions
-	for _, perm := range p.rbac.permissions {
-		if err := permissionsIndex.Index(perm.Name, perm); err != nil {
-			return fmt.Errorf("failed to index permission %s: %v", perm.Name, err)
-		}
-	}
-
-	// Index roles
-	for _, role := range p.rbac.roles {
-		if err := rolesIndex.Index(role.Name, role); err != nil {
-			return fmt.Errorf("failed to index role %s: %v", role.Name, err)
-		}
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"permissions": len(p.rbac.permissions),
-		"roles":       len(p.rbac.roles),
-	}).Debug("AWS search indices ready")
-
-	return nil
-}
-
-func (p *BaseProvider) buildIdentityIndices() error {
-	// Placeholder for building indices
-	startTime := time.Now()
-	defer func() {
-		elapsed := time.Since(startTime)
-		logrus.Debugf("Built identity search indices in %s", elapsed)
-	}()
-
-	identityMapping := bleve.NewIndexMapping()
-	identityIndex, err := bleve.NewMemOnly(identityMapping)
-	if err != nil {
-		return fmt.Errorf("failed to create identity search index: %v", err)
-	}
-
-	// Index identities
-	for _, identity := range p.identity.identities {
-		if err := identityIndex.Index(identity.ID, identity); err != nil {
-			return fmt.Errorf("failed to index identity %s: %v", identity.ID, err)
-		}
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"identities": len(p.identity.identities),
-	}).Debug("Identity search indices ready")
-
-	return nil
-}
-
 func (p *BaseProvider) Synchronize(ctx context.Context, temporalService TemporalImpl) error {
+
+	// Check if we have the relevant capabilities for synchronization
+	if !p.HasAnyCapability(
+		ProviderCapabilityIdentities,
+		ProviderCapabilityRBAC,
+	) {
+		logrus.Infof("Provider %s does not have synchronization capabilities, skipping", p.GetName())
+		return nil
+	}
+
 	if temporalService != nil {
 
 		temporalClient := temporalService.GetClient()
 
 		// Execute the provider workflow synchronize
-		workflowOptions := temporal.StartWorkflowOptions{
+		workflowOptions := client.StartWorkflowOptions{
 			ID:        fmt.Sprintf("synchronize-%s", p.GetName()),
 			TaskQueue: temporalService.GetTaskQueue(),
 			// Set a timeout for the workflow execution
 			WorkflowExecutionTimeout: 30 * time.Minute,
 		}
+
 		// Only add versioning override if versioning is enabled
 		if !temporalService.IsVersioningDisabled() {
 			workflowOptions.VersioningOverride = &client.PinnedVersioningOverride{
@@ -372,7 +337,10 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		}
 
 		we, err := temporalClient.ExecuteWorkflow(
-			ctx, workflowOptions, Synchronize, SynchronizeRequest{})
+			ctx,
+			workflowOptions,
+			p.GetTemporalName(TemporalSynchronizeWorkflowName),
+			SynchronizeRequest{})
 		if err != nil {
 			return fmt.Errorf("failed to execute synchronize workflow: %w", err)
 		}

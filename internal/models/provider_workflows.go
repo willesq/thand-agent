@@ -20,6 +20,7 @@ type SynchronizeResponse struct {
 
 func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResponse, error) {
 	ao := workflow.ActivityOptions{
+
 		StartToCloseTimeout: 10 * time.Minute,
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
@@ -27,7 +28,7 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 	// Execute all the synchronizations needed for RBAC
 	// in parallel using the workflow parallel pattern
 
-	var a *providerActivities
+	var a *ProviderActivities
 
 	syncResponse := &SynchronizeResponse{}
 	errChan := workflow.NewChannel(ctx)

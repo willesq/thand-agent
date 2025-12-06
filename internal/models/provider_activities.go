@@ -6,11 +6,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type providerActivities struct {
+type ProviderActivities struct {
 	provider ProviderImpl
 }
 
-func (a *providerActivities) SynchronizeIdentities(
+func (a *ProviderActivities) SynchronizeIdentities(
 	ctx context.Context,
 	req SynchronizeUsersRequest,
 ) (*SynchronizeUsersResponse, error) {
@@ -22,7 +22,7 @@ func (a *providerActivities) SynchronizeIdentities(
 	return a.provider.SynchronizeIdentities(ctx, req)
 }
 
-func (a *providerActivities) SynchronizeResources(
+func (a *ProviderActivities) SynchronizeResources(
 	ctx context.Context,
 	req SynchronizeResourcesRequest,
 ) (*SynchronizeResourcesResponse, error) {
@@ -34,7 +34,7 @@ func (a *providerActivities) SynchronizeResources(
 	return a.provider.SynchronizeResources(ctx, req)
 }
 
-func (a *providerActivities) SynchronizeUsers(
+func (a *ProviderActivities) SynchronizeUsers(
 	ctx context.Context,
 	req SynchronizeUsersRequest,
 ) (*SynchronizeUsersResponse, error) {
@@ -46,7 +46,7 @@ func (a *providerActivities) SynchronizeUsers(
 	return a.provider.SynchronizeUsers(ctx, req)
 }
 
-func (a *providerActivities) SynchronizeGroups(
+func (a *ProviderActivities) SynchronizeGroups(
 	ctx context.Context,
 	req SynchronizeGroupsRequest,
 ) (*SynchronizeGroupsResponse, error) {
@@ -58,7 +58,7 @@ func (a *providerActivities) SynchronizeGroups(
 	return a.provider.SynchronizeGroups(ctx, req)
 }
 
-func (a *providerActivities) SynchronizePermissions(
+func (a *ProviderActivities) SynchronizePermissions(
 	ctx context.Context,
 	req SynchronizePermissionsRequest,
 ) (*SynchronizePermissionsResponse, error) {
@@ -70,7 +70,7 @@ func (a *providerActivities) SynchronizePermissions(
 	return a.provider.SynchronizePermissions(ctx, req)
 }
 
-func (a *providerActivities) SynchronizeRoles(
+func (a *ProviderActivities) SynchronizeRoles(
 	ctx context.Context,
 	req SynchronizeRolesRequest,
 ) (*SynchronizeRolesResponse, error) {

@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 )
 
@@ -57,4 +60,36 @@ func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]
 	}
 
 	return filtered, nil
+}
+
+func (p *BaseProvider) buildResourceIndices() error {
+	// Placeholder for building indices
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Built resource search indices in %s", elapsed)
+	}()
+
+	resourceMapping := bleve.NewIndexMapping()
+	resourceIndex, err := bleve.NewMemOnly(resourceMapping)
+	if err != nil {
+		return fmt.Errorf("failed to create resource search index: %v", err)
+	}
+
+	// Index resources
+	for _, resource := range p.rbac.resources {
+		if err := resourceIndex.Index(resource.Id, resource); err != nil {
+			return fmt.Errorf("failed to index resource %s: %v", resource.Id, err)
+		}
+	}
+
+	p.rbac.mu.Lock()
+	p.rbac.resourcesIndex = resourceIndex
+	p.rbac.mu.Unlock()
+
+	logrus.WithFields(logrus.Fields{
+		"resources": len(p.rbac.resources),
+	}).Debug("Resource search indices ready")
+
+	return nil
 }

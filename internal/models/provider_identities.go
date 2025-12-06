@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/blevesearch/bleve/v2"
+	"github.com/sirupsen/logrus"
 )
 
 type ProviderIdentities interface {
@@ -82,4 +86,36 @@ func (p *BaseProvider) ListIdentities(ctx context.Context, filters ...string) ([
 	}
 
 	return filtered, nil
+}
+
+func (p *BaseProvider) buildIdentitiyIndices() error {
+	// Placeholder for building indices
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Built identity search indices in %s", elapsed)
+	}()
+
+	identityMapping := bleve.NewIndexMapping()
+	identityIndex, err := bleve.NewMemOnly(identityMapping)
+	if err != nil {
+		return fmt.Errorf("failed to create identity search index: %v", err)
+	}
+
+	// Index identities
+	for _, identity := range p.identity.identities {
+		if err := identityIndex.Index(identity.ID, identity); err != nil {
+			return fmt.Errorf("failed to index identity %s: %v", identity.ID, err)
+		}
+	}
+
+	p.identity.mu.Lock()
+	p.identity.identitiesIndex = identityIndex
+	p.identity.mu.Unlock()
+
+	logrus.WithFields(logrus.Fields{
+		"identities": len(p.identity.identities),
+	}).Debug("Identity search indices ready")
+
+	return nil
 }

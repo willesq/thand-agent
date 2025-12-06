@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/interpolate"
-	"go.temporal.io/sdk/worker"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -158,8 +157,8 @@ type ProviderImpl interface {
 	Synchronize(ctx context.Context, temporalClient TemporalImpl) error
 
 	// Temporal
-	RegisterWorkflows(worker worker.Worker) error
-	RegisterActivities(worker worker.Worker) error
+	RegisterWorkflows(temporalClient TemporalImpl) error
+	RegisterActivities(temporalClient TemporalImpl) error
 
 	GetCapabilities() []ProviderCapability
 	HasCapability(capability ProviderCapability) bool

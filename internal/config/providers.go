@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -180,10 +181,52 @@ func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[strin
 			// Skip failed providers - don't add to results
 			continue
 		}
+
+		if result.provider.GetClient() == nil {
+			logrus.Errorln("Provider client is nil after initialization:", result.key)
+			// Skip providers with nil client
+			continue
+		}
+
+		// Check for capabilities for RBAC and Identities
+		if result.provider.GetClient().HasAnyCapability(
+			models.ProviderCapabilityIdentities,
+			models.ProviderCapabilityRBAC,
+		) {
+
+			logrus.Infoln("Provider", result.key, "supports RBAC/Identities capabilities")
+
+			// Register provider workflows and activities with Temporal if available
+			if c.GetServices() != nil && c.GetServices().GetTemporal() == nil {
+
+				logrus.Warningln("Temporal service is not initialized, cannot register workflows/activities for provider:", result.key)
+
+			} else {
+
+				temporalService := c.GetServices().GetTemporal()
+
+				// Revister all provider workflows and activities
+				err := result.provider.GetClient().RegisterWorkflows(temporalService)
+				if err != nil && !errors.Is(err, models.ErrNotImplemented) {
+					logrus.WithError(err).Errorln("Failed to register workflows for provider:", result.key)
+					continue
+				}
+
+				err = result.provider.GetClient().RegisterActivities(temporalService)
+				if err != nil && !errors.Is(err, models.ErrNotImplemented) {
+					logrus.WithError(err).Errorln("Failed to register activities for provider:", result.key)
+					continue
+				}
+			}
+
+			// Synchronize the provider in the background
+			c.synchronizeProvider(result.provider)
+
+		}
+
 		// The provider returned from the goroutine already has the client set
 		results[result.key] = *result.provider
 
-		c.synchronizeProvider(result.provider)
 	}
 
 	logrus.Debugln("All providers initialized successfully")

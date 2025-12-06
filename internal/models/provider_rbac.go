@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
 )
 
@@ -422,4 +424,71 @@ func getCondensedActions(permission string) []string {
 	}
 
 	return permissions
+}
+
+func (p *BaseProvider) buildPermissionIndices() error {
+	// Placeholder for building indices
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Built RBAC search indices in %s", elapsed)
+	}()
+
+	// Create in-memory Bleve indices
+	permissionsMapping := bleve.NewIndexMapping()
+	permissionsIndex, err := bleve.NewMemOnly(permissionsMapping)
+	if err != nil {
+		return fmt.Errorf("failed to create permissions search index: %v", err)
+	}
+
+	// Index permissions
+	for _, perm := range p.rbac.permissions {
+		if err := permissionsIndex.Index(perm.Name, perm); err != nil {
+			return fmt.Errorf("failed to index permission %s: %v", perm.Name, err)
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"permissions": len(p.rbac.permissions),
+		"roles":       len(p.rbac.roles),
+	}).Debug("RBAC search indices ready")
+
+	p.rbac.mu.Lock()
+	p.rbac.permissionsIndex = permissionsIndex
+	p.rbac.mu.Unlock()
+
+	return nil
+}
+
+func (p *BaseProvider) buildRoleIndices() error {
+	// Placeholder for building indices
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Built role search indices in %s", elapsed)
+	}()
+
+	rolesMapping := bleve.NewIndexMapping()
+	rolesIndex, err := bleve.NewMemOnly(rolesMapping)
+	if err != nil {
+		return fmt.Errorf("failed to create roles search index: %v", err)
+	}
+
+	// Index roles
+	for _, role := range p.rbac.roles {
+		if err := rolesIndex.Index(role.Name, role); err != nil {
+			return fmt.Errorf("failed to index role %s: %v", role.Name, err)
+		}
+	}
+
+	p.rbac.mu.Lock()
+	p.rbac.rolesIndex = rolesIndex
+	p.rbac.mu.Unlock()
+
+	logrus.WithFields(logrus.Fields{
+		"permissions": len(p.rbac.permissions),
+		"roles":       len(p.rbac.roles),
+	}).Debug("RBAC search indices ready")
+
+	return nil
 }
