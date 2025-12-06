@@ -366,10 +366,30 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 			return fmt.Errorf("failed to get synchronize workflow result: %w", err)
 		}
 
-		provider.SetIdentities(resp.Identities)
-		provider.SetRoles(resp.Roles)
-		provider.SetPermissions(resp.Permissions)
-		provider.SetResources(resp.Resources)
+		if len(resp.Identities) > 0 {
+			logrus.WithFields(logrus.Fields{
+				"identities": len(resp.Identities),
+			}).Info("Setting synchronized identities")
+			provider.SetIdentities(resp.Identities)
+		}
+		if len(resp.Roles) > 0 {
+			logrus.WithFields(logrus.Fields{
+				"roles": len(resp.Roles),
+			}).Info("Setting synchronized roles")
+			provider.SetRoles(resp.Roles)
+		}
+		if len(resp.Permissions) > 0 {
+			logrus.WithFields(logrus.Fields{
+				"permissions": len(resp.Permissions),
+			}).Info("Setting synchronized permissions")
+			provider.SetPermissions(resp.Permissions)
+		}
+		if len(resp.Resources) > 0 {
+			logrus.WithFields(logrus.Fields{
+				"resources": len(resp.Resources),
+			}).Info("Setting synchronized resources")
+			provider.SetResources(resp.Resources)
+		}
 
 		return nil
 	}
@@ -533,10 +553,30 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 		return fmt.Errorf("synchronization failed: %v", errs)
 	}
 
-	provider.SetIdentities(syncResponse.Identities)
-	provider.SetRoles(syncResponse.Roles)
-	provider.SetPermissions(syncResponse.Permissions)
-	provider.SetResources(syncResponse.Resources)
+	if len(syncResponse.Identities) > 0 {
+		logrus.WithFields(logrus.Fields{
+			"identities": len(syncResponse.Identities),
+		}).Info("Setting synchronized identities")
+		provider.SetIdentities(syncResponse.Identities)
+	}
+	if len(syncResponse.Roles) > 0 {
+		logrus.WithFields(logrus.Fields{
+			"roles": len(syncResponse.Roles),
+		}).Info("Setting synchronized roles")
+		provider.SetRoles(syncResponse.Roles)
+	}
+	if len(syncResponse.Permissions) > 0 {
+		logrus.WithFields(logrus.Fields{
+			"permissions": len(syncResponse.Permissions),
+		}).Info("Setting synchronized permissions")
+		provider.SetPermissions(syncResponse.Permissions)
+	}
+	if len(syncResponse.Resources) > 0 {
+		logrus.WithFields(logrus.Fields{
+			"resources": len(syncResponse.Resources),
+		}).Info("Setting synchronized resources")
+		provider.SetResources(syncResponse.Resources)
+	}
 
 	return nil
 }

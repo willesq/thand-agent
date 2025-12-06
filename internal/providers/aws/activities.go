@@ -15,6 +15,10 @@ func (b *awsProvider) RegisterActivities(temporalClient models.TemporalImpl) err
 func (p *awsProvider) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
 
 	// Before we kick off the synchronize lets update the static roles and permissions
+	return PreSynchronizeActivities(ctx, temporalService, p)
+}
+
+func PreSynchronizeActivities(ctx context.Context, temporalService models.TemporalImpl, provider models.ProviderImpl) error {
 
 	awsData, err := getSharedData()
 
@@ -22,8 +26,8 @@ func (p *awsProvider) Synchronize(ctx context.Context, temporalService models.Te
 		return err
 	}
 
-	p.SetRoles(awsData.roles)
-	p.SetPermissions(awsData.permissions)
+	provider.SetRoles(awsData.roles)
+	provider.SetPermissions(awsData.permissions)
 
-	return models.Synchronize(ctx, temporalService, p)
+	return models.Synchronize(ctx, temporalService, provider)
 }

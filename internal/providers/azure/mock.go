@@ -39,5 +39,5 @@ func (p *azureProviderMock) Initialize(identifier string, provider models.Provid
 }
 
 func (p *azureProviderMock) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
-	return models.Synchronize(ctx, temporalService, p)
+	return PreSynchronizeActivities(ctx, temporalService, p)
 }

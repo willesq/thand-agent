@@ -15,16 +15,22 @@ func (b *gcpProvider) RegisterActivities(temporalClient models.TemporalImpl) err
 func (p *gcpProvider) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
 
 	// Before we kick off the synchronize lets update the static roles and permissions
-	config := p.GetConfig()
+	return PreSynchronizeActivities(ctx, temporalService, p)
+}
+
+func PreSynchronizeActivities(ctx context.Context, temporalService models.TemporalImpl, provider models.ProviderImpl) error {
+
+	config := provider.GetConfig()
 	stage := config.GetStringWithDefault("stage", "GA")
 
 	gcpData, err := getSharedData(stage)
+
 	if err != nil {
 		return err
 	}
 
-	p.SetRoles(gcpData.roles)
-	p.SetPermissions(gcpData.permissions)
+	provider.SetRoles(gcpData.roles)
+	provider.SetPermissions(gcpData.permissions)
 
-	return models.Synchronize(ctx, temporalService, p)
+	return models.Synchronize(ctx, temporalService, provider)
 }

@@ -15,6 +15,10 @@ func (b *azureProvider) RegisterActivities(temporalClient models.TemporalImpl) e
 func (p *azureProvider) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
 
 	// Before we kick off the synchronize lets update the static roles and permissions
+	return PreSynchronizeActivities(ctx, temporalService, p)
+}
+
+func PreSynchronizeActivities(ctx context.Context, temporalService models.TemporalImpl, provider models.ProviderImpl) error {
 
 	azureData, err := getSharedData()
 
@@ -22,8 +26,8 @@ func (p *azureProvider) Synchronize(ctx context.Context, temporalService models.
 		return err
 	}
 
-	p.SetRoles(azureData.roles)
-	p.SetPermissions(azureData.permissions)
+	provider.SetRoles(azureData.roles)
+	provider.SetPermissions(azureData.permissions)
 
-	return models.Synchronize(ctx, temporalService, p)
+	return models.Synchronize(ctx, temporalService, provider)
 }
