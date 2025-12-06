@@ -35,3 +35,7 @@ func (p *awsProviderMock) Initialize(identifier string, provider models.Provider
 
 	return nil
 }
+
+func (p *awsProviderMock) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
+	return models.Synchronize(ctx, temporalService, p)
+}

@@ -101,6 +101,10 @@ type ProviderRoleBasedAccessControl interface {
 	SynchronizePermissions(ctx context.Context, req SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error)
 	SynchronizeResources(ctx context.Context, req SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error)
 
+	SetRoles(roles []ProviderRole)
+	SetPermissions(permissions []ProviderPermission)
+	SetResources(resources []ProviderResource)
+
 	// Permissions are individual accesses. Used as part of a role
 	GetPermission(ctx context.Context, permission string) (*ProviderPermission, error)
 	ListPermissions(ctx context.Context, filters ...string) ([]ProviderPermission, error)

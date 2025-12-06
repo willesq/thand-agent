@@ -12,7 +12,7 @@ type azureProviderMock struct {
 }
 
 // NewMockAzureProvider creates a new mock Azure provider for testing
-func NewMockAzureProvider() models.ProviderImpl {
+func NewMockAzureProvider() *azureProviderMock {
 	return &azureProviderMock{
 		azureProvider: &azureProvider{},
 	}
@@ -24,7 +24,7 @@ func (p *azureProviderMock) Initialize(identifier string, provider models.Provid
 	p.azureProvider = &azureProvider{}
 
 	// Set the provider to the base provider
-	p.BaseProvider = models.NewBaseProvider(
+	p.azureProvider.BaseProvider = models.NewBaseProvider(
 		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
@@ -36,4 +36,8 @@ func (p *azureProviderMock) Initialize(identifier string, provider models.Provid
 	}
 
 	return nil
+}
+
+func (p *azureProviderMock) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
+	return models.Synchronize(ctx, temporalService, p)
 }

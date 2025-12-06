@@ -28,12 +28,6 @@ type BaseProvider struct {
 	// Add other common fields if necessary
 	identity *IdentitySupport
 	rbac     *RBACSupport
-
-	impl ProviderImpl
-}
-
-func (p *BaseProvider) SetProviderImpl(impl ProviderImpl) {
-	p.impl = impl
 }
 
 type IdentitySupport struct {
@@ -310,13 +304,17 @@ func (p *BaseProvider) Initialize(identifier string, provider Provider) error {
 }
 
 func (p *BaseProvider) Synchronize(ctx context.Context, temporalService TemporalImpl) error {
+	return Synchronize(ctx, temporalService, p)
+}
+
+func Synchronize(ctx context.Context, temporalService TemporalImpl, provider ProviderImpl) error {
 
 	// Check if we have the relevant capabilities for synchronization
-	if !p.HasAnyCapability(
+	if !provider.HasAnyCapability(
 		ProviderCapabilityIdentities,
 		ProviderCapabilityRBAC,
 	) {
-		logrus.Infof("Provider %s does not have synchronization capabilities, skipping", p.GetName())
+		logrus.Infof("Provider %s does not have synchronization capabilities, skipping", provider.GetName())
 		return nil
 	}
 
@@ -326,7 +324,7 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 
 		// Execute the provider workflow synchronize
 		workflowOptions := client.StartWorkflowOptions{
-			ID:        GetTemporalName(p.GetIdentifier(), TemporalSynchronizeWorkflowName),
+			ID:        GetTemporalName(provider.GetIdentifier(), TemporalSynchronizeWorkflowName),
 			TaskQueue: temporalService.GetTaskQueue(),
 			// Set a timeout for the workflow execution
 			WorkflowExecutionTimeout: 30 * time.Minute,
@@ -345,9 +343,9 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		we, err := temporalClient.ExecuteWorkflow(
 			ctx,
 			workflowOptions,
-			GetTemporalName(p.GetIdentifier(), TemporalSynchronizeWorkflowName),
+			GetTemporalName(provider.GetIdentifier(), TemporalSynchronizeWorkflowName),
 			SynchronizeRequest{
-				ProviderIdentifier: p.GetIdentifier(),
+				ProviderIdentifier: provider.GetIdentifier(),
 			},
 		)
 
@@ -360,10 +358,10 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 			return fmt.Errorf("failed to get synchronize workflow result: %w", err)
 		}
 
-		p.SetIdentities(resp.Identities)
-		p.SetRoles(resp.Roles)
-		p.SetPermissions(resp.Permissions)
-		p.SetResources(resp.Resources)
+		provider.SetIdentities(resp.Identities)
+		provider.SetRoles(resp.Roles)
+		provider.SetPermissions(resp.Permissions)
+		provider.SetResources(resp.Resources)
 
 		return nil
 	}
@@ -393,12 +391,12 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		})
 	}
 
-	if p.HasCapability(ProviderCapabilityIdentities) {
+	if provider.HasCapability(ProviderCapabilityIdentities) {
 		// Synchronize Identities
 		runSync("Identities", func() error {
 			req := SynchronizeUsersRequest{}
 			for {
-				resp, err := p.SynchronizeIdentities(ctx, req)
+				resp, err := provider.SynchronizeIdentities(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -417,7 +415,7 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		runSync("Users", func() error {
 			req := SynchronizeUsersRequest{}
 			for {
-				resp, err := p.SynchronizeUsers(ctx, req)
+				resp, err := provider.SynchronizeUsers(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -436,7 +434,7 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		runSync("Groups", func() error {
 			req := SynchronizeGroupsRequest{}
 			for {
-				resp, err := p.SynchronizeGroups(ctx, req)
+				resp, err := provider.SynchronizeGroups(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -452,12 +450,12 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		})
 	}
 
-	if p.HasCapability(ProviderCapabilityRBAC) {
+	if provider.HasCapability(ProviderCapabilityRBAC) {
 		// Synchronize Resources
 		runSync("Resources", func() error {
 			req := SynchronizeResourcesRequest{}
 			for {
-				resp, err := p.SynchronizeResources(ctx, req)
+				resp, err := provider.SynchronizeResources(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -476,7 +474,7 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		runSync("Roles", func() error {
 			req := SynchronizeRolesRequest{}
 			for {
-				resp, err := p.SynchronizeRoles(ctx, req)
+				resp, err := provider.SynchronizeRoles(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -495,7 +493,7 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		runSync("Permissions", func() error {
 			req := SynchronizePermissionsRequest{}
 			for {
-				resp, err := p.SynchronizePermissions(ctx, req)
+				resp, err := provider.SynchronizePermissions(ctx, req)
 				if err != nil {
 					return err
 				}
@@ -517,10 +515,10 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		return fmt.Errorf("synchronization failed: %v", errs)
 	}
 
-	p.SetIdentities(syncResponse.Identities)
-	p.SetRoles(syncResponse.Roles)
-	p.SetPermissions(syncResponse.Permissions)
-	p.SetResources(syncResponse.Resources)
+	provider.SetIdentities(syncResponse.Identities)
+	provider.SetRoles(syncResponse.Roles)
+	provider.SetPermissions(syncResponse.Permissions)
+	provider.SetResources(syncResponse.Resources)
 
 	return nil
 }

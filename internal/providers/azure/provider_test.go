@@ -1,4 +1,4 @@
-package aws
+package azure
 
 import (
 	"context"
@@ -11,26 +11,26 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-func TestAWSProviderPermissions(t *testing.T) {
+func TestAzureProviderPermissions(t *testing.T) {
 
 	// Create minimal config for initialization
 	testConfig := models.Provider{
-		Name:        "test-aws",
-		Description: "Test AWS provider",
-		Provider:    "aws",
+		Name:        "test-azure",
+		Description: "Test Azure provider",
+		Provider:    "azure",
 		Config: &models.BasicConfig{
-			"region":            "us-east-1",
-			"account_id":        "000000000000",
-			"access_key_id":     "test",
-			"secret_access_key": "test",
+			"tenant_id":       "test-tenant",
+			"client_id":       "test-client",
+			"client_secret":   "test-secret",
+			"subscription_id": "test-subscription",
 		},
 		Enabled: true,
 	}
 
 	// Initialize the provider
-	provider := NewMockAwsProvider()
-	err := provider.Initialize("aws", testConfig)
-	require.NoError(t, err, "Failed to initialize AWS provider")
+	provider := NewMockAzureProvider()
+	err := provider.Initialize("azure", testConfig)
+	require.NoError(t, err, "Failed to initialize Azure provider")
 
 	ctx := context.Background()
 
@@ -68,34 +68,18 @@ func TestAWSProviderPermissions(t *testing.T) {
 	})
 
 	t.Run("Search Permissions with Filter", func(t *testing.T) {
-		// Test with S3 filter
-		s3Permissions, err := provider.ListPermissions(ctx, "S3")
-		assert.NoError(t, err, "Failed to search S3 permissions")
+		// Test with Compute filter
+		computePermissions, err := provider.ListPermissions(ctx, "Compute")
+		assert.NoError(t, err, "Failed to search Compute permissions")
 
-		// Verify all returned permissions relate to S3
-		for _, perm := range s3Permissions {
-			// Check if permission name or description contains S3-related keywords
-			nameContainsS3 := common.ContainsInsensitive(perm.Name, "S3")
-			descContainsS3 := common.ContainsInsensitive(perm.Description, "S3")
-			assert.True(t, nameContainsS3 || descContainsS3,
-				"Permission %s should be S3-related", perm.Name)
+		// Verify all returned permissions relate to Compute
+		for _, perm := range computePermissions {
+			// Check if permission name or description contains Compute-related keywords
+			nameContainsCompute := common.ContainsInsensitive(perm.Name, "Compute")
+			descContainsCompute := common.ContainsInsensitive(perm.Description, "Compute")
+			assert.True(t, nameContainsCompute || descContainsCompute,
+				"Permission %s should be Compute-related", perm.Name)
 		}
-	})
-
-	t.Run("Search Permissions with Multiple Filters", func(t *testing.T) {
-		// Test with EC2 filter specifically
-		permissions, err := provider.ListPermissions(ctx, "EC2")
-		assert.NoError(t, err, "Failed to search permissions with EC2 filter")
-
-		// Verify results contain EC2 related permissions
-		hasEC2Related := false
-		for _, perm := range permissions {
-			if common.ContainsInsensitive(perm.Name, "EC2") || common.ContainsInsensitive(perm.Description, "EC2") {
-				hasEC2Related = true
-				break
-			}
-		}
-		assert.True(t, hasEC2Related, "Should find at least one EC2-related permission")
 	})
 
 	t.Run("Empty Filter Returns All Permissions", func(t *testing.T) {
@@ -111,26 +95,26 @@ func TestAWSProviderPermissions(t *testing.T) {
 	})
 }
 
-func TestAWSProviderRoles(t *testing.T) {
+func TestAzureProviderRoles(t *testing.T) {
 
 	// Create minimal config for initialization
 	testConfig := models.Provider{
-		Name:        "test-aws",
-		Description: "Test AWS provider",
-		Provider:    "aws",
+		Name:        "test-azure",
+		Description: "Test Azure provider",
+		Provider:    "azure",
 		Config: &models.BasicConfig{
-			"region":            "us-east-1",
-			"account_id":        "000000000000",
-			"access_key_id":     "test",
-			"secret_access_key": "test",
+			"tenant_id":       "test-tenant",
+			"client_id":       "test-client",
+			"client_secret":   "test-secret",
+			"subscription_id": "test-subscription",
 		},
 		Enabled: true,
 	}
 
 	// Initialize the provider
-	provider := NewMockAwsProvider()
-	err := provider.Initialize("aws", testConfig)
-	require.NoError(t, err, "Failed to initialize AWS provider")
+	provider := NewMockAzureProvider()
+	err := provider.Initialize("azure", testConfig)
+	require.NoError(t, err, "Failed to initialize Azure provider")
 
 	ctx := context.Background()
 
@@ -177,15 +161,15 @@ func TestAWSProviderRoles(t *testing.T) {
 		}
 	})
 
-	t.Run("Search Roles with ReadOnly Filter", func(t *testing.T) {
-		// Test with ReadOnly filter
-		readOnlyRoles, err := provider.ListRoles(ctx, "ReadOnly")
-		assert.NoError(t, err, "Failed to search ReadOnly roles")
+	t.Run("Search Roles with Owner Filter", func(t *testing.T) {
+		// Test with Owner filter
+		ownerRoles, err := provider.ListRoles(ctx, "Owner")
+		assert.NoError(t, err, "Failed to search Owner roles")
 
-		// Verify all returned roles relate to ReadOnly
-		for _, role := range readOnlyRoles {
-			assert.True(t, common.ContainsInsensitive(role.Name, "ReadOnly"),
-				"Role %s should contain 'ReadOnly'", role.Name)
+		// Verify all returned roles relate to Owner
+		for _, role := range ownerRoles {
+			assert.True(t, common.ContainsInsensitive(role.Name, "Owner"),
+				"Role %s should contain 'Owner'", role.Name)
 		}
 	})
 

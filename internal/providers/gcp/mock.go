@@ -12,7 +12,7 @@ type gcpProviderMock struct {
 }
 
 // NewMockGcpProvider creates a new mock GCP provider for testing
-func NewMockGcpProvider() models.ProviderImpl {
+func NewMockGcpProvider() *gcpProviderMock {
 	return &gcpProviderMock{
 		gcpProvider: &gcpProvider{},
 	}
@@ -24,7 +24,7 @@ func (p *gcpProviderMock) Initialize(identifier string, provider models.Provider
 	p.gcpProvider = &gcpProvider{}
 
 	// Set the provider to the base provider
-	p.BaseProvider = models.NewBaseProvider(
+	p.gcpProvider.BaseProvider = models.NewBaseProvider(
 		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
@@ -36,4 +36,8 @@ func (p *gcpProviderMock) Initialize(identifier string, provider models.Provider
 	}
 
 	return nil
+}
+
+func (p *gcpProviderMock) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
+	return models.Synchronize(ctx, temporalService, p)
 }

@@ -14,6 +14,8 @@ type ProviderIdentities interface {
 	GetIdentity(ctx context.Context, identity string) (*Identity, error)
 	ListIdentities(ctx context.Context, filters ...string) ([]Identity, error)
 
+	SetIdentities(identities []Identity)
+
 	// Some APIs support identities, users, groups service accoutns etc.
 	SynchronizeIdentities(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error)
 	// Some require more granular user synchronization

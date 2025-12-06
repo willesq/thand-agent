@@ -112,6 +112,7 @@ func loadPermissions(stage string) ([]models.ProviderPermission, error) {
 			Title:       perm.Title,
 			Description: perm.Description,
 		}
+
 		permissions = append(permissions, permission)
 	}
 
