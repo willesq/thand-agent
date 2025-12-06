@@ -2,13 +2,16 @@ package models
 
 import (
 	"fmt"
+	"reflect"
+	"runtime"
+	"strings"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 )
 
 type SynchronizeRequest struct {
-	//
+	ProviderIdentifier string `json:"provider"` // Provider name
 }
 
 type SynchronizeResponse struct {
@@ -18,17 +21,43 @@ type SynchronizeResponse struct {
 	Identities  []Identity           `json:"identities,omitempty"`
 }
 
-func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResponse, error) {
-	ao := workflow.ActivityOptions{
+func CreateTemporalIdentifier(providerIdentifier, base string) string {
+	return strings.ToLower(providerIdentifier + "-" + base)
+}
 
+func GetNameFromFunction(i any) string {
+	v := reflect.ValueOf(i)
+	if v.Kind() == reflect.Func && v.Type().NumIn() > 0 {
+		receiverType := v.Type().In(0)
+		for j := 0; j < receiverType.NumMethod(); j++ {
+			method := receiverType.Method(j)
+			if method.Func.Pointer() == v.Pointer() {
+				return method.Name
+			}
+		}
+	}
+	fullName := runtime.FuncForPC(v.Pointer()).Name()
+	parts := strings.Split(fullName, ".")
+	return strings.TrimSuffix(parts[len(parts)-1], "-fm")
+}
+
+func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*SynchronizeResponse, error) {
+
+	if len(syncReq.ProviderIdentifier) == 0 {
+		return nil, fmt.Errorf("provider identifier is required")
+	}
+
+	log := workflow.GetLogger(ctx)
+	log.Info("Starting synchronization workflow for provider: ", syncReq.ProviderIdentifier)
+
+	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 10 * time.Minute,
 	}
+
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
 	// Execute all the synchronizations needed for RBAC
 	// in parallel using the workflow parallel pattern
-
-	var a *ProviderActivities
 
 	syncResponse := &SynchronizeResponse{}
 	errChan := workflow.NewChannel(ctx)
@@ -39,7 +68,15 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 		req := SynchronizeIdentitiesRequest{}
 		for {
 			var resp SynchronizeIdentitiesResponse
-			err := workflow.ExecuteActivity(ctx, a.SynchronizeIdentities, req).Get(ctx, &resp)
+			err := workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizeIdentities),
+				),
+				req,
+			).
+				Get(ctx, &resp)
 			if err != nil {
 				errChan.Send(ctx, err)
 				return
@@ -58,7 +95,14 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 		req := SynchronizeUsersRequest{}
 		for {
 			var resp SynchronizeUsersResponse
-			err := workflow.ExecuteActivity(ctx, a.SynchronizeUsers, req).Get(ctx, &resp)
+			err := workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizeUsers),
+				),
+				req,
+			).Get(ctx, &resp)
 			if err != nil {
 				errChan.Send(ctx, err)
 				return
@@ -77,7 +121,14 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 		req := SynchronizeGroupsRequest{}
 		for {
 			var resp SynchronizeGroupsResponse
-			err := workflow.ExecuteActivity(ctx, a.SynchronizeGroups, req).Get(ctx, &resp)
+			err := workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizeGroups),
+				),
+				req,
+			).Get(ctx, &resp)
 			if err != nil {
 				errChan.Send(ctx, err)
 				return
@@ -96,7 +147,14 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 		req := SynchronizeResourcesRequest{}
 		for {
 			var resp SynchronizeResourcesResponse
-			err := workflow.ExecuteActivity(ctx, a.SynchronizeResources, req).Get(ctx, &resp)
+			err := workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizeResources),
+				),
+				req,
+			).Get(ctx, &resp)
 			if err != nil {
 				errChan.Send(ctx, err)
 				return
@@ -115,7 +173,14 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 		req := SynchronizeRolesRequest{}
 		for {
 			var resp SynchronizeRolesResponse
-			err := workflow.ExecuteActivity(ctx, a.SynchronizeRoles, req).Get(ctx, &resp)
+			err := workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizeRoles),
+				),
+				req,
+			).Get(ctx, &resp)
 			if err != nil {
 				errChan.Send(ctx, err)
 				return
@@ -134,7 +199,14 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 		req := SynchronizePermissionsRequest{}
 		for {
 			var resp SynchronizePermissionsResponse
-			err := workflow.ExecuteActivity(ctx, a.SynchronizePermissions, req).Get(ctx, &resp)
+			err := workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizePermissions),
+				),
+				req,
+			).Get(ctx, &resp)
 			if err != nil {
 				errChan.Send(ctx, err)
 				return
@@ -158,7 +230,8 @@ func Synchronize(ctx workflow.Context, req SynchronizeRequest) (*SynchronizeResp
 	}
 
 	if len(errs) > 0 {
-		return nil, fmt.Errorf("synchronization failed: %v", errs)
+		// Log errors but return what we have
+		log.Error("Synchronization workflow encountered errors: ", errs)
 	}
 
 	return syncResponse, nil

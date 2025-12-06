@@ -176,7 +176,7 @@ func TestGetIdentity(t *testing.T) {
 
 			if tt.expectError {
 				require.Error(t, err)
-				if tt.errorContains != "" {
+				if len(tt.errorContains) != 0 {
 					assert.Contains(t, err.Error(), tt.errorContains)
 				}
 				return
@@ -483,7 +483,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 
 			if tt.expectError {
 				require.Error(t, err)
-				if tt.errorContains != "" {
+				if len(tt.errorContains) != 0 {
 					assert.Contains(t, err.Error(), tt.errorContains)
 				}
 				return

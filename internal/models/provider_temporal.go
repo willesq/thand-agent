@@ -3,8 +3,8 @@ package models
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
+	"github.com/sirupsen/logrus"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/workflow"
@@ -12,8 +12,8 @@ import (
 
 const TemporalSynchronizeWorkflowName = "synchronize"
 
-func (b *BaseProvider) GetTemporalName(base string) string {
-	return strings.ToLower(b.GetIdentifier() + "-" + base)
+func GetTemporalName(identifier, base string) string {
+	return CreateTemporalIdentifier(identifier, base)
 }
 
 // BaseProvider provides a base implementation of the ProviderImpl interface
@@ -31,8 +31,8 @@ func (b *BaseProvider) RegisterWorkflows(temporalClient TemporalImpl) error {
 
 	// Register the Synchronize workflow. This updates roles, permissions,
 	// resources and identities for RBAC
-	worker.RegisterWorkflowWithOptions(Synchronize, workflow.RegisterOptions{
-		Name:               b.GetTemporalName(TemporalSynchronizeWorkflowName),
+	worker.RegisterWorkflowWithOptions(SynchronizeWorkflow, workflow.RegisterOptions{
+		Name:               GetTemporalName(b.GetIdentifier(), TemporalSynchronizeWorkflowName),
 		VersioningBehavior: workflow.VersioningBehaviorPinned,
 	})
 
@@ -40,8 +40,7 @@ func (b *BaseProvider) RegisterWorkflows(temporalClient TemporalImpl) error {
 
 }
 
-// RegisterActivities registers provider-specific activities with the Temporal worker
-func (b *BaseProvider) RegisterActivities(temporalClient TemporalImpl) error {
+func RegisterActivities(temporalClient TemporalImpl, providerActivities *ProviderActivities) error {
 
 	if temporalClient == nil {
 		return ErrNotImplemented
@@ -53,13 +52,10 @@ func (b *BaseProvider) RegisterActivities(temporalClient TemporalImpl) error {
 		return ErrNotImplemented
 	}
 
-	providerActivities := ProviderActivities{
-		provider: b,
-	}
-
 	structValue := reflect.ValueOf(providerActivities)
 	structType := structValue.Type()
 	count := 0
+
 	for i := 0; i < structValue.NumMethod(); i++ {
 
 		methodValue := structValue.Method(i)
@@ -75,12 +71,17 @@ func (b *BaseProvider) RegisterActivities(temporalClient TemporalImpl) error {
 			return fmt.Errorf("method %s of %s: %w", name, structType.Name(), err)
 		}
 
+		p := providerActivities.provider
+		activityName := GetTemporalName(p.GetIdentifier(), name)
+
 		worker.RegisterActivityWithOptions(
 			methodValue.Interface(),
 			activity.RegisterOptions{
-				Name: b.GetTemporalName(name),
+				Name: activityName,
 			},
 		)
+
+		logrus.Debugf("Registered activity: %s for provider: %s", activityName, p.GetIdentifier())
 		count++
 	}
 

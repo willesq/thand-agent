@@ -29,7 +29,7 @@ func (p *gsuiteProvider) SynchronizeUsers(ctx context.Context, req models.Synchr
 		MaxResults(int64(req.Pagination.PageSize)).
 		OrderBy("email")
 
-	if req.Pagination.Token != "" {
+	if len(req.Pagination.Token) != 0 {
 		call = call.PageToken(req.Pagination.Token)
 	}
 
@@ -59,7 +59,7 @@ func (p *gsuiteProvider) SynchronizeUsers(ctx context.Context, req models.Synchr
 		Identities: identities,
 	}
 
-	if resp.NextPageToken != "" {
+	if len(resp.NextPageToken) != 0 {
 		response.Pagination = &models.PaginationOptions{
 			Token:    resp.NextPageToken,
 			PageSize: req.Pagination.PageSize,
@@ -92,7 +92,7 @@ func (p *gsuiteProvider) SynchronizeGroups(ctx context.Context, req models.Synch
 		MaxResults(int64(req.Pagination.PageSize)).
 		OrderBy("email")
 
-	if req.Pagination.Token != "" {
+	if len(req.Pagination.Token) != 0 {
 		call = call.PageToken(req.Pagination.Token)
 	}
 
@@ -120,7 +120,7 @@ func (p *gsuiteProvider) SynchronizeGroups(ctx context.Context, req models.Synch
 		Identities: identities,
 	}
 
-	if resp.NextPageToken != "" {
+	if len(resp.NextPageToken) != 0 {
 		response.Pagination = &models.PaginationOptions{
 			Token:    resp.NextPageToken,
 			PageSize: req.Pagination.PageSize,

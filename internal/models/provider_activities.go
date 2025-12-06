@@ -2,12 +2,25 @@ package models
 
 import (
 	"context"
+	"errors"
 
 	"github.com/sirupsen/logrus"
+	"go.temporal.io/sdk/temporal"
 )
+
+// RegisterActivities registers provider-specific activities with the Temporal worker
+func (b *BaseProvider) RegisterActivities(temporalClient TemporalImpl) error {
+	return ErrNotImplemented
+}
 
 type ProviderActivities struct {
 	provider ProviderImpl
+}
+
+func NewProviderActivities(provider ProviderImpl) *ProviderActivities {
+	return &ProviderActivities{
+		provider: provider,
+	}
 }
 
 func (a *ProviderActivities) SynchronizeIdentities(
@@ -19,7 +32,7 @@ func (a *ProviderActivities) SynchronizeIdentities(
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeIdentities activity")
 
-	return a.provider.SynchronizeIdentities(ctx, req)
+	return handleNotImplementedError(a.provider.SynchronizeIdentities(ctx, req))
 }
 
 func (a *ProviderActivities) SynchronizeResources(
@@ -31,7 +44,7 @@ func (a *ProviderActivities) SynchronizeResources(
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeResources activity")
 
-	return a.provider.SynchronizeResources(ctx, req)
+	return handleNotImplementedError(a.provider.SynchronizeResources(ctx, req))
 }
 
 func (a *ProviderActivities) SynchronizeUsers(
@@ -43,7 +56,7 @@ func (a *ProviderActivities) SynchronizeUsers(
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeUsers activity")
 
-	return a.provider.SynchronizeUsers(ctx, req)
+	return handleNotImplementedError(a.provider.SynchronizeUsers(ctx, req))
 }
 
 func (a *ProviderActivities) SynchronizeGroups(
@@ -55,7 +68,7 @@ func (a *ProviderActivities) SynchronizeGroups(
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeGroups activity")
 
-	return a.provider.SynchronizeGroups(ctx, req)
+	return handleNotImplementedError(a.provider.SynchronizeGroups(ctx, req))
 }
 
 func (a *ProviderActivities) SynchronizePermissions(
@@ -67,7 +80,7 @@ func (a *ProviderActivities) SynchronizePermissions(
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizePermissions activity")
 
-	return a.provider.SynchronizePermissions(ctx, req)
+	return handleNotImplementedError(a.provider.SynchronizePermissions(ctx, req))
 }
 
 func (a *ProviderActivities) SynchronizeRoles(
@@ -79,5 +92,18 @@ func (a *ProviderActivities) SynchronizeRoles(
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeRoles activity")
 
-	return a.provider.SynchronizeRoles(ctx, req)
+	return handleNotImplementedError(a.provider.SynchronizeRoles(ctx, req))
+}
+
+func handleNotImplementedError[T any](res T, err error) (T, error) {
+	if err != nil {
+		if errors.Is(err, ErrNotImplemented) {
+			return res, temporal.NewNonRetryableApplicationError(
+				"The requested activity is not implemented by the provider",
+				"NotImplementedError",
+				err,
+			)
+		}
+	}
+	return res, err
 }

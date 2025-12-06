@@ -71,7 +71,7 @@ func (p *oktaProvider) loadApplicationResources(ctx context.Context, pagination 
 		Limit: int64(pagination.PageSize),
 	}
 
-	if pagination.Token != "" {
+	if len(pagination.Token) != 0 {
 		queryParams.After = pagination.Token
 	}
 

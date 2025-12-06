@@ -28,6 +28,12 @@ type BaseProvider struct {
 	// Add other common fields if necessary
 	identity *IdentitySupport
 	rbac     *RBACSupport
+
+	impl ProviderImpl
+}
+
+func (p *BaseProvider) SetProviderImpl(impl ProviderImpl) {
+	p.impl = impl
 }
 
 type IdentitySupport struct {
@@ -320,7 +326,7 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 
 		// Execute the provider workflow synchronize
 		workflowOptions := client.StartWorkflowOptions{
-			ID:        fmt.Sprintf("synchronize-%s", p.GetName()),
+			ID:        GetTemporalName(p.GetIdentifier(), TemporalSynchronizeWorkflowName),
 			TaskQueue: temporalService.GetTaskQueue(),
 			// Set a timeout for the workflow execution
 			WorkflowExecutionTimeout: 30 * time.Minute,
@@ -339,8 +345,12 @@ func (p *BaseProvider) Synchronize(ctx context.Context, temporalService Temporal
 		we, err := temporalClient.ExecuteWorkflow(
 			ctx,
 			workflowOptions,
-			p.GetTemporalName(TemporalSynchronizeWorkflowName),
-			SynchronizeRequest{})
+			GetTemporalName(p.GetIdentifier(), TemporalSynchronizeWorkflowName),
+			SynchronizeRequest{
+				ProviderIdentifier: p.GetIdentifier(),
+			},
+		)
+
 		if err != nil {
 			return fmt.Errorf("failed to execute synchronize workflow: %w", err)
 		}

@@ -28,7 +28,7 @@ func (p *oktaProvider) SynchronizeUsers(ctx context.Context, req models.Synchron
 		Limit: int64(req.Pagination.PageSize),
 	}
 
-	if req.Pagination.Token != "" {
+	if len(req.Pagination.Token) != 0 {
 		queryParams.After = req.Pagination.Token
 	}
 
@@ -76,7 +76,7 @@ func (p *oktaProvider) SynchronizeUsers(ctx context.Context, req models.Synchron
 	}
 
 	// Handle pagination
-	if resp.NextPage != "" {
+	if len(resp.NextPage) != 0 {
 		response.Pagination = &models.PaginationOptions{
 			Token:    resp.NextPage,
 			PageSize: req.Pagination.PageSize,
@@ -108,7 +108,7 @@ func (p *oktaProvider) SynchronizeGroups(ctx context.Context, req models.Synchro
 		Limit: int64(req.Pagination.PageSize),
 	}
 
-	if req.Pagination.Token != "" {
+	if len(req.Pagination.Token) != 0 {
 		queryParams.After = req.Pagination.Token
 	}
 
@@ -136,7 +136,7 @@ func (p *oktaProvider) SynchronizeGroups(ctx context.Context, req models.Synchro
 	}
 
 	// Handle pagination
-	if resp.NextPage != "" {
+	if len(resp.NextPage) != 0 {
 		response.Pagination = &models.PaginationOptions{
 			Token:    resp.NextPage,
 			PageSize: req.Pagination.PageSize,

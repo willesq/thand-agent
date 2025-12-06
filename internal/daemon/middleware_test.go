@@ -242,7 +242,7 @@ func TestCORSMiddleware(t *testing.T) {
 			})
 
 			req := httptest.NewRequest(tt.method, "/test", nil)
-			if tt.origin != "" {
+			if len(tt.origin) != 0 {
 				req.Header.Set("Origin", tt.origin)
 			}
 			if tt.method == "OPTIONS" {
