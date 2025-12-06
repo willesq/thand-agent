@@ -20,10 +20,6 @@ var (
 	awsDocsErr    error
 )
 
-func init() {
-	fmt.Printf("DEBUG: awsDocsFb size: %d\n", len(awsDocsFb))
-}
-
 // GetParsedAwsDocs returns the pre-parsed AWS docs map from FlatBuffer
 func GetParsedAwsDocs() (map[string]string, error) {
 	fmt.Println("DEBUG: GetParsedAwsDocs called")

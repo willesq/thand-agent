@@ -318,6 +318,13 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 		return nil
 	}
 
+	requests := getSynchronizationRequests(provider)
+
+	if len(requests) == 0 {
+		logrus.Infof("Provider %s does not have overridden synchronization methods, skipping", provider.GetName())
+		return nil
+	}
+
 	if temporalService != nil {
 
 		temporalClient := temporalService.GetClient()
@@ -346,6 +353,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 			GetTemporalName(provider.GetIdentifier(), TemporalSynchronizeWorkflowName),
 			SynchronizeRequest{
 				ProviderIdentifier: provider.GetIdentifier(),
+				Requests:           requests,
 			},
 		)
 
@@ -377,7 +385,13 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 	syncResponse := &SynchronizeResponse{}
 
 	// Helper to run sync
-	runSync := func(name string, syncFunc func() error) {
+	runSync := func(name SynchronizeCapability, syncFunc func() error) {
+
+		if !slices.Contains(requests, name) {
+			logrus.Infof("Skipping synchronization for %s as it's not requested", name)
+			return
+		}
+
 		wg.Go(func() {
 			if err := syncFunc(); err != nil {
 				// Ignore not implemented errors
@@ -393,7 +407,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 
 	if provider.HasCapability(ProviderCapabilityIdentities) {
 		// Synchronize Identities
-		runSync("Identities", func() error {
+		runSync(SynchronizeIdentities, func() error {
 			req := SynchronizeUsersRequest{}
 			for {
 				resp, err := provider.SynchronizeIdentities(ctx, req)
@@ -403,7 +417,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 				mu.Lock()
 				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
 				mu.Unlock()
-				if resp.Pagination == nil || resp.Pagination.Token == "" {
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
 				}
 				req.Pagination = resp.Pagination
@@ -412,7 +426,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 		})
 
 		// Synchronize Users
-		runSync("Users", func() error {
+		runSync(SynchronizeUsers, func() error {
 			req := SynchronizeUsersRequest{}
 			for {
 				resp, err := provider.SynchronizeUsers(ctx, req)
@@ -422,7 +436,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 				mu.Lock()
 				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
 				mu.Unlock()
-				if resp.Pagination == nil || resp.Pagination.Token == "" {
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
 				}
 				req.Pagination = resp.Pagination
@@ -431,7 +445,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 		})
 
 		// Synchronize Groups
-		runSync("Groups", func() error {
+		runSync(SynchronizeGroups, func() error {
 			req := SynchronizeGroupsRequest{}
 			for {
 				resp, err := provider.SynchronizeGroups(ctx, req)
@@ -441,7 +455,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 				mu.Lock()
 				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
 				mu.Unlock()
-				if resp.Pagination == nil || resp.Pagination.Token == "" {
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
 				}
 				req.Pagination = resp.Pagination
@@ -452,7 +466,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 
 	if provider.HasCapability(ProviderCapabilityRBAC) {
 		// Synchronize Resources
-		runSync("Resources", func() error {
+		runSync(SynchronizeResources, func() error {
 			req := SynchronizeResourcesRequest{}
 			for {
 				resp, err := provider.SynchronizeResources(ctx, req)
@@ -462,7 +476,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 				mu.Lock()
 				syncResponse.Resources = append(syncResponse.Resources, resp.Resources...)
 				mu.Unlock()
-				if resp.Pagination == nil || resp.Pagination.Token == "" {
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
 				}
 				req.Pagination = resp.Pagination
@@ -471,7 +485,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 		})
 
 		// Synchronize Roles
-		runSync("Roles", func() error {
+		runSync(SynchronizeRoles, func() error {
 			req := SynchronizeRolesRequest{}
 			for {
 				resp, err := provider.SynchronizeRoles(ctx, req)
@@ -481,7 +495,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 				mu.Lock()
 				syncResponse.Roles = append(syncResponse.Roles, resp.Roles...)
 				mu.Unlock()
-				if resp.Pagination == nil || resp.Pagination.Token == "" {
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
 				}
 				req.Pagination = resp.Pagination
@@ -490,7 +504,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 		})
 
 		// Synchronize Permissions
-		runSync("Permissions", func() error {
+		runSync(SynchronizePermissions, func() error {
 			req := SynchronizePermissionsRequest{}
 			for {
 				resp, err := provider.SynchronizePermissions(ctx, req)
@@ -500,7 +514,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 				mu.Lock()
 				syncResponse.Permissions = append(syncResponse.Permissions, resp.Permissions...)
 				mu.Unlock()
-				if resp.Pagination == nil || resp.Pagination.Token == "" {
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
 				}
 				req.Pagination = resp.Pagination
@@ -508,6 +522,10 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 			return nil
 		})
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"requests": len(requests),
+	}).Info("Waiting for synchronization tasks to complete")
 
 	wg.Wait()
 
@@ -521,4 +539,62 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 	provider.SetResources(syncResponse.Resources)
 
 	return nil
+}
+
+func getSynchronizationRequests(provider ProviderImpl) []SynchronizeCapability {
+	requests := make([]SynchronizeCapability, 0)
+
+	// Determine which capabilities to synchronize
+	// Check if the underlying provider has been overridden to
+	// support identities, roles, permissions, resources
+
+	if provider.CanSynchronizeIdentities() {
+		requests = append(requests, SynchronizeIdentities)
+	}
+
+	if provider.CanSynchronizeUsers() {
+		requests = append(requests, SynchronizeUsers)
+	}
+
+	if provider.CanSynchronizeGroups() {
+		requests = append(requests, SynchronizeGroups)
+	}
+
+	if provider.CanSynchronizeResources() {
+		requests = append(requests, SynchronizeResources)
+	}
+
+	if provider.CanSynchronizeRoles() {
+		requests = append(requests, SynchronizeRoles)
+	}
+
+	if provider.CanSynchronizePermissions() {
+		requests = append(requests, SynchronizePermissions)
+	}
+
+	return requests
+}
+
+func (p *BaseProvider) CanSynchronizeRoles() bool {
+	return false
+}
+
+func (p *BaseProvider) CanSynchronizePermissions() bool {
+	return false
+}
+
+func (p *BaseProvider) CanSynchronizeUsers() bool {
+	return false
+}
+
+func (p *BaseProvider) CanSynchronizeGroups() bool {
+	return false
+}
+
+func (p *BaseProvider) CanSynchronizeIdentities() bool {
+	return false
+}
+
+func (p *BaseProvider) CanSynchronizeResources() bool {
+	return false
 }

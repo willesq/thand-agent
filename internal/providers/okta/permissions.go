@@ -1,9 +1,6 @@
 package okta
 
 import (
-	"context"
-	"time"
-
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -133,12 +130,7 @@ var oktaPermissions = map[string]string{
 	"okta.workflows.read":   "Allows the admin to view delegated flows",
 }
 
-func (p *oktaProvider) SynchronizePermissions(ctx context.Context, req models.SynchronizePermissionsRequest) (*models.SynchronizePermissionsResponse, error) {
-	startTime := time.Now()
-	defer func() {
-		elapsed := time.Since(startTime)
-		logrus.Debugf("Loaded Okta permissions in %s", elapsed)
-	}()
+func (p *oktaProvider) getStaticPermissions() []models.ProviderPermission {
 
 	var permissions []models.ProviderPermission
 
@@ -155,7 +147,5 @@ func (p *oktaProvider) SynchronizePermissions(ctx context.Context, req models.Sy
 		"permissions": len(permissions),
 	}).Debug("Loaded Okta permissions")
 
-	return &models.SynchronizePermissionsResponse{
-		Permissions: permissions,
-	}, nil
+	return permissions
 }

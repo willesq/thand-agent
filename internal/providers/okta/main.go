@@ -3,7 +3,6 @@ package okta
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/sirupsen/logrus"
@@ -21,8 +20,6 @@ type oktaProvider struct {
 	client   *okta.Client
 	orgUrl   string
 	apiToken string
-
-	indexMu sync.RWMutex
 }
 
 func (p *oktaProvider) Initialize(identifier string, provider models.Provider) error {

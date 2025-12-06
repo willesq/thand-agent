@@ -164,6 +164,15 @@ type ProviderImpl interface {
 	HasCapability(capability ProviderCapability) bool
 	HasAnyCapability(capabilities ...ProviderCapability) bool
 
+	// Let us know what this provider can synchronize
+	CanSynchronizeRoles() bool
+	CanSynchronizePermissions() bool
+	CanSynchronizeResources() bool
+	CanSynchronizeIdentities() bool
+	CanSynchronizeUsers() bool
+	CanSynchronizeGroups() bool
+
+	// Sub-interfaces
 	ProviderNotifier
 	ProviderAuthorizor
 	ProviderRoleBasedAccessControl

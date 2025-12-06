@@ -4,14 +4,27 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"go.temporal.io/sdk/workflow"
 )
 
+type SynchronizeCapability string
+
+const (
+	SynchronizeRoles       SynchronizeCapability = "SynchronizeRoles"
+	SynchronizePermissions SynchronizeCapability = "SynchronizePermissions"
+	SynchronizeResources   SynchronizeCapability = "SynchronizeResources"
+	SynchronizeIdentities  SynchronizeCapability = "SynchronizeIdentities"
+	SynchronizeUsers       SynchronizeCapability = "SynchronizeUsers"
+	SynchronizeGroups      SynchronizeCapability = "SynchronizeGroups"
+)
+
 type SynchronizeRequest struct {
-	ProviderIdentifier string `json:"provider"` // Provider name
+	ProviderIdentifier string                  `json:"provider"` // Provider name
+	Requests           []SynchronizeCapability `json:"requests,omitempty"`
 }
 
 type SynchronizeResponse struct {
@@ -61,164 +74,189 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 
 	syncResponse := &SynchronizeResponse{}
 	errChan := workflow.NewChannel(ctx)
-	syncCount := 4
+	syncCount := 0
+
+	shouldSync := func(cap SynchronizeCapability) bool {
+		if len(syncReq.Requests) == 0 {
+			return true
+		}
+		return slices.Contains(syncReq.Requests, cap)
+	}
 
 	// Synchronize Identities
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		req := SynchronizeIdentitiesRequest{}
-		for {
-			var resp SynchronizeIdentitiesResponse
-			err := workflow.ExecuteActivity(
-				ctx,
-				CreateTemporalIdentifier(
-					syncReq.ProviderIdentifier,
-					GetNameFromFunction((*ProviderActivities).SynchronizeIdentities),
-				),
-				req,
-			).
-				Get(ctx, &resp)
-			if err != nil {
-				errChan.Send(ctx, err)
-				return
+	if shouldSync(SynchronizeIdentities) {
+		syncCount++
+		workflow.Go(ctx, func(ctx workflow.Context) {
+			req := SynchronizeIdentitiesRequest{}
+			for {
+				var resp SynchronizeIdentitiesResponse
+				err := workflow.ExecuteActivity(
+					ctx,
+					CreateTemporalIdentifier(
+						syncReq.ProviderIdentifier,
+						GetNameFromFunction((*ProviderActivities).SynchronizeIdentities),
+					),
+					req,
+				).
+					Get(ctx, &resp)
+				if err != nil {
+					errChan.Send(ctx, err)
+					return
+				}
+				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
+					break
+				}
+				req.Pagination = resp.Pagination
 			}
-			syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
-			if resp.Pagination == nil || resp.Pagination.Token == "" {
-				break
-			}
-			req.Pagination = resp.Pagination
-		}
-		errChan.Send(ctx, nil)
-	})
+			errChan.Send(ctx, nil)
+		})
+	}
 
 	// Synchronize Users
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		req := SynchronizeUsersRequest{}
-		for {
-			var resp SynchronizeUsersResponse
-			err := workflow.ExecuteActivity(
-				ctx,
-				CreateTemporalIdentifier(
-					syncReq.ProviderIdentifier,
-					GetNameFromFunction((*ProviderActivities).SynchronizeUsers),
-				),
-				req,
-			).Get(ctx, &resp)
-			if err != nil {
-				errChan.Send(ctx, err)
-				return
+	if shouldSync(SynchronizeUsers) {
+		syncCount++
+		workflow.Go(ctx, func(ctx workflow.Context) {
+			req := SynchronizeUsersRequest{}
+			for {
+				var resp SynchronizeUsersResponse
+				err := workflow.ExecuteActivity(
+					ctx,
+					CreateTemporalIdentifier(
+						syncReq.ProviderIdentifier,
+						GetNameFromFunction((*ProviderActivities).SynchronizeUsers),
+					),
+					req,
+				).Get(ctx, &resp)
+				if err != nil {
+					errChan.Send(ctx, err)
+					return
+				}
+				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
+					break
+				}
+				req.Pagination = resp.Pagination
 			}
-			syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
-			if resp.Pagination == nil || resp.Pagination.Token == "" {
-				break
-			}
-			req.Pagination = resp.Pagination
-		}
-		errChan.Send(ctx, nil)
-	})
+			errChan.Send(ctx, nil)
+		})
+	}
 
 	// Synchronize Groups
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		req := SynchronizeGroupsRequest{}
-		for {
-			var resp SynchronizeGroupsResponse
-			err := workflow.ExecuteActivity(
-				ctx,
-				CreateTemporalIdentifier(
-					syncReq.ProviderIdentifier,
-					GetNameFromFunction((*ProviderActivities).SynchronizeGroups),
-				),
-				req,
-			).Get(ctx, &resp)
-			if err != nil {
-				errChan.Send(ctx, err)
-				return
+	if shouldSync(SynchronizeGroups) {
+		syncCount++
+		workflow.Go(ctx, func(ctx workflow.Context) {
+			req := SynchronizeGroupsRequest{}
+			for {
+				var resp SynchronizeGroupsResponse
+				err := workflow.ExecuteActivity(
+					ctx,
+					CreateTemporalIdentifier(
+						syncReq.ProviderIdentifier,
+						GetNameFromFunction((*ProviderActivities).SynchronizeGroups),
+					),
+					req,
+				).Get(ctx, &resp)
+				if err != nil {
+					errChan.Send(ctx, err)
+					return
+				}
+				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
+					break
+				}
+				req.Pagination = resp.Pagination
 			}
-			syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
-			if resp.Pagination == nil || resp.Pagination.Token == "" {
-				break
-			}
-			req.Pagination = resp.Pagination
-		}
-		errChan.Send(ctx, nil)
-	})
+			errChan.Send(ctx, nil)
+		})
+	}
 
 	// Synchronize Resources
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		req := SynchronizeResourcesRequest{}
-		for {
-			var resp SynchronizeResourcesResponse
-			err := workflow.ExecuteActivity(
-				ctx,
-				CreateTemporalIdentifier(
-					syncReq.ProviderIdentifier,
-					GetNameFromFunction((*ProviderActivities).SynchronizeResources),
-				),
-				req,
-			).Get(ctx, &resp)
-			if err != nil {
-				errChan.Send(ctx, err)
-				return
+	if shouldSync(SynchronizeResources) {
+		syncCount++
+		workflow.Go(ctx, func(ctx workflow.Context) {
+			req := SynchronizeResourcesRequest{}
+			for {
+				var resp SynchronizeResourcesResponse
+				err := workflow.ExecuteActivity(
+					ctx,
+					CreateTemporalIdentifier(
+						syncReq.ProviderIdentifier,
+						GetNameFromFunction((*ProviderActivities).SynchronizeResources),
+					),
+					req,
+				).Get(ctx, &resp)
+				if err != nil {
+					errChan.Send(ctx, err)
+					return
+				}
+				syncResponse.Resources = append(syncResponse.Resources, resp.Resources...)
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
+					break
+				}
+				req.Pagination = resp.Pagination
 			}
-			syncResponse.Resources = append(syncResponse.Resources, resp.Resources...)
-			if resp.Pagination == nil || resp.Pagination.Token == "" {
-				break
-			}
-			req.Pagination = resp.Pagination
-		}
-		errChan.Send(ctx, nil)
-	})
+			errChan.Send(ctx, nil)
+		})
+	}
 
 	// Synchronize Roles
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		req := SynchronizeRolesRequest{}
-		for {
-			var resp SynchronizeRolesResponse
-			err := workflow.ExecuteActivity(
-				ctx,
-				CreateTemporalIdentifier(
-					syncReq.ProviderIdentifier,
-					GetNameFromFunction((*ProviderActivities).SynchronizeRoles),
-				),
-				req,
-			).Get(ctx, &resp)
-			if err != nil {
-				errChan.Send(ctx, err)
-				return
+	if shouldSync(SynchronizeRoles) {
+		syncCount++
+		workflow.Go(ctx, func(ctx workflow.Context) {
+			req := SynchronizeRolesRequest{}
+			for {
+				var resp SynchronizeRolesResponse
+				err := workflow.ExecuteActivity(
+					ctx,
+					CreateTemporalIdentifier(
+						syncReq.ProviderIdentifier,
+						GetNameFromFunction((*ProviderActivities).SynchronizeRoles),
+					),
+					req,
+				).Get(ctx, &resp)
+				if err != nil {
+					errChan.Send(ctx, err)
+					return
+				}
+				syncResponse.Roles = append(syncResponse.Roles, resp.Roles...)
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
+					break
+				}
+				req.Pagination = resp.Pagination
 			}
-			syncResponse.Roles = append(syncResponse.Roles, resp.Roles...)
-			if resp.Pagination == nil || resp.Pagination.Token == "" {
-				break
-			}
-			req.Pagination = resp.Pagination
-		}
-		errChan.Send(ctx, nil)
-	})
+			errChan.Send(ctx, nil)
+		})
+	}
 
 	// Synchronize Permissions
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		req := SynchronizePermissionsRequest{}
-		for {
-			var resp SynchronizePermissionsResponse
-			err := workflow.ExecuteActivity(
-				ctx,
-				CreateTemporalIdentifier(
-					syncReq.ProviderIdentifier,
-					GetNameFromFunction((*ProviderActivities).SynchronizePermissions),
-				),
-				req,
-			).Get(ctx, &resp)
-			if err != nil {
-				errChan.Send(ctx, err)
-				return
+	if shouldSync(SynchronizePermissions) {
+		syncCount++
+		workflow.Go(ctx, func(ctx workflow.Context) {
+			req := SynchronizePermissionsRequest{}
+			for {
+				var resp SynchronizePermissionsResponse
+				err := workflow.ExecuteActivity(
+					ctx,
+					CreateTemporalIdentifier(
+						syncReq.ProviderIdentifier,
+						GetNameFromFunction((*ProviderActivities).SynchronizePermissions),
+					),
+					req,
+				).Get(ctx, &resp)
+				if err != nil {
+					errChan.Send(ctx, err)
+					return
+				}
+				syncResponse.Permissions = append(syncResponse.Permissions, resp.Permissions...)
+				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
+					break
+				}
+				req.Pagination = resp.Pagination
 			}
-			syncResponse.Permissions = append(syncResponse.Permissions, resp.Permissions...)
-			if resp.Pagination == nil || resp.Pagination.Token == "" {
-				break
-			}
-			req.Pagination = resp.Pagination
-		}
-		errChan.Send(ctx, nil)
-	})
+			errChan.Send(ctx, nil)
+		})
+	}
 
 	var errs []error
 	for range syncCount {

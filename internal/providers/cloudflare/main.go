@@ -45,12 +45,6 @@ func (p *cloudflareProvider) Initialize(identifier string, provider models.Provi
 	// 	return fmt.Errorf("failed to load permissions: %w", err)
 	// }
 
-	// Load Cloudflare Resources (zones, etc.)
-	err = p.LoadResources(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to load resources: %w", err)
-	}
-
 	logrus.WithFields(logrus.Fields{
 		"provider":   CloudflareProviderName,
 		"account_id": p.accountID,

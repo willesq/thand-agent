@@ -13,8 +13,12 @@ import (
 const resourceTypeZone = "zone"
 const resourceTypeAccount = "account"
 
-// LoadResources loads Cloudflare resources (zones, accounts) from the API
-func (p *cloudflareProvider) LoadResources(ctx context.Context) error {
+func (p *cloudflareProvider) CanSynchronizeResources() bool {
+	return true
+}
+
+// SynchronizeResources loads Cloudflare resources (zones, accounts) from the API
+func (p *cloudflareProvider) SynchronizeResources(ctx context.Context, req models.SynchronizeResourcesRequest) (*models.SynchronizeResourcesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
@@ -26,18 +30,16 @@ func (p *cloudflareProvider) LoadResources(ctx context.Context) error {
 	// Load zones
 	zoneResources, err := p.loadZoneResources(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to load zone resources: %w", err)
+		return nil, fmt.Errorf("failed to load zone resources: %w", err)
 	}
 	resourcesData = append(resourcesData, zoneResources...)
 
 	// Load accounts
 	accountResources, err := p.loadAccountResources(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to load account resources: %w", err)
+		return nil, fmt.Errorf("failed to load account resources: %w", err)
 	}
 	resourcesData = append(resourcesData, accountResources...)
-
-	p.SetResources(resourcesData)
 
 	logrus.WithFields(logrus.Fields{
 		"resources": len(resourcesData),
@@ -45,7 +47,9 @@ func (p *cloudflareProvider) LoadResources(ctx context.Context) error {
 		"accounts":  len(accountResources),
 	}).Debug("Loaded Cloudflare resources")
 
-	return nil
+	return &models.SynchronizeResourcesResponse{
+		Resources: resourcesData,
+	}, nil
 }
 
 // loadZoneResources loads zone resources from the Cloudflare API
