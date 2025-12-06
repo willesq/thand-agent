@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -179,8 +181,52 @@ func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[strin
 			// Skip failed providers - don't add to results
 			continue
 		}
+
+		if result.provider.GetClient() == nil {
+			logrus.Errorln("Provider client is nil after initialization:", result.key)
+			// Skip providers with nil client
+			continue
+		}
+
+		// Check for capabilities for RBAC and Identities
+		if result.provider.GetClient().HasAnyCapability(
+			models.ProviderCapabilityIdentities,
+			models.ProviderCapabilityRBAC,
+		) {
+
+			logrus.Infoln("Provider", result.key, "supports RBAC/Identities capabilities")
+
+			// Register provider workflows and activities with Temporal if available
+			if c.GetServices() != nil && c.GetServices().GetTemporal() == nil {
+
+				logrus.Warningln("Temporal service is not initialized, cannot register workflows/activities for provider:", result.key)
+
+			} else {
+
+				temporalService := c.GetServices().GetTemporal()
+
+				// Revister all provider workflows and activities
+				err := result.provider.GetClient().RegisterWorkflows(temporalService)
+				if err != nil && !errors.Is(err, models.ErrNotImplemented) {
+					logrus.WithError(err).Errorln("Failed to register workflows for provider:", result.key)
+					continue
+				}
+
+				err = result.provider.GetClient().RegisterActivities(temporalService)
+				if err != nil && !errors.Is(err, models.ErrNotImplemented) {
+					logrus.WithError(err).Errorln("Failed to register activities for provider:", result.key)
+					continue
+				}
+			}
+
+			// Synchronize the provider in the background
+			c.synchronizeProvider(result.provider)
+
+		}
+
 		// The provider returned from the goroutine already has the client set
 		results[result.key] = *result.provider
+
 	}
 
 	logrus.Debugln("All providers initialized successfully")
@@ -206,7 +252,7 @@ func (c *Config) initializeSingleProvider(providerKey string, p *models.Provider
 		return fmt.Errorf("failed to resolve environment variables for provider %s: %w", providerKey, err)
 	}
 
-	if err := impl.Initialize(*p); err != nil {
+	if err := impl.Initialize(providerKey, *p); err != nil {
 		return err
 	}
 
@@ -230,4 +276,40 @@ func (c *Config) getProviderImplementation(providerKey string, providerName stri
 	}
 
 	return nil, fmt.Errorf("unknown config mode, cannot load providers")
+}
+
+func (c *Config) synchronizeProvider(p *models.Provider) {
+
+	impl := p.GetClient()
+
+	if impl == nil {
+		logrus.Warningln("Provider client is nil, cannot synchronize:", p.Name)
+		return
+	}
+
+	var temporalClient models.TemporalImpl
+
+	// First check if we have temporal capabilities
+	services := c.GetServices()
+
+	if services != nil {
+		temporalClient = services.GetTemporal()
+	}
+
+	go func() {
+
+		err := p.GetClient().Synchronize(
+			context.Background(),
+			temporalClient,
+		)
+
+		if err != nil {
+			logrus.WithError(err).Errorln("Failed to synchronize provider:", p.Name)
+			return
+		}
+
+		logrus.Infoln("Synchronized provider successfully:", p.Name)
+
+	}()
+
 }

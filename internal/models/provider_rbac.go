@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,11 +33,77 @@ type RevokeRoleRequest struct {
 type RevokeRoleResponse struct {
 }
 
+type SynchronizeRolesRequest struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+}
+
+type SynchronizeRolesResponse struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+	Roles      []ProviderRole     `json:"roles,omitempty"`
+}
+
+type SynchronizePermissionsRequest struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+}
+
+type SynchronizePermissionsResponse struct {
+	Pagination  *PaginationOptions   `json:"pagination,omitempty"`
+	Permissions []ProviderPermission `json:"permissions,omitempty"`
+}
+
+type SynchronizeUsersRequest struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+}
+
+type SynchronizeUsersResponse struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+	Identities []Identity         `json:"identities,omitempty"`
+}
+
+type SynchronizeGroupsRequest struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+}
+
+type SynchronizeGroupsResponse struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+	Identities []Identity         `json:"identities,omitempty"`
+}
+
+type SynchronizeResourcesRequest struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+}
+
+type SynchronizeResourcesResponse struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+	Resources  []ProviderResource `json:"resources,omitempty"`
+}
+
+type SynchronizeIdentitiesRequest struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+}
+
+type SynchronizeIdentitiesResponse struct {
+	Pagination *PaginationOptions `json:"pagination,omitempty"`
+	Identities []Identity         `json:"identities,omitempty"`
+}
+
+type PaginationOptions struct {
+	Page     int    `json:"page,omitempty"`
+	PageSize int    `json:"size,omitempty"`
+	Token    string `json:"token,omitempty"`
+}
+
+// ProviderRoleBasedAccessControl defines the interface for providers that support RBAC
 type ProviderRoleBasedAccessControl interface {
 
-	// Role
-	GetRole(ctx context.Context, role string) (*ProviderRole, error)
-	ListRoles(ctx context.Context, filters ...string) ([]ProviderRole, error)
+	// Sync or Async load the roles, permissions, resources and identities
+	SynchronizeRoles(ctx context.Context, req SynchronizeRolesRequest) (*SynchronizeRolesResponse, error)
+	SynchronizePermissions(ctx context.Context, req SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error)
+	SynchronizeResources(ctx context.Context, req SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error)
+
+	SetRoles(roles []ProviderRole)
+	SetPermissions(permissions []ProviderPermission)
+	SetResources(resources []ProviderResource)
 
 	// Permissions are individual accesses. Used as part of a role
 	GetPermission(ctx context.Context, permission string) (*ProviderPermission, error)
@@ -44,6 +112,10 @@ type ProviderRoleBasedAccessControl interface {
 	// Resources are things that permissions can be applied to
 	GetResource(ctx context.Context, resource string) (*ProviderResource, error)
 	ListResources(ctx context.Context, filters ...string) ([]ProviderResource, error)
+
+	// Role
+	GetRole(ctx context.Context, role string) (*ProviderRole, error)
+	ListRoles(ctx context.Context, filters ...string) ([]ProviderRole, error)
 
 	// Validate a role for a user
 	ValidateRole(ctx context.Context, identity *Identity, role *Role) (map[string]any, error)
@@ -69,38 +141,6 @@ type ProviderRoleBasedAccessControl interface {
 		req *AuthorizeRoleRequest,
 		resp *AuthorizeRoleResponse,
 	) string
-}
-
-/* Default implementations for role-based access control */
-
-func (p *BaseProvider) GetRole(ctx context.Context, role string) (*ProviderRole, error) {
-	// Default implementation does nothing
-	return nil, fmt.Errorf("the provider '%s' does not implement GetRole", p.GetProvider())
-}
-
-func (p *BaseProvider) ListRoles(ctx context.Context, filters ...string) ([]ProviderRole, error) {
-	// Default implementation does nothing
-	return nil, fmt.Errorf("the provider '%s' does not implement ListRoles", p.GetProvider())
-}
-
-func (p *BaseProvider) GetPermission(ctx context.Context, permission string) (*ProviderPermission, error) {
-	// Default implementation does nothing
-	return nil, fmt.Errorf("the provider '%s' does not implement GetPermission", p.GetProvider())
-}
-
-func (p *BaseProvider) ListPermissions(ctx context.Context, filters ...string) ([]ProviderPermission, error) {
-	// Default implementation does nothing
-	return nil, fmt.Errorf("the provider '%s' does not implement ListPermissions", p.GetProvider())
-}
-
-func (p *BaseProvider) GetResource(ctx context.Context, resource string) (*ProviderResource, error) {
-	// Default implementation does nothing
-	return nil, fmt.Errorf("the provider '%s' does not implement GetResource", p.GetProvider())
-}
-
-func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]ProviderResource, error) {
-	// Default implementation does nothing
-	return nil, fmt.Errorf("the provider '%s' does not implement ListResources", p.GetProvider())
 }
 
 func (p *BaseProvider) AuthorizeRole(
@@ -388,4 +428,71 @@ func getCondensedActions(permission string) []string {
 	}
 
 	return permissions
+}
+
+func (p *BaseProvider) buildPermissionIndices() error {
+	// Placeholder for building indices
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Built RBAC search indices in %s", elapsed)
+	}()
+
+	// Create in-memory Bleve indices
+	permissionsMapping := bleve.NewIndexMapping()
+	permissionsIndex, err := bleve.NewMemOnly(permissionsMapping)
+	if err != nil {
+		return fmt.Errorf("failed to create permissions search index: %v", err)
+	}
+
+	// Index permissions
+	for _, perm := range p.rbac.permissions {
+		if err := permissionsIndex.Index(perm.Name, perm); err != nil {
+			return fmt.Errorf("failed to index permission %s: %v", perm.Name, err)
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"permissions": len(p.rbac.permissions),
+		"roles":       len(p.rbac.roles),
+	}).Debug("RBAC search indices ready")
+
+	p.rbac.mu.Lock()
+	p.rbac.permissionsIndex = permissionsIndex
+	p.rbac.mu.Unlock()
+
+	return nil
+}
+
+func (p *BaseProvider) buildRoleIndices() error {
+	// Placeholder for building indices
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Built role search indices in %s", elapsed)
+	}()
+
+	rolesMapping := bleve.NewIndexMapping()
+	rolesIndex, err := bleve.NewMemOnly(rolesMapping)
+	if err != nil {
+		return fmt.Errorf("failed to create roles search index: %v", err)
+	}
+
+	// Index roles
+	for _, role := range p.rbac.roles {
+		if err := rolesIndex.Index(role.Name, role); err != nil {
+			return fmt.Errorf("failed to index role %s: %v", role.Name, err)
+		}
+	}
+
+	p.rbac.mu.Lock()
+	p.rbac.rolesIndex = rolesIndex
+	p.rbac.mu.Unlock()
+
+	logrus.WithFields(logrus.Fields{
+		"permissions": len(p.rbac.permissions),
+		"roles":       len(p.rbac.roles),
+	}).Debug("RBAC search indices ready")
+
+	return nil
 }

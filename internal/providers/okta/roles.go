@@ -2,13 +2,9 @@ package okta
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
-	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -72,9 +68,13 @@ var oktaPredefinedRoles = map[string]models.ProviderRole{
 	},
 }
 
+func (p *oktaProvider) CanSynchronizeRoles() bool {
+	return true
+}
+
 // Also load in user groups as these can have roles assigned too
 
-func (p *oktaProvider) LoadRoles() error {
+func (p *oktaProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
@@ -82,66 +82,19 @@ func (p *oktaProvider) LoadRoles() error {
 	}()
 
 	var roles []models.ProviderRole
-	rolesMap := make(map[string]*models.ProviderRole)
 
 	// Load predefined standard roles
 	// These are Okta's built-in administrator roles that are consistent across all Okta orgs
 	// Reference: https://help.okta.com/en-us/content/topics/security/administrators-admin-comparison.htm
 	for _, role := range oktaPredefinedRoles {
 		roles = append(roles, role)
-		rolesMap[strings.ToLower(role.Id)] = &roles[len(roles)-1]
-		rolesMap[strings.ToLower(role.Name)] = &roles[len(roles)-1]
 	}
-
-	p.roles = roles
-	p.rolesMap = rolesMap
 
 	logrus.WithFields(logrus.Fields{
 		"roles": len(roles),
-	}).Debug("Loaded Okta standard roles, building search index in background")
+	}).Debug("Loaded Okta standard roles")
 
-	return nil
-}
-
-func (p *oktaProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
-	role = strings.ToLower(role)
-	// Fast map lookup
-	if r, exists := p.rolesMap[role]; exists {
-		return r, nil
-	}
-	return nil, fmt.Errorf("role not found: %s", role)
-}
-
-func (p *oktaProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
-	// If no filters, return all roles
-	if len(filters) == 0 {
-		return p.roles, nil
-	}
-
-	// Check if search index is ready
-	p.indexMu.RLock()
-	rolesIndex := p.rolesIndex
-	p.indexMu.RUnlock()
-
-	if rolesIndex != nil {
-		// Use Bleve search for better search capabilities
-		return common.BleveListSearch(ctx, rolesIndex, func(a *search.DocumentMatch, b models.ProviderRole) bool {
-			return strings.Compare(a.ID, b.Name) == 0
-		}, p.roles, filters...)
-	}
-
-	// Fallback to simple substring filtering while index is being built
-	var filtered []models.ProviderRole
-	filterText := strings.ToLower(strings.Join(filters, " "))
-
-	for _, role := range p.roles {
-		// Check if any filter matches the role name, title or description
-		if strings.Contains(strings.ToLower(role.Name), filterText) ||
-			strings.Contains(strings.ToLower(role.Title), filterText) ||
-			strings.Contains(strings.ToLower(role.Description), filterText) {
-			filtered = append(filtered, role)
-		}
-	}
-
-	return filtered, nil
+	return &models.SynchronizeRolesResponse{
+		Roles: roles,
+	}, nil
 }

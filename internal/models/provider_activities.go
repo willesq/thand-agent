@@ -1,0 +1,107 @@
+package models
+
+import (
+	"context"
+	"errors"
+
+	"github.com/sirupsen/logrus"
+)
+
+// RegisterActivities registers provider-specific activities with the Temporal worker
+func (b *BaseProvider) RegisterActivities(temporalClient TemporalImpl) error {
+	return ErrNotImplemented
+}
+
+type ProviderActivities struct {
+	provider ProviderImpl
+}
+
+func NewProviderActivities(provider ProviderImpl) *ProviderActivities {
+	return &ProviderActivities{
+		provider: provider,
+	}
+}
+
+func (a *ProviderActivities) SynchronizeIdentities(
+	ctx context.Context,
+	req SynchronizeUsersRequest,
+) (*SynchronizeUsersResponse, error) {
+
+	logrus.WithFields(logrus.Fields{
+		"pagination": req.Pagination,
+	}).Infoln("Starting SynchronizeIdentities activity")
+
+	return handleNotImplementedError(a.provider.SynchronizeIdentities(ctx, req))
+}
+
+func (a *ProviderActivities) SynchronizeResources(
+	ctx context.Context,
+	req SynchronizeResourcesRequest,
+) (*SynchronizeResourcesResponse, error) {
+
+	logrus.WithFields(logrus.Fields{
+		"pagination": req.Pagination,
+	}).Infoln("Starting SynchronizeResources activity")
+
+	return handleNotImplementedError(a.provider.SynchronizeResources(ctx, req))
+}
+
+func (a *ProviderActivities) SynchronizeUsers(
+	ctx context.Context,
+	req SynchronizeUsersRequest,
+) (*SynchronizeUsersResponse, error) {
+
+	logrus.WithFields(logrus.Fields{
+		"pagination": req.Pagination,
+	}).Infoln("Starting SynchronizeUsers activity")
+
+	return handleNotImplementedError(a.provider.SynchronizeUsers(ctx, req))
+}
+
+func (a *ProviderActivities) SynchronizeGroups(
+	ctx context.Context,
+	req SynchronizeGroupsRequest,
+) (*SynchronizeGroupsResponse, error) {
+
+	logrus.WithFields(logrus.Fields{
+		"pagination": req.Pagination,
+	}).Infoln("Starting SynchronizeGroups activity")
+
+	return handleNotImplementedError(a.provider.SynchronizeGroups(ctx, req))
+}
+
+func (a *ProviderActivities) SynchronizePermissions(
+	ctx context.Context,
+	req SynchronizePermissionsRequest,
+) (*SynchronizePermissionsResponse, error) {
+
+	logrus.WithFields(logrus.Fields{
+		"pagination": req.Pagination,
+	}).Infoln("Starting SynchronizePermissions activity")
+
+	return handleNotImplementedError(a.provider.SynchronizePermissions(ctx, req))
+}
+
+func (a *ProviderActivities) SynchronizeRoles(
+	ctx context.Context,
+	req SynchronizeRolesRequest,
+) (*SynchronizeRolesResponse, error) {
+
+	logrus.WithFields(logrus.Fields{
+		"pagination": req.Pagination,
+	}).Infoln("Starting SynchronizeRoles activity")
+
+	return handleNotImplementedError(a.provider.SynchronizeRoles(ctx, req))
+}
+
+func handleNotImplementedError[T any](res T, err error) (T, error) {
+	if err != nil {
+		if errors.Is(err, ErrNotImplemented) {
+			// Ignore not implemented errors. This will
+			// just complete the activity as successful without doing anything.
+			logrus.WithError(err).Infoln("Activity not implemented for this provider, skipping")
+			return res, nil
+		}
+	}
+	return res, err
+}

@@ -1,21 +1,18 @@
 package azure
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
 )
 
 type azureData struct {
-	permissions      []models.ProviderPermission
-	permissionsMap   map[string]*models.ProviderPermission
-	permissionsIndex bleve.Index
-
-	roles      []models.ProviderRole
-	rolesMap   map[string]*models.ProviderRole
-	rolesIndex bleve.Index
+	permissions []models.ProviderPermission
+	roles       []models.ProviderRole
 
 	indexReady chan struct{}
 }
@@ -33,29 +30,72 @@ func getSharedData() (*azureData, error) {
 		}
 		var err error
 
-		sharedData.permissions, sharedData.permissionsMap, err = loadPermissions()
+		sharedData.permissions, err = loadPermissions()
 		if err != nil {
 			sharedDataErr = err
 			return
 		}
 
-		sharedData.roles, sharedData.rolesMap, err = loadRoles()
+		sharedData.roles, err = loadRoles()
 		if err != nil {
 			sharedDataErr = err
 			return
 		}
 
-		// Build indices in background
-		go func() {
-			defer close(sharedData.indexReady)
-			pIdx, rIdx, err := buildIndices(sharedData.permissions, sharedData.roles)
-			if err != nil {
-				logrus.WithError(err).Error("Failed to build Azure search indices")
-				return
-			}
-			sharedData.permissionsIndex = pIdx
-			sharedData.rolesIndex = rIdx
-		}()
 	})
 	return sharedData, sharedDataErr
+}
+
+func loadPermissions() ([]models.ProviderPermission, error) {
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed Azure permissions in %s", elapsed)
+	}()
+
+	// Get pre-parsed Azure permissions from data package
+	azureOperations, err := data.GetParsedAzurePermissions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parsed Azure permissions: %w", err)
+	}
+
+	var permissions []models.ProviderPermission
+
+	for _, operation := range azureOperations {
+		permission := models.ProviderPermission{
+			Name:        operation.Name,
+			Description: operation.Description,
+		}
+		permissions = append(permissions, permission)
+	}
+
+	return permissions, nil
+}
+
+func loadRoles() ([]models.ProviderRole, error) {
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed Azure roles in %s", elapsed)
+	}()
+
+	// Get pre-parsed Azure roles from data package
+	azureRoles, err := data.GetParsedAzureRoles()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parsed Azure roles: %w", err)
+	}
+
+	var roles []models.ProviderRole
+
+	for _, role := range azureRoles {
+		r := models.ProviderRole{
+			Name:        role.Name,
+			Description: role.Description,
+		}
+		roles = append(roles, r)
+	}
+
+	return roles, nil
 }

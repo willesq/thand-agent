@@ -6,28 +6,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/search"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
 // MockIdentityProvider implements ProviderImpl for testing identity functions
 type MockIdentityProvider struct {
 	*models.BaseProvider
-	identities    map[string]models.Identity
-	index         bleve.Index
-	listFunc      func(ctx context.Context, filters ...string) ([]Identity, error)
-	getIdentityFn func(ctx context.Context, identity string) (*models.Identity, error)
-	mu            sync.RWMutex
 }
 
-// Identity is an alias to avoid import issues
-type Identity = models.Identity
-
-func NewMockIdentityProvider(name string, identities map[string]models.Identity) *MockIdentityProvider {
+func NewMockIdentityProvider(name string, identities []models.Identity) *MockIdentityProvider {
 	provider := models.Provider{
 		Name:        name,
 		Description: "Mock Identity Provider",
@@ -35,57 +24,17 @@ func NewMockIdentityProvider(name string, identities map[string]models.Identity)
 		Enabled:     true,
 	}
 
-	mapping := bleve.NewIndexMapping()
-	index, _ := bleve.NewMemOnly(mapping)
-
-	for _, id := range identities {
-		_ = index.Index(id.ID, id)
+	mk := &MockIdentityProvider{
+		BaseProvider: models.NewBaseProvider(
+			name, provider, models.ProviderCapabilityIdentities),
 	}
 
-	return &MockIdentityProvider{
-		BaseProvider: models.NewBaseProvider(provider, models.ProviderCapabilityIdentities),
-		identities:   identities,
-		index:        index,
-	}
+	mk.SetIdentities(identities)
+
+	return mk
 }
 
-func (m *MockIdentityProvider) Initialize(provider models.Provider) error {
-	return nil
-}
-
-func (m *MockIdentityProvider) GetIdentity(ctx context.Context, identity string) (*models.Identity, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.getIdentityFn != nil {
-		return m.getIdentityFn(ctx, identity)
-	}
-
-	if id, exists := m.identities[identity]; exists {
-		return &id, nil
-	}
-	return nil, fmt.Errorf("identity not found: %s", identity)
-}
-
-func (m *MockIdentityProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if m.listFunc != nil {
-		return m.listFunc(ctx, filters...)
-	}
-
-	var identities []models.Identity
-	for _, id := range m.identities {
-		identities = append(identities, id)
-	}
-
-	return common.BleveListSearch(ctx, m.index, func(a *search.DocumentMatch, b models.Identity) bool {
-		return a.ID == b.ID
-	}, identities, filters...)
-}
-
-func (m *MockIdentityProvider) RefreshIdentities(ctx context.Context) error {
+func (m *MockIdentityProvider) Initialize(identifier string, provider models.Provider) error {
 	return nil
 }
 
@@ -104,8 +53,8 @@ func TestGetIdentity(t *testing.T) {
 			name:     "get identity without provider prefix - found in first provider",
 			identity: "john@example.com",
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe",
 						User: &models.User{
@@ -124,8 +73,8 @@ func TestGetIdentity(t *testing.T) {
 			name:     "get identity with provider prefix",
 			identity: "gsuite:john@example.com",
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe",
 						User: &models.User{
@@ -135,8 +84,8 @@ func TestGetIdentity(t *testing.T) {
 						},
 					},
 				}),
-				"okta": NewMockIdentityProvider("okta", map[string]models.Identity{
-					"john@example.com": {
+				"okta": NewMockIdentityProvider("okta", []models.Identity{
+					{
 						ID:    "okta-john",
 						Label: "John Doe (Okta)",
 						User: &models.User{
@@ -155,7 +104,7 @@ func TestGetIdentity(t *testing.T) {
 			name:     "get identity with nonexistent provider prefix",
 			identity: "nonexistent:john@example.com",
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{}),
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{}),
 			},
 			expectError:   true,
 			errorContains: "provider 'nonexistent' not found",
@@ -172,8 +121,8 @@ func TestGetIdentity(t *testing.T) {
 			name:     "get identity not found in provider - returns basic identity",
 			identity: "unknown@example.com",
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe",
 						User: &models.User{
@@ -214,7 +163,7 @@ func TestGetIdentity(t *testing.T) {
 
 			if tt.expectError {
 				require.Error(t, err)
-				if tt.errorContains != "" {
+				if len(tt.errorContains) != 0 {
 					assert.Contains(t, err.Error(), tt.errorContains)
 				}
 				return
@@ -252,8 +201,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 			identityType: IdentityTypeUser,
 			filter:       nil,
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe",
 						User: &models.User{
@@ -262,7 +211,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 							Name:     "John Doe",
 						},
 					},
-					"jane@example.com": {
+					{
 						ID:    "jane@example.com",
 						Label: "Jane Doe",
 						User: &models.User{
@@ -286,8 +235,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 			identityType: IdentityTypeUser,
 			filter:       []string{"john"},
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe",
 						User: &models.User{
@@ -296,7 +245,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 							Name:     "John Doe",
 						},
 					},
-					"jane@example.com": {
+					{
 						ID:    "jane@example.com",
 						Label: "Jane Doe",
 						User: &models.User{
@@ -320,8 +269,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 			identityType: IdentityTypeGroup,
 			filter:       nil,
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe",
 						User: &models.User{
@@ -329,7 +278,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 							Username: "john",
 						},
 					},
-					"developers": {
+					{
 						ID:    "developers",
 						Label: "Developers Group",
 						Group: &models.Group{
@@ -337,7 +286,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 							Email: "developers@example.com",
 						},
 					},
-					"admins": {
+					{
 						ID:    "admins",
 						Label: "Admins Group",
 						Group: &models.Group{
@@ -360,8 +309,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 			identityType: IdentityTypeAll,
 			filter:       nil,
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe",
 						User: &models.User{
@@ -371,8 +320,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 						},
 					},
 				}),
-				"okta": NewMockIdentityProvider("okta", map[string]models.Identity{
-					"jane@example.com": {
+				"okta": NewMockIdentityProvider("okta", []models.Identity{
+					{
 						ID:    "jane@example.com",
 						Label: "Jane Doe",
 						User: &models.User{
@@ -396,8 +345,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 			identityType: IdentityTypeUser,
 			filter:       nil,
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"john@example.com": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe (GSuite)",
 						User: &models.User{
@@ -407,8 +356,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 						},
 					},
 				}),
-				"okta": NewMockIdentityProvider("okta", map[string]models.Identity{
-					"john@example.com": {
+				"okta": NewMockIdentityProvider("okta", []models.Identity{
+					{
 						ID:    "john@example.com",
 						Label: "John Doe (Okta)",
 						User: &models.User{
@@ -469,10 +418,10 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 				Name:  "Admin User",
 			},
 			identityType: IdentityTypeGroup,
-			filter:       []string{"dev*"},
+			filter:       []string{"dev"},
 			providers: map[string]*MockIdentityProvider{
-				"gsuite": NewMockIdentityProvider("gsuite", map[string]models.Identity{
-					"developers": {
+				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
+					{
 						ID:    "developers",
 						Label: "Developers Group",
 						Group: &models.Group{
@@ -480,7 +429,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 							Email: "developers@example.com",
 						},
 					},
-					"admins": {
+					{
 						ID:    "admins",
 						Label: "Admins Group",
 						Group: &models.Group{
@@ -521,7 +470,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 
 			if tt.expectError {
 				require.Error(t, err)
-				if tt.errorContains != "" {
+				if len(tt.errorContains) != 0 {
 					assert.Contains(t, err.Error(), tt.errorContains)
 				}
 				return
@@ -540,14 +489,29 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 	}
 }
 
+// SpyIdentityProvider wraps MockIdentityProvider to record calls
+type SpyIdentityProvider struct {
+	*MockIdentityProvider
+	mu        *sync.Mutex
+	callOrder *[]string
+	name      string
+}
+
+func (s *SpyIdentityProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
+	s.mu.Lock()
+	*s.callOrder = append(*s.callOrder, s.name)
+	s.mu.Unlock()
+	return s.MockIdentityProvider.ListIdentities(ctx, filters...)
+}
+
 // TestGetIdentitiesWithFilter_ConcurrentProviders tests that multiple providers are queried in parallel
 func TestGetIdentitiesWithFilter_ConcurrentProviders(t *testing.T) {
 	var callOrder []string
 	var mu sync.Mutex
 
 	// Create providers that record their call order
-	provider1 := NewMockIdentityProvider("provider1", map[string]models.Identity{
-		"user1@example.com": {
+	p1 := NewMockIdentityProvider("provider1", []models.Identity{
+		{
 			ID:    "user1@example.com",
 			Label: "User 1",
 			User: &models.User{
@@ -556,24 +520,15 @@ func TestGetIdentitiesWithFilter_ConcurrentProviders(t *testing.T) {
 			},
 		},
 	})
-	provider1.listFunc = func(ctx context.Context, filters ...string) ([]Identity, error) {
-		mu.Lock()
-		callOrder = append(callOrder, "provider1")
-		mu.Unlock()
-		return []models.Identity{
-			{
-				ID:    "user1@example.com",
-				Label: "User 1",
-				User: &models.User{
-					Email:    "user1@example.com",
-					Username: "user1",
-				},
-			},
-		}, nil
+	provider1 := &SpyIdentityProvider{
+		MockIdentityProvider: p1,
+		mu:                   &mu,
+		callOrder:            &callOrder,
+		name:                 "provider1",
 	}
 
-	provider2 := NewMockIdentityProvider("provider2", map[string]models.Identity{
-		"user2@example.com": {
+	p2 := NewMockIdentityProvider("provider2", []models.Identity{
+		{
 			ID:    "user2@example.com",
 			Label: "User 2",
 			User: &models.User{
@@ -582,24 +537,15 @@ func TestGetIdentitiesWithFilter_ConcurrentProviders(t *testing.T) {
 			},
 		},
 	})
-	provider2.listFunc = func(ctx context.Context, filters ...string) ([]Identity, error) {
-		mu.Lock()
-		callOrder = append(callOrder, "provider2")
-		mu.Unlock()
-		return []models.Identity{
-			{
-				ID:    "user2@example.com",
-				Label: "User 2",
-				User: &models.User{
-					Email:    "user2@example.com",
-					Username: "user2",
-				},
-			},
-		}, nil
+	provider2 := &SpyIdentityProvider{
+		MockIdentityProvider: p2,
+		mu:                   &mu,
+		callOrder:            &callOrder,
+		name:                 "provider2",
 	}
 
-	provider3 := NewMockIdentityProvider("provider3", map[string]models.Identity{
-		"user3@example.com": {
+	p3 := NewMockIdentityProvider("provider3", []models.Identity{
+		{
 			ID:    "user3@example.com",
 			Label: "User 3",
 			User: &models.User{
@@ -608,20 +554,11 @@ func TestGetIdentitiesWithFilter_ConcurrentProviders(t *testing.T) {
 			},
 		},
 	})
-	provider3.listFunc = func(ctx context.Context, filters ...string) ([]Identity, error) {
-		mu.Lock()
-		callOrder = append(callOrder, "provider3")
-		mu.Unlock()
-		return []models.Identity{
-			{
-				ID:    "user3@example.com",
-				Label: "User 3",
-				User: &models.User{
-					Email:    "user3@example.com",
-					Username: "user3",
-				},
-			},
-		}, nil
+	provider3 := &SpyIdentityProvider{
+		MockIdentityProvider: p3,
+		mu:                   &mu,
+		callOrder:            &callOrder,
+		name:                 "provider3",
 	}
 
 	config := &Config{
@@ -630,20 +567,20 @@ func TestGetIdentitiesWithFilter_ConcurrentProviders(t *testing.T) {
 		},
 	}
 
-	for name, mockProvider := range map[string]*MockIdentityProvider{
-		"provider1": provider1,
-		"provider2": provider2,
-		"provider3": provider3,
-	} {
-		provider := models.Provider{
-			Name:        name,
-			Description: "Test provider",
-			Provider:    "mock",
-			Enabled:     true,
-		}
-		provider.SetClient(mockProvider)
-		config.Providers.Definitions[name] = provider
-	}
+	// Register providers
+	// Note: We can't easily iterate map here because we need specific spy instances
+
+	prov1 := models.Provider{Name: "provider1", Description: "Test provider", Provider: "mock", Enabled: true}
+	prov1.SetClient(provider1)
+	config.Providers.Definitions["provider1"] = prov1
+
+	prov2 := models.Provider{Name: "provider2", Description: "Test provider", Provider: "mock", Enabled: true}
+	prov2.SetClient(provider2)
+	config.Providers.Definitions["provider2"] = prov2
+
+	prov3 := models.Provider{Name: "provider3", Description: "Test provider", Provider: "mock", Enabled: true}
+	prov3.SetClient(provider3)
+	config.Providers.Definitions["provider3"] = prov3
 
 	user := &models.User{
 		Email: "admin@example.com",
@@ -660,12 +597,19 @@ func TestGetIdentitiesWithFilter_ConcurrentProviders(t *testing.T) {
 	assert.Len(t, results, 3)
 }
 
+// ErrorIdentityProvider wraps MockIdentityProvider to return errors
+type ErrorIdentityProvider struct {
+	*MockIdentityProvider
+}
+
+func (e *ErrorIdentityProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
+	return nil, fmt.Errorf("provider error")
+}
+
 // TestGetIdentitiesWithFilter_ProviderError tests handling of provider errors
 func TestGetIdentitiesWithFilter_ProviderError(t *testing.T) {
-	provider1 := NewMockIdentityProvider("provider1", map[string]models.Identity{})
-	provider1.listFunc = func(ctx context.Context, filters ...string) ([]Identity, error) {
-		return nil, fmt.Errorf("provider1 error")
-	}
+	p1 := NewMockIdentityProvider("provider1", []models.Identity{})
+	provider1 := &ErrorIdentityProvider{MockIdentityProvider: p1}
 
 	config := &Config{
 		Providers: ProviderConfig{
@@ -695,8 +639,8 @@ func TestGetIdentitiesWithFilter_ProviderError(t *testing.T) {
 
 // TestGetIdentitiesWithFilter_MixedUserAndGroup tests filtering by identity type
 func TestGetIdentitiesWithFilter_MixedUserAndGroup(t *testing.T) {
-	provider := NewMockIdentityProvider("mixed", map[string]models.Identity{
-		"user1@example.com": {
+	provider := NewMockIdentityProvider("mixed", []models.Identity{
+		{
 			ID:    "user1@example.com",
 			Label: "User 1",
 			User: &models.User{
@@ -704,7 +648,7 @@ func TestGetIdentitiesWithFilter_MixedUserAndGroup(t *testing.T) {
 				Username: "user1",
 			},
 		},
-		"user2@example.com": {
+		{
 			ID:    "user2@example.com",
 			Label: "User 2",
 			User: &models.User{
@@ -712,7 +656,7 @@ func TestGetIdentitiesWithFilter_MixedUserAndGroup(t *testing.T) {
 				Username: "user2",
 			},
 		},
-		"developers": {
+		{
 			ID:    "developers",
 			Label: "Developers",
 			Group: &models.Group{
@@ -720,7 +664,7 @@ func TestGetIdentitiesWithFilter_MixedUserAndGroup(t *testing.T) {
 				Email: "developers@example.com",
 			},
 		},
-		"admins": {
+		{
 			ID:    "admins",
 			Label: "Admins",
 			Group: &models.Group{
@@ -895,8 +839,8 @@ func TestGetIdentity_ProviderPrefixFormat(t *testing.T) {
 func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 	// Create 3 providers that all return the same user
 	providers := map[string]*MockIdentityProvider{
-		"provider1": NewMockIdentityProvider("provider1", map[string]models.Identity{
-			"shared@example.com": {
+		"provider1": NewMockIdentityProvider("provider1", []models.Identity{
+			{
 				ID:    "shared@example.com",
 				Label: "Shared User (P1)",
 				User: &models.User{
@@ -905,7 +849,7 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 					Name:     "Shared User",
 				},
 			},
-			"unique1@example.com": {
+			{
 				ID:    "unique1@example.com",
 				Label: "Unique User 1",
 				User: &models.User{
@@ -915,8 +859,8 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 				},
 			},
 		}),
-		"provider2": NewMockIdentityProvider("provider2", map[string]models.Identity{
-			"shared@example.com": {
+		"provider2": NewMockIdentityProvider("provider2", []models.Identity{
+			{
 				ID:    "shared@example.com",
 				Label: "Shared User (P2)",
 				User: &models.User{
@@ -925,7 +869,7 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 					Name:     "Shared User",
 				},
 			},
-			"unique2@example.com": {
+			{
 				ID:    "unique2@example.com",
 				Label: "Unique User 2",
 				User: &models.User{
@@ -935,8 +879,8 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 				},
 			},
 		}),
-		"provider3": NewMockIdentityProvider("provider3", map[string]models.Identity{
-			"shared@example.com": {
+		"provider3": NewMockIdentityProvider("provider3", []models.Identity{
+			{
 				ID:    "shared@example.com",
 				Label: "Shared User (P3)",
 				User: &models.User{
@@ -945,7 +889,7 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 					Name:     "Shared User",
 				},
 			},
-			"unique3@example.com": {
+			{
 				ID:    "unique3@example.com",
 				Label: "Unique User 3",
 				User: &models.User{
@@ -1015,7 +959,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 
 	t.Run("user returned when provider returns empty results - IdentityTypeUser", func(t *testing.T) {
 		// Provider returns no results
-		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+		provider := NewMockIdentityProvider("test", []models.Identity{})
 
 		config := &Config{
 			Providers: ProviderConfig{
@@ -1041,7 +985,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 
 	t.Run("user returned when provider returns empty results - IdentityTypeAll", func(t *testing.T) {
 		// Provider returns no results
-		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+		provider := NewMockIdentityProvider("test", []models.Identity{})
 
 		config := &Config{
 			Providers: ProviderConfig{
@@ -1066,8 +1010,8 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 	})
 
 	t.Run("user NOT returned when provider has results", func(t *testing.T) {
-		provider := NewMockIdentityProvider("test", map[string]models.Identity{
-			"other@example.com": {
+		provider := NewMockIdentityProvider("test", []models.Identity{
+			{
 				ID:    "other@example.com",
 				Label: "Other User",
 				User: &models.User{
@@ -1100,7 +1044,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 	})
 
 	t.Run("user NOT returned when IdentityTypeGroup even with empty results", func(t *testing.T) {
-		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+		provider := NewMockIdentityProvider("test", []models.Identity{})
 
 		config := &Config{
 			Providers: ProviderConfig{
@@ -1124,7 +1068,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 	})
 
 	t.Run("user NOT returned when filter is provided even with empty results", func(t *testing.T) {
-		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+		provider := NewMockIdentityProvider("test", []models.Identity{})
 
 		config := &Config{
 			Providers: ProviderConfig{
@@ -1148,7 +1092,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 	})
 
 	t.Run("user returned when filter is empty string", func(t *testing.T) {
-		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+		provider := NewMockIdentityProvider("test", []models.Identity{})
 
 		config := &Config{
 			Providers: ProviderConfig{
@@ -1174,7 +1118,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 	})
 
 	t.Run("nil user - no fallback, empty results", func(t *testing.T) {
-		provider := NewMockIdentityProvider("test", map[string]models.Identity{})
+		provider := NewMockIdentityProvider("test", []models.Identity{})
 
 		config := &Config{
 			Providers: ProviderConfig{
@@ -1202,17 +1146,17 @@ func BenchmarkGetIdentitiesWithFilter_MultipleProviders(b *testing.B) {
 	// Create providers with many identities
 	providers := make(map[string]*MockIdentityProvider)
 	for i := 0; i < 5; i++ {
-		identities := make(map[string]models.Identity)
+		identities := make([]models.Identity, 0, 100)
 		for j := 0; j < 100; j++ {
 			id := fmt.Sprintf("user%d-%d@example.com", i, j)
-			identities[id] = models.Identity{
+			identities = append(identities, models.Identity{
 				ID:    id,
 				Label: fmt.Sprintf("User %d-%d", i, j),
 				User: &models.User{
 					Email:    id,
 					Username: fmt.Sprintf("user%d-%d", i, j),
 				},
-			}
+			})
 		}
 		providers[fmt.Sprintf("provider%d", i)] = NewMockIdentityProvider(fmt.Sprintf("provider%d", i), identities)
 	}

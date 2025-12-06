@@ -427,7 +427,7 @@ func normalizeHostname(loginServer string) string {
 	// Check if it looks like a URL (contains ://)
 	if strings.Contains(loginServer, "://") {
 		parsed, err := url.Parse(loginServer)
-		if err == nil && parsed.Hostname() != "" {
+		if err == nil && len(parsed.Hostname()) != 0 {
 			return parsed.Hostname()
 		}
 	}

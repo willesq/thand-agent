@@ -2,6 +2,7 @@ package data
 
 import (
 	_ "embed"
+	"fmt"
 	"sync"
 
 	"github.com/thand-io/agent/internal/data/iam-dataset/generated/aws"
@@ -21,12 +22,14 @@ var (
 
 // GetParsedAwsDocs returns the pre-parsed AWS docs map from FlatBuffer
 func GetParsedAwsDocs() (map[string]string, error) {
+	fmt.Println("DEBUG: GetParsedAwsDocs called")
 	awsDocsOnce.Do(func() {
 
 		parsedAwsDocs = make(map[string]string)
 
 		// Parse FlatBuffer
 		permissionsList := aws.GetRootAsPermissionsList(awsDocsFb, 0)
+		fmt.Printf("DEBUG: PermissionsLength: %d\n", permissionsList.PermissionsLength())
 
 		// Extract permissions
 		for i := 0; i < permissionsList.PermissionsLength(); i++ {
@@ -38,6 +41,7 @@ func GetParsedAwsDocs() (map[string]string, error) {
 			}
 		}
 	})
+	fmt.Printf("DEBUG: parsedAwsDocs len: %d\n", len(parsedAwsDocs))
 	return parsedAwsDocs, awsDocsErr
 }
 

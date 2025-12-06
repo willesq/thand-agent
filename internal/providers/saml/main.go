@@ -38,8 +38,9 @@ type SAMLConfig struct {
 	SignRequests   bool   `yaml:"sign_requests" json:"sign_requests"`
 }
 
-func (p *samlProvider) Initialize(provider models.Provider) error {
+func (p *samlProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityAuthorizer,
 	)

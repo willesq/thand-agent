@@ -1,0 +1,115 @@
+package github
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/go-github/v57/github"
+	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/models"
+	"golang.org/x/oauth2"
+)
+
+func (p *githubProvider) CanSynchronizeUsers() bool {
+	return true
+}
+
+// Sync fetches and caches user and team identities from GitHub
+func (p *githubProvider) SynchronizeUsers(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Refreshed GitHub identities in %s", elapsed)
+	}()
+
+	config := p.GetConfig()
+	orgName, found := config.GetString("organization")
+	if !found || len(orgName) == 0 {
+		logrus.Warn("GitHub provider configuration missing 'organization', cannot fetch identities")
+		return nil, fmt.Errorf("missing required GitHub configuration: organization")
+	}
+
+	token, foundToken := config.GetString("token")
+	if !foundToken || len(strings.TrimSpace(token)) == 0 {
+		return nil, fmt.Errorf("GitHub token is missing or invalid in configuration")
+	}
+
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+
+	var identities []models.Identity
+	opts := &github.ListMembersOptions{
+		ListOptions: github.ListOptions{
+			Page:    req.Pagination.Page,
+			PerPage: req.Pagination.PageSize,
+		},
+	}
+
+	members, resp, err := client.Organizations.ListMembers(ctx, orgName, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch organization members: %w", err)
+	}
+
+	for _, member := range members {
+		if member == nil {
+			continue
+		}
+
+		// Extract user details
+		login := member.GetLogin()
+		id := member.GetID()
+
+		if len(login) == 0 || id == 0 {
+			continue
+		}
+
+		// Fetch full user details to get email
+		// Note: This might hit rate limits for large organizations
+		// fullUser, _, err := client.Users.Get(ctx, login)
+		// if err != nil {
+		//	logrus.Warnf("Failed to fetch user details for %s: %v", login, err)
+		// } else {
+		//	member = fullUser
+		//}
+
+		userId := fmt.Sprintf("%d", id)
+
+		user := &models.User{
+			ID:       userId,
+			Username: login,
+			Email:    member.GetEmail(),
+			Source:   "github",
+		}
+
+		identity := models.Identity{
+			ID:    userId,
+			Label: login,
+			User:  user,
+		}
+		identities = append(identities, identity)
+	}
+
+	response := models.SynchronizeUsersResponse{
+		Identities: identities,
+	}
+
+	if resp.NextPage != 0 {
+		response.Pagination = &models.PaginationOptions{
+			Page:     resp.NextPage,
+			PageSize: req.Pagination.PageSize,
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"count": len(identities),
+		"org":   orgName,
+	}).Debug("Refreshed GitHub identities")
+
+	return &response, nil
+}

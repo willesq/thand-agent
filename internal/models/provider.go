@@ -1,11 +1,11 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -145,18 +145,34 @@ These permissions, along with access to specific resources (e.g., "company finan
 
 // Interface for provider implementations
 type ProviderImpl interface {
-	Initialize(provider Provider) error
+	Initialize(identifier string, provider Provider) error
 
 	// Form base provider
 	GetConfig() *BasicConfig
+	GetIdentifier() string // This is the global unique identifier for the provider. This is the provider key in the config
 	GetName() string
 	GetDescription() string
 	GetProvider() string
+
+	Synchronize(ctx context.Context, temporalClient TemporalImpl) error
+
+	// Temporal
+	RegisterWorkflows(temporalClient TemporalImpl) error
+	RegisterActivities(temporalClient TemporalImpl) error
 
 	GetCapabilities() []ProviderCapability
 	HasCapability(capability ProviderCapability) bool
 	HasAnyCapability(capabilities ...ProviderCapability) bool
 
+	// Let us know what this provider can synchronize
+	CanSynchronizeRoles() bool
+	CanSynchronizePermissions() bool
+	CanSynchronizeResources() bool
+	CanSynchronizeIdentities() bool
+	CanSynchronizeUsers() bool
+	CanSynchronizeGroups() bool
+
+	// Sub-interfaces
 	ProviderNotifier
 	ProviderAuthorizor
 	ProviderRoleBasedAccessControl
@@ -189,67 +205,6 @@ func (r *RoleRequest) GetRole() *Role {
 
 func (r *RoleRequest) GetDuration() *time.Duration {
 	return r.Duration
-}
-
-type BaseProvider struct {
-	provider     Provider
-	capabilities []ProviderCapability
-}
-
-func NewBaseProvider(provider Provider, capabilities ...ProviderCapability) *BaseProvider {
-	return &BaseProvider{
-		provider:     provider,
-		capabilities: capabilities,
-	}
-}
-
-func (p *BaseProvider) GetConfig() *BasicConfig {
-	return p.provider.Config
-}
-
-func (p *BaseProvider) SetConfig(config *BasicConfig) {
-	p.provider.Config = config
-}
-
-func (p *BaseProvider) GetName() string {
-	return p.provider.Name
-}
-
-func (p *BaseProvider) GetDescription() string {
-	return p.provider.Description
-}
-
-func (p *BaseProvider) GetProvider() string {
-	return p.provider.Provider
-}
-
-func (p *BaseProvider) GetCapabilities() []ProviderCapability {
-	return p.capabilities
-}
-
-func (p *BaseProvider) HasCapability(capability ProviderCapability) bool {
-	return slices.Contains(p.capabilities, capability)
-}
-
-func (p *BaseProvider) HasAnyCapability(capabilities ...ProviderCapability) bool {
-	return slices.ContainsFunc(capabilities, p.HasCapability)
-}
-
-func (p *BaseProvider) EnableCapability(capability ProviderCapability) {
-	if !p.HasCapability(capability) {
-		p.capabilities = append(p.capabilities, capability)
-	}
-}
-
-func (p *BaseProvider) DisableCapability(capability ProviderCapability) {
-	p.capabilities = slices.DeleteFunc(p.capabilities, func(c ProviderCapability) bool {
-		return c == capability
-	})
-}
-
-func (p *BaseProvider) Initialize(provider Provider) error {
-	// Initialize the provider
-	return nil
 }
 
 // ProviderDefinitions represents a collection of provider configurations loaded from a file or other source.

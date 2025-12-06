@@ -3,10 +3,10 @@ package okta
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/okta/okta-sdk-golang/v2/okta"
+	"github.com/okta/okta-sdk-golang/v2/okta/query"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -25,55 +25,63 @@ type OktaApplication interface {
 	GetStatus() string
 }
 
-// LoadResources loads Okta resources (applications) from the API
-// TODO: if you're adding any new resource types, then break this into separate methods
-func (p *oktaProvider) LoadResources(ctx context.Context) error {
+func (p *oktaProvider) CanSynchronizeResources() bool {
+	return true
+}
+
+// SynchronizeResources loads Okta resources (applications) from the API
+func (p *oktaProvider) SynchronizeResources(ctx context.Context, req models.SynchronizeResourcesRequest) (*models.SynchronizeResourcesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
 		logrus.Debugf("Loaded Okta resources in %s", elapsed)
 	}()
 
-	var resourcesData []models.ProviderResource
-	resourcesMap := make(map[string]*models.ProviderResource)
+	if req.Pagination == nil {
+		req.Pagination = &models.PaginationOptions{
+			PageSize: 100,
+		}
+	}
 
 	// Load applications
-	appResources, err := p.loadApplicationResources(ctx)
+	appResources, nextPageToken, err := p.loadApplicationResources(ctx, req.Pagination)
 	if err != nil {
-		return fmt.Errorf("failed to load application resources: %w", err)
-	}
-	resourcesData = append(resourcesData, appResources...)
-
-	// Build the resource map
-	for i := range resourcesData {
-		resource := &resourcesData[i]
-		// Map by type:name (lowercase)
-		resourcesMap[fmt.Sprintf("%s:%s", resource.Type, strings.ToLower(resource.Name))] = resource
-		// Map by type:id (lowercase)
-		resourcesMap[fmt.Sprintf("%s:%s", resource.Type, strings.ToLower(resource.Id))] = resource
-		// Also map by name alone
-		resourcesMap[strings.ToLower(resource.Name)] = resource
-		// And by ID alone
-		resourcesMap[strings.ToLower(resource.Id)] = resource
+		return nil, fmt.Errorf("failed to load application resources: %w", err)
 	}
 
-	p.resources = resourcesData
-	p.resourcesMap = resourcesMap
+	response := models.SynchronizeResourcesResponse{
+		Resources: appResources,
+	}
+
+	if len(nextPageToken) != 0 {
+		response.Pagination = &models.PaginationOptions{
+			Token:    nextPageToken,
+			PageSize: req.Pagination.PageSize,
+		}
+	}
 
 	logrus.WithFields(logrus.Fields{
-		"resources":    len(resourcesData),
-		"applications": len(appResources),
+		"resources": len(appResources),
 	}).Debug("Loaded Okta resources")
 
-	return nil
+	return &response, nil
 }
 
 // loadApplicationResources loads application resources from the Okta API
 // and stores full application details in the Resource field for later use
-func (p *oktaProvider) loadApplicationResources(ctx context.Context) ([]models.ProviderResource, error) {
-	apps, _, err := p.client.Application.ListApplications(ctx, nil)
+func (p *oktaProvider) loadApplicationResources(ctx context.Context, pagination *models.PaginationOptions) ([]models.ProviderResource, string, error) {
+
+	queryParams := &query.Params{
+		Limit: int64(pagination.PageSize),
+	}
+
+	if len(pagination.Token) != 0 {
+		queryParams.After = pagination.Token
+	}
+
+	apps, resp, err := p.client.Application.ListApplications(ctx, queryParams)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list applications: %w", err)
+		return nil, "", fmt.Errorf("failed to list applications: %w", err)
 	}
 
 	var resources []models.ProviderResource
@@ -91,40 +99,5 @@ func (p *oktaProvider) loadApplicationResources(ctx context.Context) ([]models.P
 		}
 	}
 
-	return resources, nil
-}
-
-// GetResource retrieves a specific resource by name or ID
-func (p *oktaProvider) GetResource(ctx context.Context, resource string) (*models.ProviderResource, error) {
-	resourceKey := strings.ToLower(resource)
-
-	// Try lookup by name or ID
-	if r, exists := p.resourcesMap[resourceKey]; exists {
-		return r, nil
-	}
-
-	return nil, fmt.Errorf("resource not found: %s", resource)
-}
-
-// ListResources lists all resources, optionally filtered by search terms
-func (p *oktaProvider) ListResources(ctx context.Context, filters ...string) ([]models.ProviderResource, error) {
-	// If no filters, return all resources
-	if len(filters) == 0 {
-		return p.resources, nil
-	}
-
-	// Fallback to simple substring filtering
-	var filtered []models.ProviderResource
-	filterText := strings.ToLower(strings.Join(filters, " "))
-
-	for _, resource := range p.resources {
-		// Check if any filter matches the resource name, type, or description
-		if strings.Contains(strings.ToLower(resource.Name), filterText) ||
-			strings.Contains(strings.ToLower(resource.Type), filterText) ||
-			strings.Contains(strings.ToLower(resource.Description), filterText) {
-			filtered = append(filtered, resource)
-		}
-	}
-
-	return filtered, nil
+	return resources, resp.NextPage, nil
 }

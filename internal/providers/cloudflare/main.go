@@ -3,9 +3,7 @@ package cloudflare
 import (
 	"context"
 	"fmt"
-	"sync"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/cloudflare/cloudflare-go"
 	"github.com/sirupsen/logrus"
 
@@ -20,26 +18,11 @@ type cloudflareProvider struct {
 	*models.BaseProvider
 	client    *cloudflare.API
 	accountID string
-
-	// permissions      []models.ProviderPermission
-	// permissionsMap   map[string]*models.ProviderPermission
-	// permissionsIndex bleve.Index
-
-	roles      []models.ProviderRole
-	rolesMap   map[string]*models.ProviderRole
-	rolesIndex bleve.Index
-
-	resources    []models.ProviderResource
-	resourcesMap map[string]*models.ProviderResource
-
-	identities    []models.Identity
-	identitiesMap map[string]*models.Identity
-
-	indexMu sync.RWMutex
 }
 
-func (p *cloudflareProvider) Initialize(provider models.Provider) error {
+func (p *cloudflareProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 	)
@@ -56,26 +39,11 @@ func (p *cloudflareProvider) Initialize(provider models.Provider) error {
 	p.client = client
 	p.accountID = accountID
 
-	// Load Cloudflare Roles
-	err = p.LoadRoles(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
-
 	// Once the roles are loaded use the roles to create the permissions reference
 	// err = p.LoadPermissions()
 	// if err != nil {
 	// 	return fmt.Errorf("failed to load permissions: %w", err)
 	// }
-
-	// Load Cloudflare Resources (zones, etc.)
-	err = p.LoadResources(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to load resources: %w", err)
-	}
-
-	// Start background indexing
-	go p.buildSearchIndex()
 
 	logrus.WithFields(logrus.Fields{
 		"provider":   CloudflareProviderName,

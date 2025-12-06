@@ -183,7 +183,7 @@ func TestAWSProviderFunctional(t *testing.T) {
 		require.NoError(t, err, "Failed to get AWS provider from registry")
 
 		// Initialize the provider
-		err = providerImpl.Initialize(*providerConfig)
+		err = providerImpl.Initialize("aws", *providerConfig)
 		require.NoError(t, err, "Failed to initialize AWS provider")
 
 		// Verify provider is properly initialized
@@ -197,7 +197,7 @@ func TestAWSProviderFunctional(t *testing.T) {
 		require.NoError(t, err, "Failed to get AWS provider from registry")
 
 		// Initialize the provider
-		err = providerImpl.Initialize(*providerConfig)
+		err = providerImpl.Initialize("aws", *providerConfig)
 		require.NoError(t, err, "Failed to initialize AWS provider")
 
 		// Get IAM client from the provider using any and reflection
@@ -285,7 +285,7 @@ func TestAWSProviderFunctional(t *testing.T) {
 	t.Run("Role Authorization with Missing User", func(t *testing.T) {
 		providerImpl, err := providers.Get("aws")
 		require.NoError(t, err)
-		err = providerImpl.Initialize(*providerConfig)
+		err = providerImpl.Initialize("aws", *providerConfig)
 		require.NoError(t, err)
 
 		// Test with nil user - should return an error, not panic
@@ -303,7 +303,7 @@ func TestAWSProviderFunctional(t *testing.T) {
 	t.Run("Role Authorization with Missing Role", func(t *testing.T) {
 		providerImpl, err := providers.Get("aws")
 		require.NoError(t, err)
-		err = providerImpl.Initialize(*providerConfig)
+		err = providerImpl.Initialize("aws", *providerConfig)
 		require.NoError(t, err)
 
 		// Test with nil role - should return an error, not panic

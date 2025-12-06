@@ -3,9 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
-	"sync"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
 
 	"github.com/thand-io/agent/internal/common"
@@ -33,51 +31,14 @@ type awsProvider struct {
 	stsService          *sts.Client
 	ssoAdminService     *ssoadmin.Client
 	identityStoreClient *identitystore.Client
-
-	permissions      []models.ProviderPermission
-	permissionsMap   map[string]*models.ProviderPermission
-	permissionsIndex bleve.Index
-
-	roles      []models.ProviderRole
-	rolesMap   map[string]*models.ProviderRole
-	rolesIndex bleve.Index
-
-	indexMu sync.RWMutex
 }
 
-func (p *awsProvider) Initialize(provider models.Provider) error {
+func (p *awsProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 	)
-
-	// Load AWS Permissions and Roles from shared singleton
-	data, err := getSharedData()
-	if err != nil {
-		return fmt.Errorf("failed to load shared AWS data: %w", err)
-	}
-
-	p.permissions = data.permissions
-	p.permissionsMap = data.permissionsMap
-	p.roles = data.roles
-	p.rolesMap = data.rolesMap
-
-	// Assign indices if ready, otherwise wait in background
-	select {
-	case <-data.indexReady:
-		p.indexMu.Lock()
-		p.permissionsIndex = data.permissionsIndex
-		p.rolesIndex = data.rolesIndex
-		p.indexMu.Unlock()
-	default:
-		go func() {
-			<-data.indexReady
-			p.indexMu.Lock()
-			p.permissionsIndex = data.permissionsIndex
-			p.rolesIndex = data.rolesIndex
-			p.indexMu.Unlock()
-		}()
-	}
 
 	// Right lets figure out how to initialize the AWS SDK
 	awsConfig := p.GetConfig()

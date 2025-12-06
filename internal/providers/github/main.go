@@ -1,9 +1,7 @@
 package github
 
 import (
-	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -21,12 +19,6 @@ type githubProvider struct {
 	*models.BaseProvider
 	client      *pkg.Client
 	oauthClient *oauth2.Config
-	permissions []models.ProviderPermission
-	roles       []models.ProviderRole
-
-	identities    []models.Identity
-	identitiesMap map[string]*models.Identity
-	indexMu       sync.RWMutex
 }
 
 // GitHubUser represents the GitHub user response
@@ -45,9 +37,10 @@ type GitHubTokenResponse struct {
 	Scope       string `json:"scope"`
 }
 
-func (p *githubProvider) Initialize(provider models.Provider) error {
+func (p *githubProvider) Initialize(identifier string, provider models.Provider) error {
 
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityAuthorizer,
 		models.ProviderCapabilityRBAC,
@@ -104,16 +97,6 @@ func (p *githubProvider) Initialize(provider models.Provider) error {
 		logrus.Debugln("GitHub OAuth client_id or client_secret not provided; skipping OAuth setup")
 		p.DisableCapability(models.ProviderCapabilityAuthorizer)
 	}
-
-	p.permissions = GitHubPermissions
-	p.roles = GitHubRoles
-
-	// Refresh identities in background
-	go func() {
-		if err := p.RefreshIdentities(context.Background()); err != nil {
-			logrus.Warnf("Failed to refresh GitHub identities: %v", err)
-		}
-	}()
 
 	return nil
 }

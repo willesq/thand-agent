@@ -11,8 +11,12 @@ import (
 	"google.golang.org/api/cloudresourcemanager/v1"
 )
 
-// RefreshIdentities fetches and caches user and group identities from GCP IAM
-func (p *gcpProvider) RefreshIdentities(ctx context.Context) error {
+func (p *gcpProvider) CanSynchronizeIdentities() bool {
+	return true
+}
+
+// SynchronizeIdentities fetches and caches user and group identities from GCP IAM
+func (p *gcpProvider) SynchronizeIdentities(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
@@ -28,11 +32,10 @@ func (p *gcpProvider) RefreshIdentities(ctx context.Context) error {
 		},
 	}).Do()
 	if err != nil {
-		return fmt.Errorf("failed to get IAM policy: %w", err)
+		return nil, fmt.Errorf("failed to get IAM policy: %w", err)
 	}
 
 	var identities []models.Identity
-	identitiesMap := make(map[string]*models.Identity)
 	memberSet := make(map[string]bool) // To deduplicate members across bindings
 
 	var userCount, groupCount int
@@ -61,36 +64,6 @@ func (p *gcpProvider) RefreshIdentities(ctx context.Context) error {
 		}
 	}
 
-	// Build the identities map
-	for i := range identities {
-
-		identity := &identities[i]
-
-		// Map by ID (lowercase)
-		identitiesMap[strings.ToLower(identity.ID)] = identity
-		// Map by label (lowercase)
-		identitiesMap[strings.ToLower(identity.Label)] = identity
-
-		// For users, also map by email
-		if identity.User != nil && len(identity.User.Email) != 0 {
-			identitiesMap[strings.ToLower(identity.User.Email)] = identity
-		}
-		// For groups, also map by name/email
-		if identity.Group != nil {
-			if len(identity.Group.Name) != 0 {
-				identitiesMap[strings.ToLower(identity.Group.Name)] = identity
-			}
-			if len(identity.Group.Email) != 0 {
-				identitiesMap[strings.ToLower(identity.Group.Email)] = identity
-			}
-		}
-	}
-
-	p.indexMu.Lock()
-	p.identities = identities
-	p.identitiesMap = identitiesMap
-	p.indexMu.Unlock()
-
 	logrus.WithFields(logrus.Fields{
 		"users":      userCount,
 		"groups":     groupCount,
@@ -98,7 +71,9 @@ func (p *gcpProvider) RefreshIdentities(ctx context.Context) error {
 		"project_id": projectId,
 	}).Debug("Refreshed GCP identities from IAM policy")
 
-	return nil
+	return &models.SynchronizeUsersResponse{
+		Identities: identities,
+	}, nil
 }
 
 // parseMemberToIdentity converts a GCP IAM member string to an Identity
@@ -177,67 +152,4 @@ func extractNameFromEmail(email string) string {
 	}
 
 	return strings.Join(words, " ")
-}
-
-// GetIdentity retrieves a specific identity (user or group) from GCP
-func (p *gcpProvider) GetIdentity(ctx context.Context, identity string) (*models.Identity, error) {
-	// Try to get from cache first
-	p.indexMu.RLock()
-	identitiesMap := p.identitiesMap
-	p.indexMu.RUnlock()
-
-	if identitiesMap != nil {
-		if id, exists := identitiesMap[strings.ToLower(identity)]; exists {
-			return id, nil
-		}
-	}
-
-	// If not in cache, refresh and try again
-	if err := p.RefreshIdentities(ctx); err != nil {
-		return nil, fmt.Errorf("failed to refresh identities: %w", err)
-	}
-
-	p.indexMu.RLock()
-	defer p.indexMu.RUnlock()
-
-	if id, exists := p.identitiesMap[strings.ToLower(identity)]; exists {
-		return id, nil
-	}
-
-	return nil, fmt.Errorf("identity not found: %s", identity)
-}
-
-// ListIdentities lists all identities (users and groups) from GCP IAM
-func (p *gcpProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
-	// Ensure we have fresh data
-	if err := p.RefreshIdentities(ctx); err != nil {
-		return nil, fmt.Errorf("failed to refresh identities: %w", err)
-	}
-
-	p.indexMu.RLock()
-	identities := p.identities
-	p.indexMu.RUnlock()
-
-	// If no filters, return all identities
-	if len(filters) == 0 {
-		return identities, nil
-	}
-
-	// Apply filters
-	var filtered []models.Identity
-	filterText := strings.ToLower(strings.Join(filters, " "))
-
-	for _, identity := range identities {
-		// Check if any filter matches the identity
-		if strings.Contains(strings.ToLower(identity.Label), filterText) ||
-			strings.Contains(strings.ToLower(identity.ID), filterText) ||
-			(identity.User != nil && strings.Contains(strings.ToLower(identity.User.Email), filterText)) ||
-			(identity.User != nil && strings.Contains(strings.ToLower(identity.User.Name), filterText)) ||
-			(identity.Group != nil && strings.Contains(strings.ToLower(identity.Group.Name), filterText)) ||
-			(identity.Group != nil && strings.Contains(strings.ToLower(identity.Group.Email), filterText)) {
-			filtered = append(filtered, identity)
-		}
-	}
-
-	return filtered, nil
 }

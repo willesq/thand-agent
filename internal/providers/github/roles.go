@@ -1,10 +1,6 @@
 package github
 
 import (
-	"context"
-	"fmt"
-	"strings"
-
 	"github.com/thand-io/agent/internal/models"
 )
 
@@ -48,17 +44,3 @@ var GitHubRoles = append(
 	[]models.ProviderRole{},
 	GitHubOrganisationRoles...,
 )
-
-func (p *githubProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
-	for _, r := range GitHubRoles {
-		if strings.Compare(r.Name, role) == 0 {
-			return &r, nil
-		}
-	}
-	return nil, fmt.Errorf("role not found: %s", role)
-}
-
-func (p *githubProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
-	// TODO: Implement GitHub ListRoles logic
-	return GitHubRoles, nil
-}

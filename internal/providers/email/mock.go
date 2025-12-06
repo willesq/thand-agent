@@ -167,8 +167,9 @@ func NewMockEmailProviderWithInterceptor(interceptor *MockEmailInterceptor) mode
 }
 
 // Initialize sets up the mock email provider
-func (p *emailProviderMock) Initialize(provider models.Provider) error {
+func (p *emailProviderMock) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityNotifier,
 	)

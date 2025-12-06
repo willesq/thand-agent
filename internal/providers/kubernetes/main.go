@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
 
 	"github.com/thand-io/agent/internal/models"
@@ -21,15 +20,12 @@ const KubernetesProviderName = "kubernetes"
 // kubernetesProvider implements the ProviderImpl interface for Kubernetes
 type kubernetesProvider struct {
 	*models.BaseProvider
-	client           kubernetes.Interface
-	permissions      []models.ProviderPermission
-	permissionsIndex bleve.Index
-	roles            []models.ProviderRole
-	rolesIndex       bleve.Index
+	client kubernetes.Interface
 }
 
-func (p *kubernetesProvider) Initialize(provider models.Provider) error {
+func (p *kubernetesProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 	)
@@ -46,17 +42,6 @@ func (p *kubernetesProvider) Initialize(provider models.Provider) error {
 	}
 
 	p.client = client
-
-	// Load Kubernetes permissions and roles
-	err = p.LoadPermissions()
-	if err != nil {
-		return fmt.Errorf("failed to load permissions: %w", err)
-	}
-
-	err = p.LoadRoles()
-	if err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
 
 	return nil
 }

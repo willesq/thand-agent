@@ -25,9 +25,10 @@ type emailAcsProvider struct {
 	credential         *azureProvider.AzureConfigurationProvider
 }
 
-func (p *emailAcsProvider) Initialize(provider models.Provider) error {
+func (p *emailAcsProvider) Initialize(identifier string, provider models.Provider) error {
 
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityNotifier,
 	)

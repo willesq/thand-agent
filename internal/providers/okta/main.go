@@ -3,9 +3,7 @@ package okta
 import (
 	"context"
 	"fmt"
-	"sync"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/okta/okta-sdk-golang/v2/okta"
 	"github.com/sirupsen/logrus"
 
@@ -19,25 +17,14 @@ const OktaProviderName = "okta"
 type oktaProvider struct {
 	*models.BaseProvider
 
-	client           *okta.Client
-	orgUrl           string
-	apiToken         string
-	permissions      []models.ProviderPermission
-	permissionsMap   map[string]*models.ProviderPermission
-	permissionsIndex bleve.Index
-	roles            []models.ProviderRole
-	rolesMap         map[string]*models.ProviderRole
-	rolesIndex       bleve.Index
-	resources        []models.ProviderResource
-	resourcesMap     map[string]*models.ProviderResource
-	identities       []models.Identity
-	identitiesMap    map[string]*models.Identity
-
-	indexMu sync.RWMutex
+	client   *okta.Client
+	orgUrl   string
+	apiToken string
 }
 
-func (p *oktaProvider) Initialize(provider models.Provider) error {
+func (p *oktaProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 		models.ProviderCapabilityIdentities,
@@ -66,33 +53,6 @@ func (p *oktaProvider) Initialize(provider models.Provider) error {
 		return fmt.Errorf("token is required for Okta provider")
 	}
 	p.apiToken = apiToken
-
-	// Load Okta Permissions
-	err = p.LoadPermissions()
-	if err != nil {
-		return fmt.Errorf("failed to load permissions: %w", err)
-	}
-
-	// Load Okta Roles
-	err = p.LoadRoles()
-	if err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
-
-	// Load Okta Resources (applications)
-	err = p.LoadResources(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to load resources: %w", err)
-	}
-
-	// Load Okta Identities (users and groups)
-	err = p.RefreshIdentities(context.Background())
-	if err != nil {
-		return fmt.Errorf("failed to load identities: %w", err)
-	}
-
-	// Start background indexing
-	go p.buildSearchIndex()
 
 	logrus.WithField("org_url", p.orgUrl).Info("Initialized Okta provider")
 	return nil

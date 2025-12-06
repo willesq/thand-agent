@@ -21,8 +21,9 @@ type slackProvider struct {
 	client *slack.Client
 }
 
-func (p *slackProvider) Initialize(provider models.Provider) error {
+func (p *slackProvider) Initialize(identifier string, provider models.Provider) error {
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityNotifier,
 	)

@@ -16,17 +16,17 @@ func setupBenchmarkConfig(b *testing.B, numProviders int, identitiesPerProvider 
 
 	for i := range numProviders {
 		name := fmt.Sprintf("provider-%d", i)
-		identities := make(map[string]models.Identity)
+		identities := make([]models.Identity, 0, identitiesPerProvider)
 		for j := range identitiesPerProvider {
 			id := fmt.Sprintf("user-%d-%d@example.com", i, j)
-			identities[id] = models.Identity{
+			identities = append(identities, models.Identity{
 				ID:    id,
 				Label: fmt.Sprintf("User %d %d", i, j),
 				User: &models.User{
 					Email: id,
 					Name:  fmt.Sprintf("User %d %d", i, j),
 				},
-			}
+			})
 		}
 
 		mockProvider := NewMockIdentityProvider(name, identities)

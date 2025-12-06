@@ -22,9 +22,10 @@ type emailSesProvider struct {
 	defaultFromAddress string
 }
 
-func (p *emailSesProvider) Initialize(provider models.Provider) error {
+func (p *emailSesProvider) Initialize(identifier string, provider models.Provider) error {
 
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityNotifier,
 	)

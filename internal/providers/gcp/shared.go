@@ -1,23 +1,29 @@
 package gcp
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"sync"
+	"time"
 
-	"github.com/blevesearch/bleve/v2"
+	_ "embed"
+
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/data"
 	"github.com/thand-io/agent/internal/models"
 )
 
+//go:embed permissions.json
+var gcpPermissions []byte
+
+func GetGcpPermissions() []byte {
+	return gcpPermissions
+}
+
 type gcpData struct {
-	permissions      []models.ProviderPermission
-	permissionsMap   map[string]*models.ProviderPermission
-	permissionsIndex bleve.Index
-
-	roles      []models.ProviderRole
-	rolesMap   map[string]*models.ProviderRole
-	rolesIndex bleve.Index
-
-	indexReady chan struct{}
+	permissions []models.ProviderPermission
+	roles       []models.ProviderRole
 }
 
 type gcpSingleton struct {
@@ -41,37 +47,111 @@ func getSharedData(stage string) (*gcpData, error) {
 	sharedDataMu.Unlock()
 
 	singleton.once.Do(func() {
-		data := &gcpData{
-			indexReady: make(chan struct{}),
-		}
+		data := &gcpData{}
 		var err error
 
-		data.permissions, data.permissionsMap, err = loadPermissions(stage)
+		data.permissions, err = loadPermissions(stage)
 		if err != nil {
 			singleton.err = err
 			return
 		}
 
-		data.roles, data.rolesMap, err = loadRoles(stage)
+		data.roles, err = loadRoles(stage)
 		if err != nil {
 			singleton.err = err
 			return
 		}
-
-		// Build indices in background
-		go func() {
-			defer close(data.indexReady)
-			pIdx, rIdx, err := buildIndices(data.permissions, data.roles)
-			if err != nil {
-				logrus.WithError(err).Error("Failed to build GCP search indices")
-				return
-			}
-			data.permissionsIndex = pIdx
-			data.rolesIndex = rIdx
-		}()
 
 		singleton.data = data
 	})
 
 	return singleton.data, singleton.err
+}
+
+type gcpPermissionMap []struct {
+	ApiDisabled           bool   `json:"apiDisabled,omitempty"`
+	Description           string `json:"description,omitempty"`
+	Name                  string `json:"name,omitempty"`
+	Stage                 string `json:"stage,omitempty"`
+	Title                 string `json:"title,omitempty"`
+	OnlyInPredefinedRoles bool   `json:"onlyInPredefinedRoles,omitempty"`
+}
+
+func loadPermissions(stage string) ([]models.ProviderPermission, error) {
+	var permissionMap gcpPermissionMap
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed GCP permissions in %s", elapsed)
+	}()
+
+	// Load GCP Permissions
+	if err := json.Unmarshal(GetGcpPermissions(), &permissionMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal GCP permissions: %w", err)
+	}
+
+	var permissions = make([]models.ProviderPermission, 0, len(permissionMap))
+
+	if len(stage) == 0 {
+		stage = DefaultStage
+	}
+
+	for _, perm := range permissionMap {
+
+		if perm.OnlyInPredefinedRoles {
+			continue
+		}
+
+		if !strings.EqualFold(perm.Stage, stage) {
+			continue
+		}
+
+		permission := models.ProviderPermission{
+			Name:        perm.Name,
+			Title:       perm.Title,
+			Description: perm.Description,
+		}
+
+		permissions = append(permissions, permission)
+	}
+
+	return permissions, nil
+}
+
+func loadRoles(stage string) ([]models.ProviderRole, error) {
+
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Since(startTime)
+		logrus.Debugf("Parsed GCP roles in %s", elapsed)
+	}()
+
+	// Get pre-parsed GCP roles from data package
+	predefinedRoles, err := data.GetParsedGcpRoles()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parsed GCP roles: %w", err)
+	}
+
+	var roles = make([]models.ProviderRole, 0, len(predefinedRoles))
+
+	if len(stage) == 0 {
+		stage = DefaultStage
+	}
+
+	for _, gcpRole := range predefinedRoles {
+
+		if !strings.EqualFold(gcpRole.Stage, stage) {
+			continue
+		}
+
+		role := models.ProviderRole{
+			Name:        gcpRole.Name,
+			Title:       gcpRole.Title,
+			Description: gcpRole.Description,
+		}
+		roles = append(roles, role)
+	}
+
+	return roles, nil
 }

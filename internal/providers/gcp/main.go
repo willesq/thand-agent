@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sync"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
@@ -33,24 +31,12 @@ type gcpProvider struct {
 	client    *GcpConfigurationProvider
 	iamClient *iam.Service
 	crmClient *cloudresourcemanager.Service
-
-	permissions      []models.ProviderPermission
-	permissionsIndex bleve.Index
-	permissionsMap   map[string]*models.ProviderPermission
-
-	roles      []models.ProviderRole
-	rolesIndex bleve.Index
-	rolesMap   map[string]*models.ProviderRole
-
-	identities    []models.Identity
-	identitiesMap map[string]*models.Identity
-
-	indexMu sync.RWMutex
 }
 
-func (p *gcpProvider) Initialize(provider models.Provider) error {
+func (p *gcpProvider) Initialize(identifier string, provider models.Provider) error {
 	// Set the provider to the base provider
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 		models.ProviderCapabilityIdentities,
@@ -69,35 +55,6 @@ func (p *gcpProvider) Initialize(provider models.Provider) error {
 	p.client = gcpClient
 
 	clientOptions := gcpClient.ClientOptions
-	projectStage := gcpClient.Stage
-
-	// Load GCP Permissions and Roles from shared singleton
-	data, err := getSharedData(projectStage)
-	if err != nil {
-		return fmt.Errorf("failed to load shared GCP data: %w", err)
-	}
-
-	p.permissions = data.permissions
-	p.permissionsMap = data.permissionsMap
-	p.roles = data.roles
-	p.rolesMap = data.rolesMap
-
-	// Assign indices if ready, otherwise wait in background
-	select {
-	case <-data.indexReady:
-		p.indexMu.Lock()
-		p.permissionsIndex = data.permissionsIndex
-		p.rolesIndex = data.rolesIndex
-		p.indexMu.Unlock()
-	default:
-		go func() {
-			<-data.indexReady
-			p.indexMu.Lock()
-			p.permissionsIndex = data.permissionsIndex
-			p.rolesIndex = data.rolesIndex
-			p.indexMu.Unlock()
-		}()
-	}
 
 	iamService, err := iam.NewService(ctx, clientOptions...)
 	if err != nil {
@@ -110,9 +67,6 @@ func (p *gcpProvider) Initialize(provider models.Provider) error {
 		return fmt.Errorf("failed to create Resource Manager client: %w", err)
 	}
 	p.crmClient = crmService
-
-	// Initialize identities map
-	p.identitiesMap = make(map[string]*models.Identity)
 
 	return nil
 }

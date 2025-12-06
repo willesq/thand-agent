@@ -3,13 +3,11 @@ package azure
 import (
 	_ "embed"
 	"fmt"
-	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
-	"github.com/blevesearch/bleve/v2"
 	"github.com/sirupsen/logrus"
 
 	"github.com/thand-io/agent/internal/models"
@@ -30,50 +28,15 @@ type azureProvider struct {
 	subscriptionsClient *armsubscriptions.Client
 	subscriptionID      string
 	resourceGroupName   string
-	permissions         []models.ProviderPermission
-	permissionsIndex    bleve.Index
-	permissionsMap      map[string]*models.ProviderPermission
-	roles               []models.ProviderRole
-	rolesIndex          bleve.Index
-	rolesMap            map[string]*models.ProviderRole
-
-	indexMu sync.RWMutex
 }
 
-func (p *azureProvider) Initialize(provider models.Provider) error {
+func (p *azureProvider) Initialize(identifier string, provider models.Provider) error {
 	// Set the provider to the base provider
 	p.BaseProvider = models.NewBaseProvider(
+		identifier,
 		provider,
 		models.ProviderCapabilityRBAC,
 	)
-
-	// Load Azure Permissions and Roles from shared singleton
-	data, err := getSharedData()
-	if err != nil {
-		return fmt.Errorf("failed to load shared Azure data: %w", err)
-	}
-
-	p.permissions = data.permissions
-	p.permissionsMap = data.permissionsMap
-	p.roles = data.roles
-	p.rolesMap = data.rolesMap
-
-	// Assign indices if ready, otherwise wait in background
-	select {
-	case <-data.indexReady:
-		p.indexMu.Lock()
-		p.permissionsIndex = data.permissionsIndex
-		p.rolesIndex = data.rolesIndex
-		p.indexMu.Unlock()
-	default:
-		go func() {
-			<-data.indexReady
-			p.indexMu.Lock()
-			p.permissionsIndex = data.permissionsIndex
-			p.rolesIndex = data.rolesIndex
-			p.indexMu.Unlock()
-		}()
-	}
 
 	config := p.GetConfig()
 
@@ -90,10 +53,12 @@ func (p *azureProvider) Initialize(provider models.Provider) error {
 	}
 
 	// Initialize Azure credentials using CreateAzureConfig
-	p.cred, err = CreateAzureConfig(config)
+	azureCreds, err := CreateAzureConfig(config)
 	if err != nil {
 		return fmt.Errorf("failed to create Azure credentials: %w", err)
 	}
+
+	p.cred = azureCreds
 
 	// Initialize Azure clients
 	p.authClient, err = armauthorization.NewRoleAssignmentsClient(subscriptionID, p.cred.Token, nil)
