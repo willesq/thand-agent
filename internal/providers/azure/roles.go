@@ -12,6 +12,17 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+func (p *azureProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
+	data, err := getSharedData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shared Azure data: %w", err)
+	}
+
+	return &models.SynchronizeRolesResponse{
+		Roles: data.roles,
+	}, nil
+}
+
 // getRoleDefinition retrieves a custom role definition by name
 func (p *azureProvider) getRoleDefinition(ctx context.Context, roleName string) (*armauthorization.RoleDefinition, error) {
 	scope := p.getScope()
@@ -184,15 +195,4 @@ func (p *azureProvider) getScope() string {
 		return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", p.subscriptionID, p.resourceGroupName)
 	}
 	return fmt.Sprintf("/subscriptions/%s", p.subscriptionID)
-}
-
-func (p *azureProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
-	data, err := getSharedData()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get shared Azure data: %w", err)
-	}
-
-	return &models.SynchronizeRolesResponse{
-		Roles: data.roles,
-	}, nil
 }

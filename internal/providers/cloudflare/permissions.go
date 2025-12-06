@@ -10,12 +10,12 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
-// SynchronizeRoles fetches and caches roles from Cloudflare
-func (p *cloudflareProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
+// SynchronizePermissions fetches and caches permissions from Cloudflare
+func (p *cloudflareProvider) SynchronizePermissions(ctx context.Context, req models.SynchronizePermissionsRequest) (*models.SynchronizePermissionsResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
-		logrus.Debugf("Refreshed Cloudflare roles in %s", elapsed)
+		logrus.Debugf("Refreshed Cloudflare permissions in %s", elapsed)
 	}()
 
 	accountRC := cloudflare.AccountIdentifier(p.accountID)
@@ -27,7 +27,6 @@ func (p *cloudflareProvider) SynchronizeRoles(ctx context.Context, req models.Sy
 		}
 	}
 
-	// List all account roles
 	// List account roles with pagination
 	roles, err := p.client.ListAccountRoles(ctx, accountRC, cloudflare.ListAccountRolesParams{
 		ResultInfo: cloudflare.ResultInfo{
@@ -36,27 +35,28 @@ func (p *cloudflareProvider) SynchronizeRoles(ctx context.Context, req models.Sy
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list account roles: %w", err)
+		return nil, fmt.Errorf("failed to list account permissions: %w", err)
 	}
 
-	var providerRoles []models.ProviderRole
+	var providerPermissions []models.ProviderPermission
 
 	for _, role := range roles {
-		providerRoles = append(providerRoles, models.ProviderRole{
-			Id:   role.ID,
-			Name: role.Name,
-			Role: role,
+		providerPermissions = append(providerPermissions, models.ProviderPermission{
+			Name:        role.Name,
+			Description: role.Description,
+			Permission:  role,
 		})
 	}
-	logrus.WithFields(logrus.Fields{
-		"roles": len(providerRoles),
-	}).Debug("Refreshed Cloudflare roles")
 
-	return &models.SynchronizeRolesResponse{
+	logrus.WithFields(logrus.Fields{
+		"permissions": len(providerPermissions),
+	}).Debug("Refreshed Cloudflare permissions")
+
+	return &models.SynchronizePermissionsResponse{
 		Pagination: &models.PaginationOptions{
 			Page:     req.Pagination.Page + 1,
 			PageSize: req.Pagination.PageSize,
 		},
-		Roles: providerRoles,
+		Permissions: providerPermissions,
 	}, nil
 }

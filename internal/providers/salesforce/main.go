@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/simpleforce/simpleforce"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
@@ -15,10 +14,7 @@ import (
 // salesForceProvider implements the ProviderImpl interface for Salesforce
 type salesForceProvider struct {
 	*models.BaseProvider
-	client     *simpleforce.Client
-	roles      []models.ProviderRole
-	rolesMap   map[string]*models.ProviderRole
-	rolesIndex bleve.Index
+	client *simpleforce.Client
 }
 
 func (p *salesForceProvider) Initialize(identifier string, provider models.Provider) error {
@@ -39,13 +35,13 @@ func (p *salesForceProvider) Initialize(identifier string, provider models.Provi
 	p.client = sdkConfig
 
 	// Cool lets query the avalible roles
-	foundRoles, err := p.LoadRoles()
+	// foundRoles, err := p.LoadRoles()
 
-	if err != nil {
-		return fmt.Errorf("failed to load roles: %w", err)
-	}
+	// if err != nil {
+	// 	return fmt.Errorf("failed to load roles: %w", err)
+	// }
 
-	p.roles = foundRoles
+	// p.roles = foundRoles
 
 	return nil
 }
