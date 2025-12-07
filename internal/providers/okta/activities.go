@@ -10,7 +10,7 @@ func (b *oktaProvider) RegisterActivities(temporalClient models.TemporalImpl) er
 	return models.RegisterActivities(temporalClient, models.NewProviderActivities(b))
 }
 
-// GitHub uses static roles and permissions so we don't need to them.
+// GitHub uses static roles and permissions so we don't need to fetch them.
 // Instead we will just return these in the synchronize call.
 func (p *oktaProvider) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/sirupsen/logrus"
+	"go.temporal.io/sdk/temporal"
 )
 
 // RegisterActivities registers provider-specific activities with the Temporal worker
@@ -20,6 +21,26 @@ func NewProviderActivities(provider ProviderImpl) *ProviderActivities {
 	return &ProviderActivities{
 		provider: provider,
 	}
+}
+
+func (a *ProviderActivities) AuthorizeRole(
+	ctx context.Context,
+	req *AuthorizeRoleRequest,
+) (*AuthorizeRoleResponse, error) {
+
+	logrus.Infoln("Starting AuthorizeRole activity")
+	return handleNotImplementedError(a.provider.AuthorizeRole(ctx, req))
+
+}
+
+func (a *ProviderActivities) RevokeRole(
+	ctx context.Context,
+	req *RevokeRoleRequest,
+) (*RevokeRoleResponse, error) {
+
+	logrus.Infoln("Starting RevokeRole activity")
+	return handleNotImplementedError(a.provider.RevokeRole(ctx, req))
+
 }
 
 func (a *ProviderActivities) SynchronizeIdentities(
@@ -97,10 +118,11 @@ func (a *ProviderActivities) SynchronizeRoles(
 func handleNotImplementedError[T any](res T, err error) (T, error) {
 	if err != nil {
 		if errors.Is(err, ErrNotImplemented) {
-			// Ignore not implemented errors. This will
-			// just complete the activity as successful without doing anything.
-			logrus.WithError(err).Infoln("Activity not implemented for this provider, skipping")
-			return res, nil
+			return res, temporal.NewNonRetryableApplicationError(
+				"activity not implemented for this provider",
+				"NotImplementedError",
+				err,
+			)
 		}
 	}
 	return res, err
