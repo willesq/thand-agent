@@ -1,14 +1,14 @@
 package github
 
 import (
-	"fmt"
-	"time"
+	"strings"
+	"context"
 
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
 
-	"github.com/octokit/go-sdk/pkg"
+	"github.com/google/go-github/v57/github"
 	"golang.org/x/oauth2"
 )
 
@@ -17,8 +17,9 @@ var GithubProviderName = "github"
 // githubProvider implements the ProviderImpl interface for GitHub
 type githubProvider struct {
 	*models.BaseProvider
-	client      *pkg.Client
+	client      *github.Client
 	oauthClient *oauth2.Config
+	organizationName string
 }
 
 // GitHubUser represents the GitHub user response
@@ -50,30 +51,29 @@ func (p *githubProvider) Initialize(identifier string, provider models.Provider)
 	// Right lets figure out how to initialize the GitHub SDK
 	githubConfig := p.GetConfig()
 
-	githubEndpoint, foundEndpoint := githubConfig.GetString("endpoint")
+
 	githubToken, foundToken := githubConfig.GetString("token")
 
-	if !foundToken {
-		return fmt.Errorf("missing required GitHub configuration: either token or OAuth credentials required")
-	}
+	if foundToken && len(strings.TrimSpace(githubToken)) > 0 {
 
-	if !foundEndpoint || len(githubEndpoint) == 0 {
-		githubEndpoint = "https://api.github.com"
-	}
-
-	if foundToken {
-		githubClient, err := pkg.NewApiClient(
-			pkg.WithUserAgent("thand"),
-			pkg.WithRequestTimeout(5*time.Second),
-			pkg.WithBaseUrl(githubEndpoint),
-			pkg.WithTokenAuthentication(githubToken),
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: githubToken},
 		)
 
-		if err != nil {
-			return fmt.Errorf("error creating GitHub client: %v", err)
-		}
+		tc := oauth2.NewClient(context.Background(), ts)
+		p.client = github.NewClient(tc)
 
-		p.client = githubClient
+	} else {
+
+		logrus.Debugln("GitHub token not provided; skipping client setup")
+		p.DisableCapability(models.ProviderCapabilityRBAC)
+		p.DisableCapability(models.ProviderCapabilityIdentities)
+	}
+
+	orgName, found := githubConfig.GetString("organization")
+
+	if found && len(orgName) > 0 {
+		p.organizationName = orgName
 	}
 
 	// OAuth configuration
@@ -82,6 +82,7 @@ func (p *githubProvider) Initialize(identifier string, provider models.Provider)
 
 	// Create a client config
 	if foundClientId && foundClientSecret {
+
 		conf := &oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
@@ -93,7 +94,9 @@ func (p *githubProvider) Initialize(identifier string, provider models.Provider)
 		}
 
 		p.oauthClient = conf
+
 	} else {
+
 		logrus.Debugln("GitHub OAuth client_id or client_secret not provided; skipping OAuth setup")
 		p.DisableCapability(models.ProviderCapabilityAuthorizer)
 	}

@@ -17,7 +17,6 @@ func (p *githubProvider) Synchronize(ctx context.Context, temporalService models
 	// Before we kick off the synchronize lets update the static roles and permissions
 
 	p.SetRoles(GitHubOrganisationRoles)
-	p.SetPermissions(GitHubPermissions)
 
 	return models.Synchronize(ctx, temporalService, p)
 }
