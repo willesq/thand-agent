@@ -10,7 +10,7 @@ func (b *azureProvider) RegisterActivities(temporalClient models.TemporalImpl) e
 	return models.RegisterActivities(temporalClient, models.NewProviderActivities(b))
 }
 
-// Azure uses static roles and permissions so we don't need to them.
+// Azure uses static roles and permissions so we don't need to fetch them.
 // Instead we will just return these in the synchronize call.
 func (p *azureProvider) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
 

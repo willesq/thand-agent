@@ -23,6 +23,26 @@ func NewProviderActivities(provider ProviderImpl) *ProviderActivities {
 	}
 }
 
+func (a *ProviderActivities) AuthorizeRole(
+	ctx context.Context,
+	req *AuthorizeRoleRequest,
+) (*AuthorizeRoleResponse, error) {
+
+	logrus.Infoln("Starting AuthorizeRole activity")
+	return handleNotImplementedError(a.provider.AuthorizeRole(ctx, req))
+
+}
+
+func (a *ProviderActivities) RevokeRole(
+	ctx context.Context,
+	req *RevokeRoleRequest,
+) (*RevokeRoleResponse, error) {
+
+	logrus.Infoln("Starting RevokeRole activity")
+	return handleNotImplementedError(a.provider.RevokeRole(ctx, req))
+
+}
+
 func (a *ProviderActivities) SynchronizeIdentities(
 	ctx context.Context,
 	req SynchronizeUsersRequest,

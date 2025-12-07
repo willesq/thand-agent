@@ -10,7 +10,7 @@ func (b *gcpProvider) RegisterActivities(temporalClient models.TemporalImpl) err
 	return models.RegisterActivities(temporalClient, models.NewProviderActivities(b))
 }
 
-// GCP uses static roles and permissions so we don't need to them.
+// GCP uses static roles and permissions so we don't need to fetch them.
 // Instead we will just return these in the synchronize call.
 func (p *gcpProvider) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
 
