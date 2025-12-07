@@ -3,16 +3,19 @@ package github
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/go-github/v57/github"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
-	"golang.org/x/oauth2"
 )
 
 func (p *githubProvider) CanSynchronizeUsers() bool {
+
+	if p.client == nil {
+		return false
+	}
+
 	return true
 }
 
@@ -24,24 +27,21 @@ func (p *githubProvider) SynchronizeUsers(ctx context.Context, req models.Synchr
 		logrus.Debugf("Refreshed GitHub identities in %s", elapsed)
 	}()
 
-	config := p.GetConfig()
-	orgName, found := config.GetString("organization")
-	if !found || len(orgName) == 0 {
+	if p.client == nil {
+		return nil, fmt.Errorf("github client is not initialized")
+	}
+
+	if len(p.organizationName) == 0 {
 		logrus.Warn("GitHub provider configuration missing 'organization', cannot fetch identities")
 		return nil, fmt.Errorf("missing required GitHub configuration: organization")
 	}
 
-	token, foundToken := config.GetString("token")
-	if !foundToken || len(strings.TrimSpace(token)) == 0 {
-		return nil, fmt.Errorf("GitHub token is missing or invalid in configuration")
+	if req.Pagination == nil {
+		req.Pagination = &models.PaginationOptions{
+			Page:     1,
+			PageSize: 100,
+		}
 	}
-
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
 
 	var identities []models.Identity
 	opts := &github.ListMembersOptions{
@@ -51,7 +51,7 @@ func (p *githubProvider) SynchronizeUsers(ctx context.Context, req models.Synchr
 		},
 	}
 
-	members, resp, err := client.Organizations.ListMembers(ctx, orgName, opts)
+	members, resp, err := p.client.Organizations.ListMembers(ctx, p.organizationName, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch organization members: %w", err)
 	}
@@ -108,7 +108,7 @@ func (p *githubProvider) SynchronizeUsers(ctx context.Context, req models.Synchr
 
 	logrus.WithFields(logrus.Fields{
 		"count": len(identities),
-		"org":   orgName,
+		"org":   p.organizationName,
 	}).Debug("Refreshed GitHub identities")
 
 	return &response, nil

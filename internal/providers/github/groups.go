@@ -8,10 +8,14 @@ import (
 	"github.com/google/go-github/v57/github"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
-	"golang.org/x/oauth2"
 )
 
 func (p *githubProvider) CanSynchronizeGroups() bool {
+
+	if p.client == nil {
+		return false
+	}
+
 	return true
 }
 
@@ -23,20 +27,14 @@ func (p *githubProvider) SynchronizeGroups(ctx context.Context, req models.Synch
 		logrus.Debugf("Refreshed GitHub identities in %s", elapsed)
 	}()
 
-	config := p.GetConfig()
-	orgName, found := config.GetString("organization")
+	if p.client == nil {
+		return nil, fmt.Errorf("github client is not initialized")
+	}
 
-	if !found || len(orgName) == 0 {
+	if len(p.organizationName) == 0 {
 		logrus.Warn("GitHub provider configuration missing 'organization', cannot fetch identities")
 		return nil, fmt.Errorf("missing required GitHub configuration: organization")
 	}
-
-	token, _ := config.GetString("token")
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
 
 	if req.Pagination == nil {
 		req.Pagination = &models.PaginationOptions{
@@ -51,7 +49,7 @@ func (p *githubProvider) SynchronizeGroups(ctx context.Context, req models.Synch
 		PerPage: req.Pagination.PageSize,
 	}
 
-	teams, resp, err := client.Teams.ListTeams(ctx, orgName, opts)
+	teams, resp, err := p.client.Teams.ListTeams(ctx, p.organizationName, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch organization teams: %w", err)
 	}
@@ -103,7 +101,7 @@ func (p *githubProvider) SynchronizeGroups(ctx context.Context, req models.Synch
 
 	logrus.WithFields(logrus.Fields{
 		"count": len(identities),
-		"org":   orgName,
+		"org":   p.organizationName,
 	}).Debug("Refreshed GitHub identities")
 
 	return &response, nil
