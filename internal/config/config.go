@@ -141,6 +141,11 @@ func setupHomeConfigPath(v *viper.Viper) error {
 // bindEnvironmentVariables binds all environment variables to viper
 func bindEnvironmentVariables(v *viper.Viper) {
 
+	// Thand environment variables
+	v.BindEnv("thand.endpoint", "THAND_ENDPOINT")
+	v.BindEnv("thand.base", "THAND_BASE_PATH")
+	v.BindEnv("thand.api_key", "THAND_API_KEY")
+
 	// Set base environment variables
 	v.BindEnv("login.endpoint", "THAND_LOGIN_ENDPOINT")
 	v.BindEnv("login.endpoint", "THAND_BASE_URL")
@@ -474,7 +479,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	version, commit, _ := common.GetModuleBuildInfo()
 
 	preflightBody, err := json.Marshal(PreflightRequest{
-		Mode:	    c.GetMode(),
+		Mode:       c.GetMode(),
 		Version:    version,
 		Commit:     commit,
 		Identifier: common.GetClientIdentifier(),
@@ -513,7 +518,7 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	}
 
 	reqBody, err := json.Marshal(RegistrationRequest{
-		Mode: 	   c.GetMode(),
+		Mode:        c.GetMode(),
 		Environment: &c.Environment,
 		Version:     version,
 		Commit:      commit,
@@ -611,6 +616,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("environment.config.timeout", "5s")                    // Timeout for any config fetch operations
 	v.SetDefault("environment.config.key", common.DefaultServerSecret)  // Default encryption key name
 	v.SetDefault("environment.config.salt", common.DefaultServerSecret) // Default encryption salt
+
+	// Thand upstream service defaults
+	v.SetDefault("thand.endpoint", common.DefaultThandEndpoint)
+	v.SetDefault("thand.base", "/")
+	v.SetDefault("thand.api_key", "")
 
 	// Login server defaults
 	v.SetDefault("login.endpoint", common.DefaultLoginServerEndpoint)

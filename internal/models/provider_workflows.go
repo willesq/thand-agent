@@ -71,22 +71,75 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	var upstreamWorkflowID string
+	// Channel for upstream chunks
+	upstreamChan := workflow.NewChannel(ctx)
+	upstreamDone := workflow.NewChannel(ctx)
+
 	if syncReq.Upstream != nil {
-		var startResp SynchronizeStartResponse
-		err := workflow.ExecuteActivity(
-			ctx,
-			CreateTemporalIdentifier(
+		workflow.Go(ctx, func(ctx workflow.Context) {
+			defer upstreamDone.Close()
+
+			var startResp SynchronizeStartResponse
+			err := workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizeThandStart),
+				),
+				syncReq.Upstream,
 				syncReq.ProviderIdentifier,
-				GetNameFromFunction((*ProviderActivities).SynchronizeThandStart),
-			),
-			syncReq.Upstream,
-			syncReq.ProviderIdentifier,
-		).Get(ctx, &startResp)
-		if err != nil {
-			return nil, err
-		}
-		upstreamWorkflowID = startResp.WorkflowID
+			).Get(ctx, &startResp)
+
+			if err != nil {
+				log.Error("Failed to start upstream sync: ", err)
+				// Drain channel
+				for {
+					var ignored interface{}
+					if !upstreamChan.Receive(ctx, &ignored) {
+						break
+					}
+				}
+				return
+			}
+
+			upstreamWorkflowID := startResp.WorkflowID
+
+			for {
+				var chunk SynchronizeChunkRequest
+				if !upstreamChan.Receive(ctx, &chunk) {
+					break
+				}
+
+				err := workflow.ExecuteActivity(
+					ctx,
+					CreateTemporalIdentifier(
+						syncReq.ProviderIdentifier,
+						GetNameFromFunction((*ProviderActivities).SynchronizeThandChunk),
+					),
+					syncReq.Upstream,
+					syncReq.ProviderIdentifier,
+					upstreamWorkflowID,
+					chunk,
+				).Get(ctx, nil)
+				if err != nil {
+					log.Error("Failed to send chunk: ", err)
+				}
+			}
+
+			err = workflow.ExecuteActivity(
+				ctx,
+				CreateTemporalIdentifier(
+					syncReq.ProviderIdentifier,
+					GetNameFromFunction((*ProviderActivities).SynchronizeThandCommit),
+				),
+				syncReq.Upstream,
+				syncReq.ProviderIdentifier,
+				upstreamWorkflowID,
+			).Get(ctx, nil)
+			if err != nil {
+				log.Error("Failed to commit upstream sync: ", err)
+			}
+		})
 	}
 
 	// Execute all the synchronizations needed for RBAC
@@ -129,21 +182,9 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 					chunk := SynchronizeChunkRequest{
 						Identities: resp.Identities,
 					}
-					err := workflow.ExecuteActivity(
-						ctx,
-						CreateTemporalIdentifier(
-							syncReq.ProviderIdentifier,
-							GetNameFromFunction((*ProviderActivities).SynchronizeThandChunk),
-						),
-						syncReq.Upstream,
-						syncReq.ProviderIdentifier,
-						upstreamWorkflowID,
-						chunk,
-					).Get(ctx, nil)
-					if err != nil {
-						errChan.Send(ctx, err)
-						return
-					}
+					workflow.Go(ctx, func(ctx workflow.Context) {
+						upstreamChan.Send(ctx, chunk)
+					})
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -180,21 +221,9 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 					chunk := SynchronizeChunkRequest{
 						Identities: resp.Identities,
 					}
-					err := workflow.ExecuteActivity(
-						ctx,
-						CreateTemporalIdentifier(
-							syncReq.ProviderIdentifier,
-							GetNameFromFunction((*ProviderActivities).SynchronizeThandChunk),
-						),
-						syncReq.Upstream,
-						syncReq.ProviderIdentifier,
-						upstreamWorkflowID,
-						chunk,
-					).Get(ctx, nil)
-					if err != nil {
-						errChan.Send(ctx, err)
-						return
-					}
+					workflow.Go(ctx, func(ctx workflow.Context) {
+						upstreamChan.Send(ctx, chunk)
+					})
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -231,21 +260,9 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 					chunk := SynchronizeChunkRequest{
 						Identities: resp.Identities,
 					}
-					err := workflow.ExecuteActivity(
-						ctx,
-						CreateTemporalIdentifier(
-							syncReq.ProviderIdentifier,
-							GetNameFromFunction((*ProviderActivities).SynchronizeThandChunk),
-						),
-						syncReq.Upstream,
-						syncReq.ProviderIdentifier,
-						upstreamWorkflowID,
-						chunk,
-					).Get(ctx, nil)
-					if err != nil {
-						errChan.Send(ctx, err)
-						return
-					}
+					workflow.Go(ctx, func(ctx workflow.Context) {
+						upstreamChan.Send(ctx, chunk)
+					})
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -282,21 +299,9 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 					chunk := SynchronizeChunkRequest{
 						Resources: resp.Resources,
 					}
-					err := workflow.ExecuteActivity(
-						ctx,
-						CreateTemporalIdentifier(
-							syncReq.ProviderIdentifier,
-							GetNameFromFunction((*ProviderActivities).SynchronizeThandChunk),
-						),
-						syncReq.Upstream,
-						syncReq.ProviderIdentifier,
-						upstreamWorkflowID,
-						chunk,
-					).Get(ctx, nil)
-					if err != nil {
-						errChan.Send(ctx, err)
-						return
-					}
+					workflow.Go(ctx, func(ctx workflow.Context) {
+						upstreamChan.Send(ctx, chunk)
+					})
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -333,21 +338,9 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 					chunk := SynchronizeChunkRequest{
 						Roles: resp.Roles,
 					}
-					err := workflow.ExecuteActivity(
-						ctx,
-						CreateTemporalIdentifier(
-							syncReq.ProviderIdentifier,
-							GetNameFromFunction((*ProviderActivities).SynchronizeThandChunk),
-						),
-						syncReq.Upstream,
-						syncReq.ProviderIdentifier,
-						upstreamWorkflowID,
-						chunk,
-					).Get(ctx, nil)
-					if err != nil {
-						errChan.Send(ctx, err)
-						return
-					}
+					workflow.Go(ctx, func(ctx workflow.Context) {
+						upstreamChan.Send(ctx, chunk)
+					})
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -384,21 +377,9 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 					chunk := SynchronizeChunkRequest{
 						Permissions: resp.Permissions,
 					}
-					err := workflow.ExecuteActivity(
-						ctx,
-						CreateTemporalIdentifier(
-							syncReq.ProviderIdentifier,
-							GetNameFromFunction((*ProviderActivities).SynchronizeThandChunk),
-						),
-						syncReq.Upstream,
-						syncReq.ProviderIdentifier,
-						upstreamWorkflowID,
-						chunk,
-					).Get(ctx, nil)
-					if err != nil {
-						errChan.Send(ctx, err)
-						return
-					}
+					workflow.Go(ctx, func(ctx workflow.Context) {
+						upstreamChan.Send(ctx, chunk)
+					})
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -419,24 +400,14 @@ func SynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeRequest) (*Syn
 		}
 	}
 
+	upstreamChan.Close()
+	if syncReq.Upstream != nil {
+		upstreamDone.Receive(ctx, nil)
+	}
+
 	if len(errs) > 0 {
 		// Log errors but return what we have
 		log.Error("Synchronization workflow encountered errors: ", errs)
-	} else if syncReq.Upstream != nil {
-		// Commit sync
-		err := workflow.ExecuteActivity(
-			ctx,
-			CreateTemporalIdentifier(
-				syncReq.ProviderIdentifier,
-				GetNameFromFunction((*ProviderActivities).SynchronizeThandCommit),
-			),
-			syncReq.Upstream,
-			syncReq.ProviderIdentifier,
-			upstreamWorkflowID,
-		).Get(ctx, nil)
-		if err != nil {
-			log.Error("Failed to commit synchronization: ", err)
-		}
 	}
 
 	return syncResponse, nil

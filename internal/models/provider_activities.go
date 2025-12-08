@@ -150,7 +150,7 @@ func (a *ProviderActivities) SynchronizeThandStart(
 
 	resp, err := common.InvokeHttpRequest(args)
 	if err != nil {
-		return nil, err
+		return nil, temporal.NewApplicationError("failed to invoke http request", "HttpRequestError", err)
 	}
 
 	if resp.StatusCode() != http.StatusAccepted {
@@ -201,7 +201,7 @@ func (a *ProviderActivities) SynchronizeThandChunk(
 
 	resp, err := common.InvokeHttpRequest(args)
 	if err != nil {
-		return err
+		return temporal.NewApplicationError("failed to invoke http request", "HttpRequestError", err)
 	}
 
 	if resp.StatusCode() != http.StatusAccepted {
@@ -241,7 +241,7 @@ func (a *ProviderActivities) SynchronizeThandCommit(
 
 	resp, err := common.InvokeHttpRequest(args)
 	if err != nil {
-		return err
+		return temporal.NewApplicationError("failed to invoke http request", "HttpRequestError", err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
