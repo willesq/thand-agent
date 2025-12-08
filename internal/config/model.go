@@ -318,7 +318,15 @@ func (c *Config) GetLoginServerUrl() string {
 	return strings.TrimSuffix(fmt.Sprintf(
 		"%s/%s",
 		strings.TrimSuffix(c.Login.Endpoint, "/"),
-		strings.TrimSuffix(c.Login.Base, "/")),
+		strings.TrimPrefix(strings.TrimSuffix(c.Login.Base, "/"), "/")),
+		"/")
+}
+
+func (c *Config) GetThandServerUrl() string {
+	return strings.TrimSuffix(fmt.Sprintf(
+		"%s/%s",
+		strings.TrimSuffix(c.Thand.Endpoint, "/"),
+		strings.TrimPrefix(strings.TrimSuffix(c.Thand.Base, "/"), "/")),
 		"/")
 }
 

@@ -31,7 +31,7 @@ func Synchronize(
 	ctx context.Context,
 	temporalService TemporalImpl,
 	provider ProviderImpl,
-	syncRequest *SynchronizeRequest,
+	syncRequest *SynchronizeRequest, // can be nil
 ) error {
 
 	// Check if we have the relevant capabilities for synchronization
@@ -57,7 +57,11 @@ func Synchronize(
 		requests := getSynchronizationRequests(provider)
 
 		if len(requests) == 0 {
-			logrus.Infof("Provider %s does not have overridden synchronization methods, skipping", provider.GetName())
+			logrus.WithFields(logrus.Fields{
+				"provider":   provider.GetProvider(),
+				"name":       provider.GetName(),
+				"identifier": provider.GetIdentifier(),
+			}).Info("Provider does not have overridden synchronization methods, skipping")
 			return nil
 		}
 		syncRequest.Requests = requests
@@ -90,7 +94,7 @@ func Synchronize(
 			ctx,
 			workflowOptions,
 			GetTemporalName(provider.GetIdentifier(), TemporalSynchronizeWorkflowName),
-			syncRequest,
+			*syncRequest,
 		)
 
 		if err != nil {

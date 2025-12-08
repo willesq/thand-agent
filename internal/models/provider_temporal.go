@@ -11,6 +11,7 @@ import (
 )
 
 const TemporalSynchronizeWorkflowName = "synchronize"
+const TemporalSynchronizeUpstreamWorkflowName = "synchronize_upstream"
 
 func GetTemporalName(identifier, base string) string {
 	return CreateTemporalIdentifier(identifier, base)
@@ -33,6 +34,11 @@ func (b *BaseProvider) RegisterWorkflows(temporalClient TemporalImpl) error {
 	// resources and identities for RBAC
 	worker.RegisterWorkflowWithOptions(SynchronizeWorkflow, workflow.RegisterOptions{
 		Name:               GetTemporalName(b.GetIdentifier(), TemporalSynchronizeWorkflowName),
+		VersioningBehavior: workflow.VersioningBehaviorPinned,
+	})
+
+	worker.RegisterWorkflowWithOptions(SynchronizeUpstreamWorkflow, workflow.RegisterOptions{
+		Name:               GetTemporalName(b.GetIdentifier(), TemporalSynchronizeUpstreamWorkflowName),
 		VersioningBehavior: workflow.VersioningBehaviorPinned,
 	})
 

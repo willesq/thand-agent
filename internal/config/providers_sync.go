@@ -33,10 +33,13 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 		}
 
 		if c.HasThandService() {
+
+			thandEndpoint := c.GetThandServerUrl()
+
 			syncRequest.Upstream = &model.Endpoint{
 				EndpointConfig: &model.EndpointConfiguration{
 					URI: &model.LiteralUri{
-						Value: c.Thand.Endpoint,
+						Value: thandEndpoint,
 					},
 					Authentication: &model.ReferenceableAuthenticationPolicy{
 						AuthenticationPolicy: &model.AuthenticationPolicy{

@@ -68,7 +68,9 @@ func CreateRequestBuilderFromEndpointWithClient(client *resty.Client, req *model
 		return nil, err
 	}
 
-	restBuilder := client.R().EnableTrace()
+	restBuilder := client.R().
+		EnableTrace().
+		SetHeader("User-Agent", fmt.Sprintf("Thand - %s", GetBuildIdentifier()))
 
 	if err := configureAuthentication(restBuilder, req.Endpoint); err != nil {
 		return nil, err

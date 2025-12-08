@@ -3,8 +3,9 @@ package models
 import "github.com/google/uuid"
 
 type ThandConfig struct {
-	Endpoint string `mapstructure:"endpoint"` // The Thand.io service endpoint
-	ApiKey   string `mapstructure:"api_key"`  // The API key for authenticating with Thand.io
+	Endpoint string `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint" default:"https://app.thand.io/"`
+	Base     string `json:"base" yaml:"base" mapstructure:"base" default:"/"` // Base path for login endpoint e.g. /
+	ApiKey   string `json:"api_key" yaml:"api_key" mapstructure:"api_key"`    // The API key for authenticating with Thand.io
 }
 
 type SynchronizeStartRequest struct {
