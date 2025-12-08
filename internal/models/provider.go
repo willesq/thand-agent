@@ -154,7 +154,7 @@ type ProviderImpl interface {
 	GetDescription() string
 	GetProvider() string
 
-	Synchronize(ctx context.Context, temporalClient TemporalImpl) error
+	Synchronize(ctx context.Context, temporalClient TemporalImpl, req *SynchronizeRequest) error
 
 	// Temporal
 	RegisterWorkflows(temporalClient TemporalImpl) error

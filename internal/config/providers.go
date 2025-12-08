@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config/environment"
 	"github.com/thand-io/agent/internal/models"
@@ -298,9 +299,31 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 
 	go func() {
 
+		syncRequest := models.SynchronizeRequest{
+			ProviderIdentifier: impl.GetIdentifier(),
+		}
+
+		if c.HasThandService() {
+			syncRequest.Upstream = &model.Endpoint{
+				EndpointConfig: &model.EndpointConfiguration{
+					URI: &model.LiteralUri{
+						Value: c.Thand.Endpoint,
+					},
+					Authentication: &model.ReferenceableAuthenticationPolicy{
+						AuthenticationPolicy: &model.AuthenticationPolicy{
+							Bearer: &model.BearerAuthenticationPolicy{
+								Token: c.Thand.ApiKey,
+							},
+						},
+					},
+				},
+			}
+		}
+
 		err := impl.Synchronize(
 			context.Background(),
 			temporalClient,
+			&syncRequest,
 		)
 
 		if err != nil {
@@ -309,17 +332,6 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 		}
 
 		logrus.Infoln("Synchronized provider successfully:", p.Name)
-
-		// If we have a Thand.io configuration, also sync with Thand.io
-
-		if len(c.Thand.Endpoint) > 0 && len(c.Thand.ApiKey) > 0 {
-			err = c.SynchronizeProviderWithThand(impl)
-			if err != nil {
-				logrus.WithError(err).Errorln("Failed to synchronize provider with Thand.io:", p.Name)
-				return
-			}
-			logrus.Infoln("Synchronized provider with Thand.io successfully:", p.Name)
-		}
 
 	}()
 

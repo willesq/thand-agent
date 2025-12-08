@@ -585,6 +585,10 @@ func (r *Config) GetProviderPermission(permissionName string, providers ...strin
 	return nil
 }
 
+func (r *Config) HasThandService() bool {
+	return len(r.Thand.Endpoint) != 0 && len(r.Thand.ApiKey) != 0
+}
+
 // TemplateData represents data passed to HTML templates
 type TemplateData struct {
 	Config      *Config
