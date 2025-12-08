@@ -78,15 +78,6 @@ func preRunConfigE(cmd *cobra.Command, mode config.Mode) error {
 			}
 		}
 
-		// Get the API key override from the flag
-		apiKey, err := cmd.Flags().GetString("api-key")
-		if err == nil && len(apiKey) > 0 {
-			err := cfg.SetAPIKey(apiKey)
-			if err != nil {
-				return fmt.Errorf("failed to set API key: %w", err)
-			}
-		}
-
 		// Generate a global secret if one hasn't been set
 		if strings.EqualFold(cfg.Secret, common.DefaultServerSecret) {
 			generatedSecret, err := common.GenerateSecureRandomString(32)
@@ -284,7 +275,6 @@ func init() {
 	rootCmd.PersistentFlags().String("config", "", "Config file (default is $HOME/.thand/config.yaml)")
 	// Add the login-server flag
 	rootCmd.PersistentFlags().String("login-server", "", "Override the default login server URL (e.g., http://localhost:8080)")
-	rootCmd.PersistentFlags().String("api-key", "", "Provide an API key for authentication with the login server")
 
 }
 

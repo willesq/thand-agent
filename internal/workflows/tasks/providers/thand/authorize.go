@@ -293,6 +293,7 @@ func (t *thandTask) executeTemporalParallel(
 			var authOut models.AuthorizeRoleResponse
 			err := workflow.ExecuteActivity(
 				aoctx,
+				// TODO(hugh): Replace with direct call to AuthorizeActivity
 				thandFunction.ThandAuthorizeFunction,
 				workflowTask,
 				taskName,

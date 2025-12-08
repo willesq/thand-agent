@@ -55,6 +55,10 @@ type Config struct {
 	Workflows WorkflowConfig `mapstructure:"workflows"` // These are workflows to run for role associated workflows
 	Providers ProviderConfig `mapstructure:"providers"` // These are integration providers like AWS, GCP, etc.
 
+	// This is ONLY if the agent is running in server mode
+	// and you want to use https://www.thand.io hosted services
+	Thand models.ThandConfig `mapstructure:"thand"`
+
 	// Internal mode of operation
 	mode   Mode
 	logger thandLogger
@@ -373,19 +377,19 @@ func (c *Config) SetLoginServer(loginServer string) error {
 }
 
 func (c *Config) GetAPIKey() string {
-	return c.Login.ApiKey
+	return c.Thand.ApiKey
 }
 
 func (c *Config) SetAPIKey(apiKey string) error {
 	if len(apiKey) == 0 {
 		return fmt.Errorf("API key cannot be empty")
 	}
-	c.Login.ApiKey = apiKey
+	c.Thand.ApiKey = apiKey
 	return nil
 }
 
 func (c *Config) HasAPIKey() bool {
-	return len(c.Login.ApiKey) > 0
+	return len(c.Thand.ApiKey) > 0
 }
 
 func (c *Config) GetApiBasePath() string {
@@ -444,40 +448,6 @@ func (c *Config) GetSignalCallbackUrl(workflowTask *models.WorkflowTask) string 
 		workflowTask.WorkflowID,
 		queryParams.Encode(),
 	)
-}
-
-/*
-GetSecret retrieves a secret from the provider configuration
-If the provider is not found, it returns an empty string.
-
-A jq expression must be provided to extract the secret from the provider's configuration.
-
-Node is the incoming yaml/json node that contains the jq expression.
-*/
-func (c *Config) TraverseAndEvaluateProviderSecrets(providerName string, node map[string]any) (any, error) {
-
-	if len(c.Providers.Definitions) == 0 {
-		return nil, fmt.Errorf("no providers defined in configuration")
-	}
-
-	// Check if the provider exists
-	/*
-		if provider, exists := c.Providers.Definitions[providerName]; exists {
-
-			variables := map[string]any{
-				fmt.Sprintf("$%s", providerName): provider.GetConfig(),
-			}
-			input := map[string]any{}
-
-			// Create interpolator and use it for string interpolation
-			interpolator := configExpr.NewStringInterpolator()
-			result, err := interpolator.InterpolateAndEvaluate(node, input, variables, context.TODO())
-
-			return result, err
-		}
-	*/
-
-	return nil, fmt.Errorf("provider '%s' not found", providerName)
 }
 
 func (c *Config) GetEventsWithFilter(filter LogFilter) []*models.LogEntry {

@@ -298,7 +298,7 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 
 	go func() {
 
-		err := p.GetClient().Synchronize(
+		err := impl.Synchronize(
 			context.Background(),
 			temporalClient,
 		)
@@ -309,6 +309,17 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 		}
 
 		logrus.Infoln("Synchronized provider successfully:", p.Name)
+
+		// If we have a Thand.io configuration, also sync with Thand.io
+
+		if len(c.Thand.Endpoint) > 0 && len(c.Thand.ApiKey) > 0 {
+			err = c.SynchronizeProviderWithThand(impl)
+			if err != nil {
+				logrus.WithError(err).Errorln("Failed to synchronize provider with Thand.io:", p.Name)
+				return
+			}
+			logrus.Infoln("Synchronized provider with Thand.io successfully:", p.Name)
+		}
 
 	}()
 
