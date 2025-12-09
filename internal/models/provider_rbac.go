@@ -122,17 +122,17 @@ type ProviderRoleBasedAccessControl interface {
 	// Overrides all existing roles, with the provided list
 	SetRoles(roles []ProviderRole)
 	// Appends new roles to the existing list
-	AddRole(role ProviderRole)
+	AddRoles(role ...ProviderRole)
 
 	// Overrides all existing permissions with the provided list
 	SetPermissions(permissions []ProviderPermission)
 	// Appends new permissions to the existing list
-	AddPermission(permission ProviderPermission)
+	AddPermissions(permission ...ProviderPermission)
 
 	// Overrides all existing resources with the provided list
 	SetResources(resources []ProviderResource)
 	// Appends new resources to the existing list
-	AddResource(resource ProviderResource)
+	AddResources(resource ...ProviderResource)
 
 	// Permissions are individual accesses. Used as part of a role
 	GetPermission(ctx context.Context, permission string) (*ProviderPermission, error)

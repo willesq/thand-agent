@@ -55,9 +55,7 @@ func (a *ProviderActivities) SynchronizeIdentities(
 	result, err := handleNotImplementedError(a.provider.SynchronizeIdentities(ctx, req))
 
 	if err == nil {
-		for _, identity := range result.Identities {
-			a.provider.AddIdentity(identity)
-		}
+		a.provider.AddIdentities(result.Identities...)
 	}
 
 	return result, err
@@ -75,9 +73,7 @@ func (a *ProviderActivities) SynchronizeResources(
 	result, err := handleNotImplementedError(a.provider.SynchronizeResources(ctx, req))
 
 	if err == nil {
-		for _, resource := range result.Resources {
-			a.provider.AddResource(resource)
-		}
+		a.provider.AddResources(result.Resources...)
 	}
 
 	return result, err
@@ -98,9 +94,7 @@ func (a *ProviderActivities) SynchronizeUsers(
 	result, err := handleNotImplementedError(a.provider.SynchronizeUsers(ctx, req))
 
 	if err == nil {
-		for _, user := range result.Identities {
-			a.provider.AddIdentity(user)
-		}
+		a.provider.AddIdentities(result.Identities...)
 	}
 
 	return result, err
@@ -122,9 +116,7 @@ func (a *ProviderActivities) SynchronizeGroups(
 	result, err := handleNotImplementedError(a.provider.SynchronizeGroups(ctx, req))
 
 	if err == nil {
-		for _, group := range result.Identities {
-			a.provider.AddIdentity(group)
-		}
+		a.provider.AddIdentities(result.Identities...)
 	}
 
 	return result, err
@@ -145,9 +137,7 @@ func (a *ProviderActivities) SynchronizePermissions(
 	result, err := handleNotImplementedError(a.provider.SynchronizePermissions(ctx, req))
 
 	if err == nil {
-		for _, permission := range result.Permissions {
-			a.provider.AddPermission(permission)
-		}
+		a.provider.AddPermissions(result.Permissions...)
 	}
 
 	return result, err
@@ -168,9 +158,7 @@ func (a *ProviderActivities) SynchronizeRoles(
 	result, err := handleNotImplementedError(a.provider.SynchronizeRoles(ctx, req))
 
 	if err == nil {
-		for _, role := range result.Roles {
-			a.provider.AddRole(role)
-		}
+		a.provider.AddRoles(result.Roles...)
 	}
 
 	return result, err

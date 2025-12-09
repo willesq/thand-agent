@@ -134,7 +134,7 @@ func (p *BaseProvider) SetPermissionsWithKey(
 	}()
 }
 
-func (p *BaseProvider) AddPermission(permission ProviderPermission) {
+func (p *BaseProvider) AddPermissions(permissions ...ProviderPermission) {
 	// Take existing permissions and append new ones
 
 	if p.rbac == nil {
@@ -147,7 +147,7 @@ func (p *BaseProvider) AddPermission(permission ProviderPermission) {
 		existing = make([]ProviderPermission, 0)
 	}
 
-	combined := append(existing, permission)
+	combined := append(existing, permissions...)
 	p.SetPermissions(combined)
 }
 
@@ -192,7 +192,7 @@ func (p *BaseProvider) SetRolesWithKey(
 	}()
 }
 
-func (p *BaseProvider) AddRole(role ProviderRole) {
+func (p *BaseProvider) AddRoles(roles ...ProviderRole) {
 	// Take existing roles and append new ones
 	if p.rbac == nil {
 		return
@@ -204,7 +204,7 @@ func (p *BaseProvider) AddRole(role ProviderRole) {
 		existing = make([]ProviderRole, 0)
 	}
 
-	combined := append(existing, role)
+	combined := append(existing, roles...)
 	p.SetRoles(combined)
 }
 
@@ -250,7 +250,7 @@ func (p *BaseProvider) SetResourcesWithKey(
 	}()
 }
 
-func (p *BaseProvider) AddResource(resource ProviderResource) {
+func (p *BaseProvider) AddResources(resources ...ProviderResource) {
 	// Take existing resources and append new ones
 	if p.rbac == nil {
 		return
@@ -261,7 +261,7 @@ func (p *BaseProvider) AddResource(resource ProviderResource) {
 		existing = make([]ProviderResource, 0)
 	}
 
-	combined := append(existing, resource)
+	combined := append(existing, resources...)
 	p.SetResources(combined)
 }
 
@@ -325,7 +325,7 @@ func (p *BaseProvider) SetIdentitiesWithKey(
 	}()
 }
 
-func (p *BaseProvider) AddIdentity(identity ...Identity) {
+func (p *BaseProvider) AddIdentities(identities ...Identity) {
 	// Take existing identities and append new ones
 	if p.identity == nil {
 		return
@@ -336,7 +336,7 @@ func (p *BaseProvider) AddIdentity(identity ...Identity) {
 		existing = make([]Identity, 0)
 	}
 
-	combined := append(existing, identity...)
+	combined := append(existing, identities...)
 	p.SetIdentities(combined)
 }
 

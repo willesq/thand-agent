@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/thand-io/agent/internal/models"
-	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -76,12 +75,10 @@ func (c *Config) registerTemporalActivities() error {
 			Config: c,
 		}
 
-		temporalWorker.RegisterActivityWithOptions(
-			systemActivities.GetLocalConfiguration,
-			activity.RegisterOptions{
-				Name: "GetLocalConfiguration",
-			},
-		)
+		temporalWorker.RegisterActivity(systemActivities.GetLocalConfigurationChunk)
+		temporalWorker.RegisterActivity(systemActivities.SynchronizeThandStart)
+		temporalWorker.RegisterActivity(systemActivities.SynchronizeThandChunk)
+		temporalWorker.RegisterActivity(systemActivities.SynchronizeThandCommit)
 
 	}
 

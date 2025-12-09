@@ -143,7 +143,7 @@ func Synchronize(
 					return err
 				}
 
-				provider.AddIdentity(resp.Identities...)
+				provider.AddIdentities(resp.Identities...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -162,7 +162,7 @@ func Synchronize(
 					return err
 				}
 
-				provider.AddIdentity(resp.Identities...)
+				provider.AddIdentities(resp.Identities...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -181,7 +181,7 @@ func Synchronize(
 					return err
 				}
 
-				provider.AddIdentity(resp.Identities...)
+				provider.AddIdentities(resp.Identities...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -202,9 +202,7 @@ func Synchronize(
 					return err
 				}
 
-				for _, r := range resp.Resources {
-					provider.AddResource(r)
-				}
+				provider.AddResources(resp.Resources...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -223,9 +221,7 @@ func Synchronize(
 					return err
 				}
 
-				for _, r := range resp.Roles {
-					provider.AddRole(r)
-				}
+				provider.AddRoles(resp.Roles...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -244,9 +240,7 @@ func Synchronize(
 					return err
 				}
 
-				for _, p := range resp.Permissions {
-					provider.AddPermission(p)
-				}
+				provider.AddPermissions(resp.Permissions...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break

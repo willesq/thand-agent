@@ -17,7 +17,7 @@ type ProviderIdentities interface {
 	// Overrides all existing identities with the provided list
 	SetIdentities(identities []Identity)
 	// Appends new identities to the existing list
-	AddIdentity(identity ...Identity)
+	AddIdentities(identities ...Identity)
 
 	// Some APIs support identities, users, groups service accoutns etc.
 	SynchronizeIdentities(ctx context.Context, req SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error)

@@ -340,11 +340,31 @@ func (c *Config) ReloadConfig() error {
 	}
 
 	if c.IsServer() {
-		logrus.Infoln("Setting up temporal services...")
-		err := c.setupTemporalServices()
-		if err != nil {
-			return fmt.Errorf("setting up temporal services: %w", err)
+
+		if c.GetServices() != nil && c.GetServices().GetTemporal() != nil {
+
+			logrus.Infoln("Setting up temporal services...")
+			err := c.setupTemporalServices()
+
+			if err != nil {
+				return fmt.Errorf("setting up temporal services: %w", err)
+			}
+
 		}
+
+		go func() {
+
+			// Kick off thand.io sync
+			logrus.Infof("Starting synchronization with %s..", c.Thand.Endpoint)
+
+			err := c.KickStartThandSync()
+
+			if err != nil {
+				logrus.WithError(err).Errorln("Failed to start thand sync workflow")
+			}
+
+		}()
+
 	}
 
 	return nil
