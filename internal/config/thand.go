@@ -28,7 +28,7 @@ func (c *Config) KickStartThandSync() error {
 	}
 
 	workflowOptions := client.StartWorkflowOptions{
-		ID:        fmt.Sprintf("sync-%s", common.GetClientIdentifier()),
+		ID:        models.CreateTemporalWorkflowIdentifier("sync"),
 		TaskQueue: temporalClient.GetTaskQueue(),
 	}
 

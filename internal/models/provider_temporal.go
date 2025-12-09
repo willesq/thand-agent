@@ -12,8 +12,12 @@ import (
 
 const TemporalSynchronizeWorkflowName = "synchronize"
 
-func GetTemporalName(identifier, base string) string {
-	return CreateTemporalIdentifier(identifier, base)
+func CreateTemporalProviderWorkflowIdentifier(identifier, base string) string {
+	return CreateTemporalWorkflowIdentifier(fmt.Sprintf("%s-%s", identifier, base))
+}
+
+func CreateTemporalProviderWorkflowName(identifier, base string) string {
+	return fmt.Sprintf("%s-%s", identifier, base)
 }
 
 // BaseProvider provides a base implementation of the ProviderImpl interface
@@ -32,7 +36,7 @@ func (b *BaseProvider) RegisterWorkflows(temporalClient TemporalImpl) error {
 	// Register the provider Synchronize workflow. This updates roles, permissions,
 	// resources and identities for RBAC
 	worker.RegisterWorkflowWithOptions(ProviderSynchronizeWorkflow, workflow.RegisterOptions{
-		Name:               GetTemporalName(b.GetIdentifier(), TemporalSynchronizeWorkflowName),
+		Name:               CreateTemporalProviderWorkflowName(b.GetIdentifier(), TemporalSynchronizeWorkflowName),
 		VersioningBehavior: workflow.VersioningBehaviorPinned,
 	})
 
@@ -72,7 +76,7 @@ func RegisterActivities(temporalClient TemporalImpl, providerActivities *Provide
 		}
 
 		p := providerActivities.provider
-		activityName := GetTemporalName(p.GetIdentifier(), name)
+		activityName := CreateTemporalProviderWorkflowName(p.GetIdentifier(), name)
 
 		worker.RegisterActivityWithOptions(
 			methodValue.Interface(),

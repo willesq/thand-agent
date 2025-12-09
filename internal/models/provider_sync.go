@@ -74,7 +74,10 @@ func Synchronize(
 
 		// Execute the provider workflow synchronize
 		workflowOptions := client.StartWorkflowOptions{
-			ID:        GetTemporalName(provider.GetIdentifier(), TemporalSynchronizeWorkflowName),
+			ID: CreateTemporalProviderWorkflowIdentifier(
+				provider.GetIdentifier(),
+				TemporalSynchronizeWorkflowName,
+			),
 			TaskQueue: temporalService.GetTaskQueue(),
 			// Set a timeout for the workflow execution
 			WorkflowExecutionTimeout: 30 * time.Minute,
@@ -93,7 +96,10 @@ func Synchronize(
 		_, err := temporalClient.ExecuteWorkflow(
 			ctx,
 			workflowOptions,
-			GetTemporalName(provider.GetIdentifier(), TemporalSynchronizeWorkflowName),
+			CreateTemporalProviderWorkflowName(
+				provider.GetIdentifier(),
+				TemporalSynchronizeWorkflowName,
+			),
 			*syncRequest,
 		)
 

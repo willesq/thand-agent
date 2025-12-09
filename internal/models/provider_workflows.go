@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thand-io/agent/internal/common"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -32,8 +34,8 @@ type SynchronizeResponse struct {
 	// so we can just return an empty response for now
 }
 
-func CreateTemporalIdentifier(providerIdentifier, base string) string {
-	return strings.ToLower(providerIdentifier + "-" + base)
+func CreateTemporalWorkflowIdentifier(workflowName string) string {
+	return strings.ToLower(fmt.Sprintf("%s-%s", common.GetClientIdentifier(), workflowName))
 }
 
 func GetNameFromFunction(i any) string {
@@ -60,16 +62,24 @@ func runSyncLoop[Req any, Resp any](
 	setPagination func(*Req, *PaginationOptions),
 	getPagination func(Resp) *PaginationOptions,
 ) error {
+
 	ao := workflow.LocalActivityOptions{
 		StartToCloseTimeout: 10 * time.Minute,
+		RetryPolicy: &temporal.RetryPolicy{
+			InitialInterval:    1 * time.Second,
+			BackoffCoefficient: 2.0,
+			MaximumInterval:    100 * time.Second,
+			MaximumAttempts:    10,
+		},
 	}
+
 	ctx = workflow.WithLocalActivityOptions(ctx, ao)
 
 	for {
 		var resp Resp
 		err := workflow.ExecuteLocalActivity(
 			ctx,
-			CreateTemporalIdentifier(
+			CreateTemporalProviderWorkflowName(
 				providerID,
 				GetNameFromFunction(activityMethod),
 			),
