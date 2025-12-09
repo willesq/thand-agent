@@ -106,8 +106,14 @@ func (p *BaseProvider) SetPermissionsWithKey(
 	if p.rbac == nil {
 		return
 	}
+
 	p.rbac.mu.Lock()
 	defer p.rbac.mu.Unlock()
+
+	if p.rbac.permissions == nil {
+		p.rbac.permissions = make([]ProviderPermission, 0)
+	}
+
 	p.rbac.permissions = permissions
 
 	// Create the permissions map
@@ -128,6 +134,23 @@ func (p *BaseProvider) SetPermissionsWithKey(
 	}()
 }
 
+func (p *BaseProvider) AddPermission(permission ProviderPermission) {
+	// Take existing permissions and append new ones
+
+	if p.rbac == nil {
+		return
+	}
+
+	existing := p.rbac.permissions
+
+	if existing == nil {
+		existing = make([]ProviderPermission, 0)
+	}
+
+	combined := append(existing, permission)
+	p.SetPermissions(combined)
+}
+
 func (p *BaseProvider) SetRoles(roles []ProviderRole) {
 	p.SetRolesWithKey(roles, func(r *ProviderRole) string {
 		return r.Name
@@ -137,11 +160,18 @@ func (p *BaseProvider) SetRoles(roles []ProviderRole) {
 func (p *BaseProvider) SetRolesWithKey(
 	roles []ProviderRole,
 	keyFunc func(r *ProviderRole) string) {
+
 	if p.rbac == nil {
 		return
 	}
+
 	p.rbac.mu.Lock()
 	defer p.rbac.mu.Unlock()
+
+	if p.rbac.roles == nil {
+		p.rbac.roles = make([]ProviderRole, 0)
+	}
+
 	p.rbac.roles = roles
 
 	// Create the roles map
@@ -162,6 +192,22 @@ func (p *BaseProvider) SetRolesWithKey(
 	}()
 }
 
+func (p *BaseProvider) AddRole(role ProviderRole) {
+	// Take existing roles and append new ones
+	if p.rbac == nil {
+		return
+	}
+
+	existing := p.rbac.roles
+
+	if existing == nil {
+		existing = make([]ProviderRole, 0)
+	}
+
+	combined := append(existing, role)
+	p.SetRoles(combined)
+}
+
 func (p *BaseProvider) SetResources(resources []ProviderResource) {
 	p.SetResourcesWithKey(resources, func(r *ProviderResource) string {
 		return r.Id
@@ -172,11 +218,18 @@ func (p *BaseProvider) SetResourcesWithKey(
 	resources []ProviderResource,
 	keyFunc func(r *ProviderResource) string,
 ) {
+
 	if p.rbac == nil {
 		return
 	}
+
 	p.rbac.mu.Lock()
 	defer p.rbac.mu.Unlock()
+
+	if p.rbac.resources == nil {
+		p.rbac.resources = make([]ProviderResource, 0)
+	}
+
 	p.rbac.resources = resources
 
 	// Create the resources map
@@ -195,6 +248,21 @@ func (p *BaseProvider) SetResourcesWithKey(
 			return
 		}
 	}()
+}
+
+func (p *BaseProvider) AddResource(resource ProviderResource) {
+	// Take existing resources and append new ones
+	if p.rbac == nil {
+		return
+	}
+	existing := p.rbac.resources
+
+	if existing == nil {
+		existing = make([]ProviderResource, 0)
+	}
+
+	combined := append(existing, resource)
+	p.SetResources(combined)
 }
 
 func (p *BaseProvider) SetIdentities(identities []Identity) {
@@ -225,8 +293,14 @@ func (p *BaseProvider) SetIdentitiesWithKey(
 	if p.identity == nil {
 		return
 	}
+
 	p.identity.mu.Lock()
 	defer p.identity.mu.Unlock()
+
+	if p.identity.identities == nil {
+		p.identity.identities = make([]Identity, 0)
+	}
+
 	p.identity.identities = identities
 
 	// Build the identities map
@@ -249,6 +323,21 @@ func (p *BaseProvider) SetIdentitiesWithKey(
 			return
 		}
 	}()
+}
+
+func (p *BaseProvider) AddIdentity(identity ...Identity) {
+	// Take existing identities and append new ones
+	if p.identity == nil {
+		return
+	}
+
+	existing := p.identity.identities
+	if existing == nil {
+		existing = make([]Identity, 0)
+	}
+
+	combined := append(existing, identity...)
+	p.SetIdentities(combined)
 }
 
 func (p *BaseProvider) GetIdentifier() string {

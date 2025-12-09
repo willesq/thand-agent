@@ -339,6 +339,14 @@ func (c *Config) ReloadConfig() error {
 		return errors.Join(foundErrors...)
 	}
 
+	if c.IsServer() {
+		logrus.Infoln("Setting up temporal services...")
+		err := c.setupTemporalServices()
+		if err != nil {
+			return fmt.Errorf("setting up temporal services: %w", err)
+		}
+	}
+
 	return nil
 }
 

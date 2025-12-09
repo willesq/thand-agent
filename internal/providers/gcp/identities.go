@@ -16,7 +16,7 @@ func (p *gcpProvider) CanSynchronizeIdentities() bool {
 }
 
 // SynchronizeIdentities fetches and caches user and group identities from GCP IAM
-func (p *gcpProvider) SynchronizeIdentities(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
+func (p *gcpProvider) SynchronizeIdentities(ctx context.Context, req models.SynchronizeIdentitiesRequest) (*models.SynchronizeIdentitiesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)
@@ -71,7 +71,7 @@ func (p *gcpProvider) SynchronizeIdentities(ctx context.Context, req models.Sync
 		"project_id": projectId,
 	}).Debug("Refreshed GCP identities from IAM policy")
 
-	return &models.SynchronizeUsersResponse{
+	return &models.SynchronizeIdentitiesResponse{
 		Identities: identities,
 	}, nil
 }

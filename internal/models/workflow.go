@@ -10,10 +10,11 @@ import (
 )
 
 type Workflow struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Workflow    *model.Workflow `json:"workflow,omitempty"`
-	Enabled     bool            `json:"enabled" default:"true"` // By default enable the workflow
+	Version     *version.Version `json:"version,omitempty"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Workflow    *model.Workflow  `json:"workflow,omitempty"`
+	Enabled     bool             `json:"enabled" default:"true"` // By default enable the workflow
 }
 
 func (r *Workflow) HasPermission(user *User) bool {

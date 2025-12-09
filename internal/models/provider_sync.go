@@ -90,7 +90,7 @@ func Synchronize(
 			}
 		}
 
-		we, err := temporalClient.ExecuteWorkflow(
+		_, err := temporalClient.ExecuteWorkflow(
 			ctx,
 			workflowOptions,
 			GetTemporalName(provider.GetIdentifier(), TemporalSynchronizeWorkflowName),
@@ -99,36 +99,6 @@ func Synchronize(
 
 		if err != nil {
 			return fmt.Errorf("failed to execute synchronize workflow: %w", err)
-		}
-
-		var resp SynchronizeResponse
-		if err := we.Get(context.Background(), &resp); err != nil {
-			return fmt.Errorf("failed to get synchronize workflow result: %w", err)
-		}
-
-		if len(resp.Identities) > 0 {
-			logrus.WithFields(logrus.Fields{
-				"identities": len(resp.Identities),
-			}).Info("Setting synchronized identities")
-			provider.SetIdentities(resp.Identities)
-		}
-		if len(resp.Roles) > 0 {
-			logrus.WithFields(logrus.Fields{
-				"roles": len(resp.Roles),
-			}).Info("Setting synchronized roles")
-			provider.SetRoles(resp.Roles)
-		}
-		if len(resp.Permissions) > 0 {
-			logrus.WithFields(logrus.Fields{
-				"permissions": len(resp.Permissions),
-			}).Info("Setting synchronized permissions")
-			provider.SetPermissions(resp.Permissions)
-		}
-		if len(resp.Resources) > 0 {
-			logrus.WithFields(logrus.Fields{
-				"resources": len(resp.Resources),
-			}).Info("Setting synchronized resources")
-			provider.SetResources(resp.Resources)
 		}
 
 		return nil
@@ -141,19 +111,6 @@ func Synchronize(
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var errs []error
-
-	syncResponse := &SynchronizeResponse{}
-
-	activities := NewProviderActivities(provider)
-	var upstreamWorkflowID string
-
-	if syncRequest.Upstream != nil {
-		resp, err := activities.SynchronizeThandStart(ctx, syncRequest.Upstream, provider.GetIdentifier())
-		if err != nil {
-			return fmt.Errorf("failed to start upstream sync: %w", err)
-		}
-		upstreamWorkflowID = resp.WorkflowID
-	}
 
 	// Helper to run sync
 	runSync := func(name SynchronizeCapability, syncFunc func() error) {
@@ -179,22 +136,14 @@ func Synchronize(
 	if provider.HasCapability(ProviderCapabilityIdentities) {
 		// Synchronize Identities
 		runSync(SynchronizeIdentities, func() error {
-			req := SynchronizeUsersRequest{}
+			req := SynchronizeIdentitiesRequest{}
 			for {
 				resp, err := provider.SynchronizeIdentities(ctx, req)
 				if err != nil {
 					return err
 				}
-				mu.Lock()
-				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
-				mu.Unlock()
 
-				if syncRequest.Upstream != nil {
-					chunk := SynchronizeChunkRequest{Identities: resp.Identities}
-					if err := activities.SynchronizeThandChunk(ctx, syncRequest.Upstream, provider.GetIdentifier(), upstreamWorkflowID, chunk); err != nil {
-						return fmt.Errorf("failed to send chunk: %w", err)
-					}
-				}
+				provider.AddIdentity(resp.Identities...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -212,16 +161,8 @@ func Synchronize(
 				if err != nil {
 					return err
 				}
-				mu.Lock()
-				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
-				mu.Unlock()
 
-				if syncRequest.Upstream != nil {
-					chunk := SynchronizeChunkRequest{Identities: resp.Identities}
-					if err := activities.SynchronizeThandChunk(ctx, syncRequest.Upstream, provider.GetIdentifier(), upstreamWorkflowID, chunk); err != nil {
-						return fmt.Errorf("failed to send chunk: %w", err)
-					}
-				}
+				provider.AddIdentity(resp.Identities...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -239,16 +180,8 @@ func Synchronize(
 				if err != nil {
 					return err
 				}
-				mu.Lock()
-				syncResponse.Identities = append(syncResponse.Identities, resp.Identities...)
-				mu.Unlock()
 
-				if syncRequest.Upstream != nil {
-					chunk := SynchronizeChunkRequest{Identities: resp.Identities}
-					if err := activities.SynchronizeThandChunk(ctx, syncRequest.Upstream, provider.GetIdentifier(), upstreamWorkflowID, chunk); err != nil {
-						return fmt.Errorf("failed to send chunk: %w", err)
-					}
-				}
+				provider.AddIdentity(resp.Identities...)
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
 					break
@@ -268,15 +201,9 @@ func Synchronize(
 				if err != nil {
 					return err
 				}
-				mu.Lock()
-				syncResponse.Resources = append(syncResponse.Resources, resp.Resources...)
-				mu.Unlock()
 
-				if syncRequest.Upstream != nil {
-					chunk := SynchronizeChunkRequest{Resources: resp.Resources}
-					if err := activities.SynchronizeThandChunk(ctx, syncRequest.Upstream, provider.GetIdentifier(), upstreamWorkflowID, chunk); err != nil {
-						return fmt.Errorf("failed to send chunk: %w", err)
-					}
+				for _, r := range resp.Resources {
+					provider.AddResource(r)
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -295,15 +222,9 @@ func Synchronize(
 				if err != nil {
 					return err
 				}
-				mu.Lock()
-				syncResponse.Roles = append(syncResponse.Roles, resp.Roles...)
-				mu.Unlock()
 
-				if syncRequest.Upstream != nil {
-					chunk := SynchronizeChunkRequest{Roles: resp.Roles}
-					if err := activities.SynchronizeThandChunk(ctx, syncRequest.Upstream, provider.GetIdentifier(), upstreamWorkflowID, chunk); err != nil {
-						return fmt.Errorf("failed to send chunk: %w", err)
-					}
+				for _, r := range resp.Roles {
+					provider.AddRole(r)
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -322,15 +243,9 @@ func Synchronize(
 				if err != nil {
 					return err
 				}
-				mu.Lock()
-				syncResponse.Permissions = append(syncResponse.Permissions, resp.Permissions...)
-				mu.Unlock()
 
-				if syncRequest.Upstream != nil {
-					chunk := SynchronizeChunkRequest{Permissions: resp.Permissions}
-					if err := activities.SynchronizeThandChunk(ctx, syncRequest.Upstream, provider.GetIdentifier(), upstreamWorkflowID, chunk); err != nil {
-						return fmt.Errorf("failed to send chunk: %w", err)
-					}
+				for _, p := range resp.Permissions {
+					provider.AddPermission(p)
 				}
 
 				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
@@ -350,37 +265,6 @@ func Synchronize(
 
 	if len(errs) > 0 {
 		return fmt.Errorf("synchronization failed: %v", errs)
-	}
-
-	if syncRequest.Upstream != nil {
-		if err := activities.SynchronizeThandCommit(ctx, syncRequest.Upstream, provider.GetIdentifier(), upstreamWorkflowID); err != nil {
-			return fmt.Errorf("failed to commit upstream sync: %w", err)
-		}
-	}
-
-	if len(syncResponse.Identities) > 0 {
-		logrus.WithFields(logrus.Fields{
-			"identities": len(syncResponse.Identities),
-		}).Info("Setting synchronized identities")
-		provider.SetIdentities(syncResponse.Identities)
-	}
-	if len(syncResponse.Roles) > 0 {
-		logrus.WithFields(logrus.Fields{
-			"roles": len(syncResponse.Roles),
-		}).Info("Setting synchronized roles")
-		provider.SetRoles(syncResponse.Roles)
-	}
-	if len(syncResponse.Permissions) > 0 {
-		logrus.WithFields(logrus.Fields{
-			"permissions": len(syncResponse.Permissions),
-		}).Info("Setting synchronized permissions")
-		provider.SetPermissions(syncResponse.Permissions)
-	}
-	if len(syncResponse.Resources) > 0 {
-		logrus.WithFields(logrus.Fields{
-			"resources": len(syncResponse.Resources),
-		}).Info("Setting synchronized resources")
-		provider.SetResources(syncResponse.Resources)
 	}
 
 	return nil

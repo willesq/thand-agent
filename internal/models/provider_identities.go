@@ -14,17 +14,20 @@ type ProviderIdentities interface {
 	GetIdentity(ctx context.Context, identity string) (*Identity, error)
 	ListIdentities(ctx context.Context, filters ...string) ([]Identity, error)
 
+	// Overrides all existing identities with the provided list
 	SetIdentities(identities []Identity)
+	// Appends new identities to the existing list
+	AddIdentity(identity ...Identity)
 
 	// Some APIs support identities, users, groups service accoutns etc.
-	SynchronizeIdentities(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error)
+	SynchronizeIdentities(ctx context.Context, req SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error)
 	// Some require more granular user synchronization
 	SynchronizeUsers(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error)
 	// Others require group synchronization
 	SynchronizeGroups(ctx context.Context, req SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error)
 }
 
-func (p *BaseProvider) SynchronizeIdentities(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error) {
+func (p *BaseProvider) SynchronizeIdentities(ctx context.Context, req SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error) {
 	return nil, ErrNotImplemented
 }
 

@@ -120,7 +120,9 @@ func (c *Config) processProviderDefinitions(foundProviders []*models.ProviderDef
 			if !c.shouldIncludeProvider(providerKey, p, defs) {
 				continue
 			}
-
+			if p.Version == nil {
+				p.Version = provider.Version
+			}
 			if len(p.Name) == 0 {
 				p.Name = providerKey
 			}
@@ -200,7 +202,7 @@ func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[strin
 
 				logrus.Warningln("Temporal service is not initialized, cannot register workflows/activities for provider:", result.key)
 
-			} else {
+			} else if c.IsServer() {
 
 				temporalService := c.GetServices().GetTemporal()
 
@@ -216,11 +218,12 @@ func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[strin
 					logrus.WithError(err).Errorln("Failed to register activities for provider:", result.key)
 					continue
 				}
+
+				c.synchronizeProvider(result.provider)
+
+			} else {
+				logrus.Infoln("Skipping Temporal registration for provider", result.key, "in non-server mode")
 			}
-
-			// Synchronize the provider in the background
-			c.synchronizeProvider(result.provider)
-
 		}
 
 		// The provider returned from the goroutine already has the client set
@@ -261,6 +264,7 @@ func (c *Config) initializeSingleProvider(providerKey string, p *models.Provider
 
 // getProviderImplementation returns the appropriate provider implementation based on config mode
 func (c *Config) getProviderImplementation(providerKey string, providerName string) (models.ProviderImpl, error) {
+
 	if c.IsServer() || c.IsAgent() {
 		return providers.CreateInstance(strings.ToLower(providerName))
 	}

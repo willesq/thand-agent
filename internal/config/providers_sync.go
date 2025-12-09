@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 
-	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -30,26 +29,6 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 
 		syncRequest := models.SynchronizeRequest{
 			ProviderIdentifier: impl.GetIdentifier(),
-		}
-
-		if c.HasThandService() {
-
-			thandEndpoint := c.GetThandServerUrl()
-
-			syncRequest.Upstream = &model.Endpoint{
-				EndpointConfig: &model.EndpointConfiguration{
-					URI: &model.LiteralUri{
-						Value: thandEndpoint,
-					},
-					Authentication: &model.ReferenceableAuthenticationPolicy{
-						AuthenticationPolicy: &model.AuthenticationPolicy{
-							Bearer: &model.BearerAuthenticationPolicy{
-								Token: c.Thand.ApiKey,
-							},
-						},
-					},
-				},
-			}
 		}
 
 		err := impl.Synchronize(

@@ -75,6 +75,14 @@ func (c *Config) LoadWorkflows() (map[string]models.Workflow, error) {
 				continue
 			}
 
+			if p.Version == nil {
+				p.Version = workflow.Version
+			}
+
+			if len(p.Name) == 0 {
+				p.Name = workflowKey
+			}
+
 			if _, exists := defs[workflowKey]; exists {
 				logrus.Warningln("Duplicate workflow key found, skipping:", workflowKey)
 				continue

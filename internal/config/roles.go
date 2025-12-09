@@ -141,13 +141,20 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 				logrus.Infoln("Role disabled:", roleKey)
 				continue
 			}
+
 			if _, exists := defs[roleKey]; exists {
 				logrus.Warningln("Duplicate role key found, skipping:", roleKey)
 				continue
 			}
+
+			if r.Version == nil {
+				r.Version = role.Version
+			}
+
 			if len(r.Name) == 0 {
 				r.Name = roleKey
 			}
+
 			// Validate role limits
 			if err := validateRoleLimits(roleKey, &r); err != nil {
 				logrus.WithError(err).Warnln("Role exceeds limits, skipping:", roleKey)
