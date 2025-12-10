@@ -111,6 +111,21 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 		foundRoles = importedRoles
 	}
 
+	if len(foundRoles) == 0 {
+		logrus.Warningln("No roles found from any source, loading defaults")
+		foundRoles, err = environment.GetDefaultRoles(c.Environment.Platform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load default roles: %w", err)
+		}
+		logrus.Infoln("Loaded default roles:", len(foundRoles))
+	}
+
+	return c.ApplyRoles(foundRoles)
+}
+
+func (c *Config) ApplyRoles(foundRoles []*models.RoleDefinitions) (map[string]models.Role, error) {
+
+	// Add roles defined directly in config
 	if len(c.Roles.Definitions) > 0 {
 		logrus.Debugln("Adding roles defined directly in config: ", len(c.Roles.Definitions))
 		defaultVersion := version.Must(version.NewVersion("1.0"))
@@ -121,15 +136,6 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 				Roles:   map[string]models.Role{roleKey: role},
 			})
 		}
-	}
-
-	if len(foundRoles) == 0 {
-		logrus.Warningln("No roles found from any source, loading defaults")
-		foundRoles, err = environment.GetDefaultRoles(c.Environment.Platform)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load default roles: %w", err)
-		}
-		logrus.Infoln("Loaded default roles:", len(foundRoles))
 	}
 
 	defs := make(map[string]models.Role)

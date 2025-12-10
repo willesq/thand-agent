@@ -339,34 +339,6 @@ func (c *Config) ReloadConfig() error {
 		return errors.Join(foundErrors...)
 	}
 
-	if c.IsServer() {
-
-		if c.GetServices() != nil && c.GetServices().GetTemporal() != nil {
-
-			logrus.Infoln("Setting up temporal services...")
-			err := c.setupTemporalServices()
-
-			if err != nil {
-				return fmt.Errorf("setting up temporal services: %w", err)
-			}
-
-		}
-
-		go func() {
-
-			// Kick off thand.io sync
-			logrus.Infof("Starting synchronization with %s..", c.Thand.Endpoint)
-
-			err := c.KickStartThandSync()
-
-			if err != nil {
-				logrus.WithError(err).Errorln("Failed to start thand sync workflow")
-			}
-
-		}()
-
-	}
-
 	return nil
 }
 
@@ -490,9 +462,93 @@ func (c *Config) SyncWithLoginServer() error {
 		logrus.WithError(err).Errorln("Failed to sync configuration with login server")
 	}
 
-	// Update all providers, roles and workflows to be enabled
+	// Now lets initialize our providers
+	_, err = c.InitializeProviders()
 
-	// TODO Reload environment?
+	if err != nil {
+		logrus.WithError(err).Errorln("Failed to initialize providers after login server sync")
+	}
+
+	return nil
+
+}
+
+// RegisterWithThandServer registers the agent with the thand.io server
+func (c *Config) RegisterWithThandServer() error {
+
+	if !c.IsServer() {
+		return fmt.Errorf("thand services can only be set up in server mode")
+	}
+
+	if len(c.Thand.Endpoint) == 0 {
+
+		logrus.Debugln("Thand endpoint not configured, skipping registration with thand server")
+		return nil
+
+	}
+
+	/*
+
+		1. Discover thand server API URL
+		2. Register with thand server
+		3. Setup temporal services if enabled
+		4. Get back the roles, providers and workflow definitions
+		5. Check this incoming config version against local version
+		6. If remote version is newer then update local config
+		6.1. Commit the new config version to memeory
+		7. If local version is newer then push local config to server
+		8. Check for provider roles, users, permissions etc. If these
+		   do not exist on the server then create them.
+		9. Reload config afterwards. This will start to pull down all,
+		   provider, users, permisions roles etc.
+		10. Upload all these provider roles, permissions etc to the server
+		11. Return
+
+	*/
+
+	loginUrl := c.DiscoverThandServerApiUrl(
+		c.GetThandServerUrl(),
+	)
+
+	registraion, err := c.syncWithEndpoint(loginUrl, c.Thand.ApiKey)
+
+	if err != nil {
+		return fmt.Errorf("failed to register with thand server: %w", err)
+	}
+
+	// Now that we are registed and configured. We need to compare our local config
+	// with the remote config and update if needed. We need to compare the version
+	// numbers
+
+	err = c.MergeConfiguration(registraion)
+
+	if err != nil {
+		logrus.WithError(err).Errorln("Failed to merge configuration from thand server")
+	}
+
+	if c.GetServices() != nil && c.GetServices().GetTemporal() != nil {
+
+		logrus.Infoln("Setting up temporal services...")
+		err := c.setupTemporalServices()
+
+		if err != nil {
+			return fmt.Errorf("setting up temporal services: %w", err)
+		}
+
+	}
+
+	go func() {
+
+		// Kick off thand.io sync
+		logrus.Infof("Starting synchronization with %s..", c.Thand.Endpoint)
+
+		err := c.KickStartThandSync(registraion)
+
+		if err != nil {
+			logrus.WithError(err).Errorln("Failed to start thand sync workflow")
+		}
+
+	}()
 
 	return nil
 
@@ -503,6 +559,12 @@ func (c *Config) RegisterWithLoginServer(localToken string) (*RegistrationRespon
 	loginUrl := c.DiscoverLoginServerApiUrl(
 		c.GetLoginServerUrl(),
 	)
+
+	return c.syncWithEndpoint(loginUrl, localToken)
+
+}
+
+func (c *Config) syncWithEndpoint(loginUrl, localToken string) (*RegistrationResponse, error) {
 
 	version, commit, _ := common.GetModuleBuildInfo()
 

@@ -11,7 +11,7 @@ import (
 	"go.temporal.io/sdk/worker"
 )
 
-func (c *Config) KickStartThandSync() error {
+func (c *Config) KickStartThandSync(registration *RegistrationResponse) error {
 
 	if !c.HasThandService() {
 		return fmt.Errorf("thand service is not configured")

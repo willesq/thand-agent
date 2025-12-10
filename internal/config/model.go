@@ -216,12 +216,12 @@ func (c *Config) HasLargeLanguageModel() bool {
 }
 
 type RoleConfig struct {
-	Path  string          `mapstructure:"path"`
-	URL   *model.Endpoint `mapstructure:"url"`
-	Vault string          `mapstructure:"vault"` // vault secret / path to use
+	Path  string          `mapstructure:"path" json:"path"`
+	URL   *model.Endpoint `mapstructure:"url" json:"url"`
+	Vault string          `mapstructure:"vault" json:"vault"` // vault secret / path to use
 
 	// Store everything in memory
-	Definitions map[string]models.Role `mapstructure:",remain"`
+	Definitions map[string]models.Role `mapstructure:",remain" json:"definitions"`
 }
 
 func (r *RoleConfig) GetRoleByName(name string) (*models.Role, error) {
@@ -236,15 +236,15 @@ func (r *RoleConfig) GetRoleByName(name string) (*models.Role, error) {
 }
 
 type WorkflowConfig struct {
-	Path  string          `mapstructure:"path"`
-	URL   *model.Endpoint `mapstructure:"url"`
-	Vault string          `mapstructure:"vault"` // vault secret / path to use
+	Path  string          `mapstructure:"path" json:"path"`
+	URL   *model.Endpoint `mapstructure:"url" json:"url"`
+	Vault string          `mapstructure:"vault" json:"vault"` // vault secret / path to use
 
 	// Load dynamic plugin registry for custom call tools
-	Plugins WorkflowPluginConfig `mapstructure:"plugins"`
+	Plugins WorkflowPluginConfig `mapstructure:"plugins" json:"plugins"`
 
 	// Store everything in memory
-	Definitions map[string]models.Workflow `mapstructure:",remain"`
+	Definitions map[string]models.Workflow `mapstructure:",remain" json:"definitions"`
 }
 
 func (p *WorkflowConfig) GetWorkflowByName(name string) (*models.Workflow, error) {
@@ -270,15 +270,19 @@ type WorkflowPlugin struct {
 }
 
 type ProviderConfig struct {
-	Path  string          `mapstructure:"path"`
-	URL   *model.Endpoint `mapstructure:"url"`
-	Vault string          `mapstructure:"vault"` // vault secret / path to use
+	Path  string          `mapstructure:"path" json:"path"`
+	URL   *model.Endpoint `mapstructure:"url" json:"url"`
+	Vault string          `mapstructure:"vault" json:"vault"` // vault secret / path to use
 
 	// Load dynamic provider configs
-	Plugins ProviderPluginConfig `mapstructure:"plugins"`
+	Plugins ProviderPluginConfig `mapstructure:"plugins" json:"plugins"`
 
 	// Load providers directly from config using mapstructure:",remain"
-	Definitions map[string]models.Provider `mapstructure:",remain"`
+	Definitions map[string]models.Provider `mapstructure:",remain" json:"definitions"`
+}
+
+func (p *ProviderConfig) GetDefinitions() map[string]models.Provider {
+	return p.Definitions
 }
 
 func (p *ProviderConfig) GetProviderByName(name string) (*models.Provider, error) {
@@ -330,6 +334,10 @@ func (c *Config) GetThandServerUrl() string {
 		"/")
 }
 
+func (c *Config) DiscoverThandServerApiUrl(thandServer string) string {
+	return c.DiscoverLoginServerApiUrl(thandServer)
+}
+
 func (c *Config) DiscoverLoginServerApiUrl(loginServer string) string {
 
 	// Make request to the login server to get the
@@ -362,7 +370,7 @@ func (c *Config) DiscoverLoginServerApiUrl(loginServer string) string {
 	}
 
 	trimPath := strings.TrimSuffix(strings.TrimPrefix(discoveryCheckResponse.ApiBasePath, "/"), "/")
-	return fmt.Sprintf("%s/%s", c.GetLoginServerUrl(), trimPath)
+	return fmt.Sprintf("%s/%s", loginServer, trimPath)
 }
 
 func (c *Config) GetLoginServerHostname() string {

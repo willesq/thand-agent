@@ -20,8 +20,9 @@ const (
 
 type ThandConfig struct {
 	Endpoint string `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint" default:"https://app.thand.io/"`
-	Base     string `json:"base" yaml:"base" mapstructure:"base" default:"/"` // Base path for login endpoint e.g. /
-	ApiKey   string `json:"api_key" yaml:"api_key" mapstructure:"api_key"`    // The API key for authenticating with Thand.io
+	Base     string `json:"base" yaml:"base" mapstructure:"base" default:"/"`    // Base path for login endpoint e.g. /
+	ApiKey   string `json:"api_key" yaml:"api_key" mapstructure:"api_key"`       // The API key for authenticating with Thand.io
+	Sync     bool   `json:"sync" yaml:"sync" mapstructure:"sync" default:"true"` // Whether to enable synchronization with Thand.io
 }
 
 type SynchronizeStartRequest struct {
@@ -32,15 +33,6 @@ type SynchronizeStartRequest struct {
 type SynchronizeStartResponse struct {
 	WorkflowID string `json:"workflow_id"`
 	RunID      string `json:"run_id"`
-}
-
-type SynchronizeChunkRequest struct {
-	Identities  []Identity           `json:"identities"`
-	Users       []User               `json:"users"`
-	Groups      []Group              `json:"groups"`
-	Roles       []ProviderRole       `json:"roles"`
-	Permissions []ProviderPermission `json:"permissions"`
-	Resources   []ProviderResource   `json:"resources"`
 }
 
 type SynchronizeCommitRequest struct {
@@ -59,7 +51,7 @@ type SystemSyncState struct {
 }
 
 // SystemChunk represents a batch of updates to be synced
-type SystemChunk struct {
+type SynchronizeChunkRequest struct {
 	// Configuration Definitions (Versioned)
 	Roles     map[string]Role     `json:"roles,omitempty"`
 	Workflows map[string]Workflow `json:"workflows,omitempty"`

@@ -56,6 +56,20 @@ func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 
 	}
 
+	if len(foundProviders) == 0 {
+		logrus.Warningln("No providers found from any source, loading defaults")
+		foundProviders, err = environment.GetDefaultProviders(c.Environment.Platform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load default providers: %w", err)
+		}
+		logrus.Infoln("Loaded default providers:", len(foundProviders))
+	}
+
+	return c.ApplyProviders(foundProviders)
+}
+
+func (c *Config) ApplyProviders(foundProviders []*models.ProviderDefinitions) (map[string]models.Provider, error) {
+
 	if len(c.Providers.Definitions) > 0 {
 		// Add providers defined directly in config
 		logrus.Debugln("Adding providers defined directly in config: ", len(c.Providers.Definitions))
@@ -72,17 +86,8 @@ func (c *Config) LoadProviders() (map[string]models.Provider, error) {
 		}
 	}
 
-	if len(foundProviders) == 0 {
-		logrus.Warningln("No providers found from any source, loading defaults")
-		foundProviders, err = environment.GetDefaultProviders(c.Environment.Platform)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load default providers: %w", err)
-		}
-		logrus.Infoln("Loaded default providers:", len(foundProviders))
-	}
+	return c.processProviderDefinitions(foundProviders), nil
 
-	defs := c.processProviderDefinitions(foundProviders)
-	return c.InitializeProviders(defs)
 }
 
 // loadProviderVaultData loads provider data from vault if configured
@@ -158,7 +163,12 @@ type initResult struct {
 }
 
 // InitializeProviders initializes all providers in parallel using channels
-func (c *Config) InitializeProviders(defs map[string]models.Provider) (map[string]models.Provider, error) {
+func (c *Config) InitializeProviders() (map[string]models.Provider, error) {
+
+	defs := c.GetProviders().Definitions
+
+	logrus.Debugln("Initializing providers: ", len(defs))
+
 	resultChan := make(chan initResult, len(defs))
 
 	// Start goroutines for each provider

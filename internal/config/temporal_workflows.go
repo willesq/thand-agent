@@ -62,7 +62,7 @@ func ThandSyncWorkflow(ctx workflow.Context, req SystemSyncRequest) error {
 	var initialSyncCursor *models.ConfigurationCursor
 	for {
 		var result struct {
-			Chunk      models.SystemChunk
+			Chunk      models.SynchronizeChunkRequest
 			NextCursor *models.ConfigurationCursor
 		}
 
@@ -96,7 +96,7 @@ func ThandSyncWorkflow(ctx workflow.Context, req SystemSyncRequest) error {
 	return nil
 }
 
-func hasUpdates(chunk models.SystemChunk) bool {
+func hasUpdates(chunk models.SynchronizeChunkRequest) bool {
 	return len(chunk.Roles) > 0 ||
 		len(chunk.Workflows) > 0 ||
 		len(chunk.Providers) > 0 ||

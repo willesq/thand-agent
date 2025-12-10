@@ -18,7 +18,7 @@ type ThandActivities struct {
 }
 
 type GetLocalConfigurationChunkResponse struct {
-	Chunk      models.SystemChunk
+	Chunk      models.SynchronizeChunkRequest
 	NextCursor *models.ConfigurationCursor
 }
 
@@ -30,7 +30,7 @@ func (a *ThandActivities) GetLocalConfigurationChunk(ctx context.Context, cursor
 		return nil, fmt.Errorf("configuration is not initialized")
 	}
 
-	chunk := models.SystemChunk{
+	chunk := models.SynchronizeChunkRequest{
 		Roles:        make(map[string]models.Role),
 		Workflows:    make(map[string]models.Workflow),
 		Providers:    make(map[string]models.Provider),
@@ -154,7 +154,7 @@ func (a *ThandActivities) SynchronizeThandStart(
 		return nil, fmt.Errorf("configuration is not initialized")
 	}
 
-	endpoint := a.Config.Thand.Endpoint
+	endpoint := a.Config.GetThandServerUrl()
 	if endpoint == "" {
 		return nil, fmt.Errorf("thand endpoint is not configured")
 	}
@@ -197,14 +197,14 @@ func (a *ThandActivities) SynchronizeThandChunk(
 	ctx context.Context,
 	providerID string,
 	workflowID string,
-	chunk models.SystemChunk,
+	chunk models.SynchronizeChunkRequest,
 ) error {
 
 	if a.Config == nil {
 		return fmt.Errorf("configuration is not initialized")
 	}
 
-	endpoint := a.Config.Thand.Endpoint
+	endpoint := a.Config.GetThandServerUrl()
 	if endpoint == "" {
 		return fmt.Errorf("thand endpoint is not configured")
 	}
@@ -256,7 +256,7 @@ func (a *ThandActivities) SynchronizeThandCommit(
 		return fmt.Errorf("configuration is not initialized")
 	}
 
-	endpoint := a.Config.Thand.Endpoint
+	endpoint := a.Config.GetThandServerUrl()
 	if endpoint == "" {
 		return fmt.Errorf("thand endpoint is not configured")
 	}
