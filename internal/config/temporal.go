@@ -2,9 +2,6 @@ package config
 
 import (
 	"fmt"
-
-	"github.com/thand-io/agent/internal/models"
-	"go.temporal.io/sdk/workflow"
 )
 
 func (c *Config) setupTemporalServices() error {
@@ -41,17 +38,6 @@ func (c *Config) registerTemporalWorkflows() error {
 		return fmt.Errorf("temporal worker is not initialized")
 	}
 
-	if c.HasThandService() {
-
-		// Register system sync workflow
-		temporalWorker.RegisterWorkflowWithOptions(
-			ThandSyncWorkflow,
-			workflow.RegisterOptions{
-				Name: models.ThandSyncWorkflowName,
-			},
-		)
-	}
-
 	return nil
 
 }
@@ -66,20 +52,6 @@ func (c *Config) registerTemporalActivities() error {
 
 	if temporalWorker == nil {
 		return fmt.Errorf("temporal worker is not initialized")
-	}
-
-	if c.HasThandService() {
-
-		// Register system activities
-		systemActivities := &ThandActivities{
-			Config: c,
-		}
-
-		temporalWorker.RegisterActivity(systemActivities.GetLocalConfigurationChunk)
-		temporalWorker.RegisterActivity(systemActivities.SynchronizeThandStart)
-		temporalWorker.RegisterActivity(systemActivities.SynchronizeThandChunk)
-		temporalWorker.RegisterActivity(systemActivities.SynchronizeThandCommit)
-
 	}
 
 	return nil

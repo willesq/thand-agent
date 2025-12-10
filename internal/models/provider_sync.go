@@ -2,17 +2,27 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"sync"
 	"time"
 
+	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 )
+
+type ProviderPatchRequest struct {
+	Identities  []Identity           `json:"identities,omitempty"`
+	Roles       []ProviderRole       `json:"roles,omitempty"`
+	Permissions []ProviderPermission `json:"permissions,omitempty"`
+	Resources   []ProviderResource   `json:"resources,omitempty"`
+}
 
 func (p *BaseProvider) Synchronize(
 	ctx context.Context,
@@ -100,7 +110,7 @@ func Synchronize(
 				provider.GetIdentifier(),
 				TemporalSynchronizeWorkflowName,
 			),
-			*syncRequest,
+			syncRequest,
 		)
 
 		if err != nil {
@@ -118,143 +128,62 @@ func Synchronize(
 	var mu sync.Mutex
 	var errs []error
 
-	// Helper to run sync
-	runSync := func(name SynchronizeCapability, syncFunc func() error) {
-
-		if !slices.Contains(syncRequest.Requests, name) {
-			logrus.Infof("Skipping synchronization for %s as it's not requested", name)
-			return
-		}
-
-		wg.Go(func() {
-			if err := syncFunc(); err != nil {
-				// Ignore not implemented errors
-				if errors.Is(err, ErrNotImplemented) {
-					return
-				}
-				mu.Lock()
-				errs = append(errs, fmt.Errorf("%s failed: %w", name, err))
-				mu.Unlock()
-			}
-		})
-	}
-
 	if provider.HasCapability(ProviderCapabilityIdentities) {
 		// Synchronize Identities
-		runSync(SynchronizeIdentities, func() error {
-			req := SynchronizeIdentitiesRequest{}
-			for {
-				resp, err := provider.SynchronizeIdentities(ctx, req)
-				if err != nil {
-					return err
-				}
-
+		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeIdentities, &SynchronizeIdentitiesRequest{},
+			func(ctx context.Context, req *SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error) {
+				return provider.SynchronizeIdentities(ctx, *req)
+			},
+			func(resp *SynchronizeIdentitiesResponse) {
 				provider.AddIdentities(resp.Identities...)
-
-				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
-					break
-				}
-				req.Pagination = resp.Pagination
-			}
-			return nil
-		})
+			})
 
 		// Synchronize Users
-		runSync(SynchronizeUsers, func() error {
-			req := SynchronizeUsersRequest{}
-			for {
-				resp, err := provider.SynchronizeUsers(ctx, req)
-				if err != nil {
-					return err
-				}
-
+		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeUsers, &SynchronizeUsersRequest{},
+			func(ctx context.Context, req *SynchronizeUsersRequest) (*SynchronizeUsersResponse, error) {
+				return provider.SynchronizeUsers(ctx, *req)
+			},
+			func(resp *SynchronizeUsersResponse) {
 				provider.AddIdentities(resp.Identities...)
-
-				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
-					break
-				}
-				req.Pagination = resp.Pagination
-			}
-			return nil
-		})
+			})
 
 		// Synchronize Groups
-		runSync(SynchronizeGroups, func() error {
-			req := SynchronizeGroupsRequest{}
-			for {
-				resp, err := provider.SynchronizeGroups(ctx, req)
-				if err != nil {
-					return err
-				}
-
+		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeGroups, &SynchronizeGroupsRequest{},
+			func(ctx context.Context, req *SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error) {
+				return provider.SynchronizeGroups(ctx, *req)
+			},
+			func(resp *SynchronizeGroupsResponse) {
 				provider.AddIdentities(resp.Identities...)
-
-				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
-					break
-				}
-				req.Pagination = resp.Pagination
-			}
-			return nil
-		})
+			})
 	}
 
 	if provider.HasCapability(ProviderCapabilityRBAC) {
 		// Synchronize Resources
-		runSync(SynchronizeResources, func() error {
-			req := SynchronizeResourcesRequest{}
-			for {
-				resp, err := provider.SynchronizeResources(ctx, req)
-				if err != nil {
-					return err
-				}
-
+		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeResources, &SynchronizeResourcesRequest{},
+			func(ctx context.Context, req *SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error) {
+				return provider.SynchronizeResources(ctx, *req)
+			},
+			func(resp *SynchronizeResourcesResponse) {
 				provider.AddResources(resp.Resources...)
-
-				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
-					break
-				}
-				req.Pagination = resp.Pagination
-			}
-			return nil
-		})
+			})
 
 		// Synchronize Roles
-		runSync(SynchronizeRoles, func() error {
-			req := SynchronizeRolesRequest{}
-			for {
-				resp, err := provider.SynchronizeRoles(ctx, req)
-				if err != nil {
-					return err
-				}
-
+		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeRoles, &SynchronizeRolesRequest{},
+			func(ctx context.Context, req *SynchronizeRolesRequest) (*SynchronizeRolesResponse, error) {
+				return provider.SynchronizeRoles(ctx, *req)
+			},
+			func(resp *SynchronizeRolesResponse) {
 				provider.AddRoles(resp.Roles...)
-
-				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
-					break
-				}
-				req.Pagination = resp.Pagination
-			}
-			return nil
-		})
+			})
 
 		// Synchronize Permissions
-		runSync(SynchronizePermissions, func() error {
-			req := SynchronizePermissionsRequest{}
-			for {
-				resp, err := provider.SynchronizePermissions(ctx, req)
-				if err != nil {
-					return err
-				}
-
+		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizePermissions, &SynchronizePermissionsRequest{},
+			func(ctx context.Context, req *SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error) {
+				return provider.SynchronizePermissions(ctx, *req)
+			},
+			func(resp *SynchronizePermissionsResponse) {
 				provider.AddPermissions(resp.Permissions...)
-
-				if resp.Pagination == nil || len(resp.Pagination.Token) == 0 {
-					break
-				}
-				req.Pagination = resp.Pagination
-			}
-			return nil
-		})
+			})
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -265,6 +194,123 @@ func Synchronize(
 
 	if len(errs) > 0 {
 		return fmt.Errorf("synchronization failed: %v", errs)
+	}
+
+	return nil
+}
+
+func executeSync[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	mu *sync.Mutex,
+	errs *[]error,
+	syncRequest *SynchronizeRequest,
+	name SynchronizeCapability,
+	req Req,
+	syncOp func(context.Context, Req) (Resp, error),
+	processOp func(Resp),
+) {
+	if !slices.Contains(syncRequest.Requests, name) {
+		logrus.Infof("Skipping synchronization for %s as it's not requested", name)
+		return
+	}
+
+	wg.Go(func() {
+
+		logrus.Infof("Starting synchronization operation: %s", name)
+
+		for {
+
+			logrus.WithFields(logrus.Fields{
+				"request": req,
+			}).Debugf("Making synchronization request: %s", name)
+
+			resp, err := syncOp(ctx, req)
+
+			if err != nil {
+				// Ignore not implemented errors
+				if errors.Is(err, ErrNotImplemented) {
+					return
+				}
+				mu.Lock()
+				*errs = append(*errs, fmt.Errorf("%s failed: %w", name, err))
+				mu.Unlock()
+				return
+			}
+
+			processOp(resp)
+
+			pagination := resp.GetPagination()
+
+			if pagination == nil || len(pagination.Token) == 0 {
+				break
+			}
+
+			req.SetPagination(pagination)
+
+			// Now send the patch to the server
+
+			go func() {
+				if syncRequest.Upstream != nil {
+					providerUpstreamPatchRequest(name, resp, *syncRequest)
+				}
+			}()
+		}
+	})
+}
+
+func providerUpstreamPatchRequest(
+	name SynchronizeCapability,
+	payload any,
+	syncRequest SynchronizeRequest,
+) error {
+	logrus.Debugln("Sending synchronization updates back to server")
+
+	providerReq := ProviderPatchRequest{}
+
+	switch name {
+	case SynchronizeIdentities:
+		identitiesResp, ok := payload.(*SynchronizeIdentitiesResponse)
+		if ok {
+			providerReq.Identities = identitiesResp.Identities
+		}
+	case SynchronizeRoles:
+		rolesResp, ok := payload.(*SynchronizeRolesResponse)
+		if ok {
+			providerReq.Roles = rolesResp.Roles
+		}
+	case SynchronizePermissions:
+		permissionsResp, ok := payload.(*SynchronizePermissionsResponse)
+		if ok {
+			providerReq.Permissions = permissionsResp.Permissions
+		}
+	case SynchronizeResources:
+		resourcesResp, ok := payload.(*SynchronizeResourcesResponse)
+		if ok {
+			providerReq.Resources = resourcesResp.Resources
+		}
+	}
+
+	data, err := json.Marshal(providerReq)
+
+	if err == nil && len(data) > 0 && syncRequest.Upstream != nil {
+
+		resp, err := common.InvokeHttpRequest(&model.HTTPArguments{
+			Method:   http.MethodPatch,
+			Endpoint: syncRequest.Upstream,
+			Body:     data,
+		})
+
+		if err != nil {
+			logrus.WithError(err).Errorln("Failed to send synchronization updates to server")
+			return err
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			logrus.WithField("status_code", resp.StatusCode()).Errorln("Failed to send synchronization updates to server")
+		} else {
+			logrus.Infoln("Successfully sent synchronization updates to server")
+		}
 	}
 
 	return nil

@@ -93,6 +93,14 @@ type PaginationOptions struct {
 	Token    string `json:"token,omitempty"`
 }
 
+type SynchronizeRequestImpl interface {
+	SetPagination(p *PaginationOptions)
+}
+
+type SynchronizeResponseImpl interface {
+	GetPagination() *PaginationOptions
+}
+
 func (r *SynchronizeRolesRequest) SetPagination(p *PaginationOptions) { r.Pagination = p }
 func (r SynchronizeRolesResponse) GetPagination() *PaginationOptions  { return r.Pagination }
 

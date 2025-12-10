@@ -2,13 +2,17 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/models"
 )
 
-type configDiff struct {
+type ConfigPatchRequest struct {
 	RoleConfig     *RoleConfig     `json:"roles,omitempty"`
 	WorkflowConfig *WorkflowConfig `json:"workflows,omitempty"`
 	ProviderConfig *ProviderConfig `json:"providers,omitempty"`
@@ -16,7 +20,7 @@ type configDiff struct {
 
 func (c *Config) MergeConfiguration(config *RegistrationResponse) error {
 
-	incoming := configDiff{
+	incoming := ConfigPatchRequest{
 		RoleConfig:     config.Roles,
 		WorkflowConfig: config.Workflows,
 		ProviderConfig: config.Providers,
@@ -33,7 +37,7 @@ func (c *Config) MergeConfiguration(config *RegistrationResponse) error {
 	workflows := c.GetWorkflows()
 	providers := c.GetProviders()
 
-	existing := configDiff{
+	existing := ConfigPatchRequest{
 		RoleConfig:     &roles,
 		WorkflowConfig: &workflows,
 		ProviderConfig: &providers,
@@ -62,8 +66,9 @@ func (c *Config) MergeConfiguration(config *RegistrationResponse) error {
 		return err
 	}
 
-	// Convert patches back to structs
-	var incomingDiff configDiff
+	// Convert patches back to structs - these are the NEW changes from the remote
+	// server that we need to apply to our existing configuration
+	var incomingDiff ConfigPatchRequest
 	err = json.Unmarshal(incomingPatch, &incomingDiff)
 
 	if err != nil {
@@ -71,6 +76,7 @@ func (c *Config) MergeConfiguration(config *RegistrationResponse) error {
 		return err
 	}
 
+	// Add these new changes to our existing configuration
 	err = c.applyPatch(incomingDiff)
 
 	if err != nil {
@@ -78,16 +84,61 @@ func (c *Config) MergeConfiguration(config *RegistrationResponse) error {
 		return err
 	}
 
-	// The incoming patch is what needs to be applied to the existing configuration
+	// Now we need to figure out what changes exist on the local system that need to
+	// be sent back to the server
 
-	// However, if we have outgoing changes then we need to update the remove server
-	// with these changes.
+	outgoingPatch, err := jsonpatch.CreateMergePatch(incomingData, existingData)
+
+	if err != nil {
+		logrus.WithError(err).Errorln("Failed to create merge patch for configuration diffing")
+		return err
+	}
+
+	// Send the outgoing changes back to the server to update its configuration
+
+	go func() {
+
+		logrus.Debugln("Sending configuration updates back to server")
+
+		url := fmt.Sprintf("%s/sync", c.DiscoverThandServerApiUrl())
+
+		authentication := &model.ReferenceableAuthenticationPolicy{
+			AuthenticationPolicy: &model.AuthenticationPolicy{
+				Bearer: &model.BearerAuthenticationPolicy{
+					Token: c.Thand.ApiKey,
+				},
+			},
+		}
+
+		resp, err := common.InvokeHttpRequest(&model.HTTPArguments{
+			Method: http.MethodPatch,
+			Endpoint: &model.Endpoint{
+				EndpointConfig: &model.EndpointConfiguration{
+					URI:            &model.LiteralUri{Value: url},
+					Authentication: authentication,
+				},
+			},
+			Body: outgoingPatch,
+		})
+
+		if err != nil {
+			logrus.WithError(err).Errorln("Failed to send configuration updates to server")
+			return
+		}
+
+		if resp.StatusCode() != http.StatusOK {
+			logrus.WithField("status_code", resp.StatusCode()).Errorln("Failed to send configuration updates to server")
+		} else {
+			logrus.Infoln("Successfully sent configuration updates to server")
+		}
+
+	}()
 
 	return nil
 
 }
 
-func (c *Config) applyPatch(diff configDiff) error {
+func (c *Config) applyPatch(diff ConfigPatchRequest) error {
 	// Apply role changes
 	if diff.RoleConfig != nil {
 		err := c.updateRoles(diff.RoleConfig)

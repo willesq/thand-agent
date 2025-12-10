@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config/services"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -334,11 +334,24 @@ func (c *Config) GetThandServerUrl() string {
 		"/")
 }
 
-func (c *Config) DiscoverThandServerApiUrl(thandServer string) string {
-	return c.DiscoverLoginServerApiUrl(thandServer)
+func (c *Config) DiscoverThandServerApiUrl() string {
+	return c.discoverServerApiUrl(c.Thand.Endpoint, &model.ReferenceableAuthenticationPolicy{
+		AuthenticationPolicy: &model.AuthenticationPolicy{
+			Bearer: &model.BearerAuthenticationPolicy{
+				Token: c.Thand.ApiKey,
+			},
+		},
+	})
 }
 
 func (c *Config) DiscoverLoginServerApiUrl(loginServer string) string {
+	return c.discoverServerApiUrl(loginServer, nil)
+}
+
+func (c *Config) discoverServerApiUrl(
+	loginServer string,
+	auth *model.ReferenceableAuthenticationPolicy,
+) string {
 
 	// Make request to the login server to get the
 	// /.well-known/api-configuration endpoint
@@ -347,26 +360,37 @@ func (c *Config) DiscoverLoginServerApiUrl(loginServer string) string {
 	discoveryCheckUrl := fmt.Sprintf("%s/.well-known/api-configuration", loginServer)
 	defaultUrl := fmt.Sprintf("%s/api/v1", loginServer)
 
-	client := resty.New()
-	res, err := client.R().
-		EnableTrace().
-		Get(discoveryCheckUrl)
+	resp, err := common.InvokeHttpRequest(&model.HTTPArguments{
+		Endpoint: &model.Endpoint{
+			EndpointConfig: &model.EndpointConfiguration{
+				URI:            &model.LiteralUri{Value: discoveryCheckUrl},
+				Authentication: auth,
+			},
+		},
+		Method: http.MethodGet,
+	})
 
 	if err != nil {
 		return defaultUrl
 	}
 
-	if res.StatusCode() != http.StatusOK {
+	if resp.StatusCode() != http.StatusOK {
 		return defaultUrl
 	}
 
 	// Get the path field in the JSON response this is our API path
 	var discoveryCheckResponse struct {
+		BaseUrl     string `json:"baseUrl"`
 		ApiBasePath string `json:"apiBasePath"`
 	}
 
-	if err := json.Unmarshal(res.Body(), &discoveryCheckResponse); err != nil {
+	if err := json.Unmarshal(resp.Body(), &discoveryCheckResponse); err != nil {
 		return defaultUrl
+	}
+
+	if len(discoveryCheckResponse.BaseUrl) > 0 {
+		logrus.Debugf("Discovered login server base URL: %s", discoveryCheckResponse.BaseUrl)
+		loginServer = strings.TrimSuffix(discoveryCheckResponse.BaseUrl, "/")
 	}
 
 	trimPath := strings.TrimSuffix(strings.TrimPrefix(discoveryCheckResponse.ApiBasePath, "/"), "/")

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/serverlessworkflow/sdk-go/v3/model"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -27,6 +29,9 @@ const (
 type SynchronizeRequest struct {
 	ProviderIdentifier string                  `json:"provider"` // Provider name
 	Requests           []SynchronizeCapability `json:"requests,omitempty"`
+	// TODO: I don't like embedding the upstream here. I'd ideally like to call in
+	// via the pimary code workflow activity code.
+	Upstream *model.Endpoint `json:"upstream,omitempty"`
 }
 
 type SynchronizeResponse struct {
@@ -54,13 +59,11 @@ func GetNameFromFunction(i any) string {
 	return strings.TrimSuffix(parts[len(parts)-1], "-fm")
 }
 
-func runSyncLoop[Req any, Resp any](
+func runSyncLoop[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 	ctx workflow.Context,
 	providerID string,
-	activityMethod any,
+	activityMethod SynchronizeCapability,
 	req Req,
-	setPagination func(*Req, *PaginationOptions),
-	getPagination func(Resp) *PaginationOptions,
 ) error {
 
 	ao := workflow.LocalActivityOptions{
@@ -76,7 +79,9 @@ func runSyncLoop[Req any, Resp any](
 	ctx = workflow.WithLocalActivityOptions(ctx, ao)
 
 	for {
+
 		var resp Resp
+
 		err := workflow.ExecuteLocalActivity(
 			ctx,
 			CreateTemporalProviderWorkflowName(
@@ -90,12 +95,31 @@ func runSyncLoop[Req any, Resp any](
 			return err
 		}
 
-		pagination := getPagination(resp)
+		pagination := resp.GetPagination()
+
 		if pagination == nil || len(pagination.Token) == 0 {
 			break
 		}
-		setPagination(&req, pagination)
+
+		req.SetPagination(pagination)
+
+		// Make patch request
+		err = providerUpstreamPatchRequest(
+			activityMethod,
+			&resp,
+			SynchronizeRequest{
+				ProviderIdentifier: providerID,
+			},
+		)
+
+		if err != nil {
+
+			logrus.WithError(err).Errorln("Failed to send pagination patch to server")
+			return err
+
+		}
 	}
+
 	return nil
 }
 
@@ -122,9 +146,11 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 	if shouldSync(SynchronizeIdentities) {
 		syncCount++
 		workflow.Go(ctx, func(ctx workflow.Context) {
-			err := runSyncLoop(ctx, syncReq.ProviderIdentifier, (*ProviderActivities).SynchronizeIdentities, SynchronizeIdentitiesRequest{},
-				func(r *SynchronizeIdentitiesRequest, p *PaginationOptions) { r.Pagination = p },
-				func(r SynchronizeIdentitiesResponse) *PaginationOptions { return r.Pagination },
+			err := runSyncLoop[*SynchronizeIdentitiesRequest, SynchronizeIdentitiesResponse](
+				ctx,
+				syncReq.ProviderIdentifier,
+				SynchronizeIdentities,
+				&SynchronizeIdentitiesRequest{},
 			)
 			errChan.Send(ctx, err)
 		})
@@ -134,9 +160,11 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 	if shouldSync(SynchronizeUsers) {
 		syncCount++
 		workflow.Go(ctx, func(ctx workflow.Context) {
-			err := runSyncLoop(ctx, syncReq.ProviderIdentifier, (*ProviderActivities).SynchronizeUsers, SynchronizeUsersRequest{},
-				func(r *SynchronizeUsersRequest, p *PaginationOptions) { r.Pagination = p },
-				func(r SynchronizeUsersResponse) *PaginationOptions { return r.Pagination },
+			err := runSyncLoop[*SynchronizeUsersRequest, SynchronizeUsersResponse](
+				ctx,
+				syncReq.ProviderIdentifier,
+				SynchronizeUsers,
+				&SynchronizeUsersRequest{},
 			)
 			errChan.Send(ctx, err)
 		})
@@ -146,9 +174,11 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 	if shouldSync(SynchronizeGroups) {
 		syncCount++
 		workflow.Go(ctx, func(ctx workflow.Context) {
-			err := runSyncLoop(ctx, syncReq.ProviderIdentifier, (*ProviderActivities).SynchronizeGroups, SynchronizeGroupsRequest{},
-				func(r *SynchronizeGroupsRequest, p *PaginationOptions) { r.Pagination = p },
-				func(r SynchronizeGroupsResponse) *PaginationOptions { return r.Pagination },
+			err := runSyncLoop[*SynchronizeGroupsRequest, SynchronizeGroupsResponse](
+				ctx,
+				syncReq.ProviderIdentifier,
+				SynchronizeGroups,
+				&SynchronizeGroupsRequest{},
 			)
 			errChan.Send(ctx, err)
 		})
@@ -158,9 +188,11 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 	if shouldSync(SynchronizeResources) {
 		syncCount++
 		workflow.Go(ctx, func(ctx workflow.Context) {
-			err := runSyncLoop(ctx, syncReq.ProviderIdentifier, (*ProviderActivities).SynchronizeResources, SynchronizeResourcesRequest{},
-				func(r *SynchronizeResourcesRequest, p *PaginationOptions) { r.Pagination = p },
-				func(r SynchronizeResourcesResponse) *PaginationOptions { return r.Pagination },
+			err := runSyncLoop[*SynchronizeResourcesRequest, SynchronizeResourcesResponse](
+				ctx,
+				syncReq.ProviderIdentifier,
+				SynchronizeResources,
+				&SynchronizeResourcesRequest{},
 			)
 			errChan.Send(ctx, err)
 		})
@@ -170,9 +202,11 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 	if shouldSync(SynchronizeRoles) {
 		syncCount++
 		workflow.Go(ctx, func(ctx workflow.Context) {
-			err := runSyncLoop(ctx, syncReq.ProviderIdentifier, (*ProviderActivities).SynchronizeRoles, SynchronizeRolesRequest{},
-				func(r *SynchronizeRolesRequest, p *PaginationOptions) { r.Pagination = p },
-				func(r SynchronizeRolesResponse) *PaginationOptions { return r.Pagination },
+			err := runSyncLoop[*SynchronizeRolesRequest, SynchronizeRolesResponse](
+				ctx,
+				syncReq.ProviderIdentifier,
+				SynchronizeRoles,
+				&SynchronizeRolesRequest{},
 			)
 			errChan.Send(ctx, err)
 		})
@@ -182,9 +216,11 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 	if shouldSync(SynchronizePermissions) {
 		syncCount++
 		workflow.Go(ctx, func(ctx workflow.Context) {
-			err := runSyncLoop(ctx, syncReq.ProviderIdentifier, (*ProviderActivities).SynchronizePermissions, SynchronizePermissionsRequest{},
-				func(r *SynchronizePermissionsRequest, p *PaginationOptions) { r.Pagination = p },
-				func(r SynchronizePermissionsResponse) *PaginationOptions { return r.Pagination },
+			err := runSyncLoop[*SynchronizePermissionsRequest, SynchronizePermissionsResponse](
+				ctx,
+				syncReq.ProviderIdentifier,
+				SynchronizePermissions,
+				&SynchronizePermissionsRequest{},
 			)
 			errChan.Send(ctx, err)
 		})

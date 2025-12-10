@@ -50,6 +50,8 @@ func MakeRequestFromBuilder(restBuilder *resty.Request, method string, finalUrl 
 		return restBuilder.Post(finalUrl)
 	case http.MethodPut:
 		return restBuilder.Put(finalUrl)
+	case http.MethodPatch:
+		return restBuilder.Patch(finalUrl)
 	case http.MethodDelete:
 		return restBuilder.Delete(finalUrl)
 	default:
@@ -70,7 +72,8 @@ func CreateRequestBuilderFromEndpointWithClient(client *resty.Client, req *model
 
 	restBuilder := client.R().
 		EnableTrace().
-		SetHeader("User-Agent", fmt.Sprintf("Thand - %s", GetBuildIdentifier()))
+		SetHeader("User-Agent", fmt.Sprintf("Thand - %s", GetBuildIdentifier())).
+		SetHeader("X-Agent-Id", GetClientIdentifier().String())
 
 	if err := configureAuthentication(restBuilder, req.Endpoint); err != nil {
 		return nil, err

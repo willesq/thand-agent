@@ -37,17 +37,17 @@ type RBACSupport struct {
 
 	// Permission management
 	permissions      []ProviderPermission
-	permissionsMap   map[string]*ProviderPermission
+	permissionsMap   map[string]*ProviderPermission // map is a pointer back to the permissions list
 	permissionsIndex bleve.Index
 
 	// Role management
 	roles      []ProviderRole
-	rolesMap   map[string]*ProviderRole
+	rolesMap   map[string]*ProviderRole // map is a pointer back to the roles list
 	rolesIndex bleve.Index
 
 	// Resource management
 	resources      []ProviderResource
-	resourcesMap   map[string]*ProviderResource
+	resourcesMap   map[string]*ProviderResource // map is a pointer back to the resources list
 	resourcesIndex bleve.Index
 }
 
@@ -147,19 +147,27 @@ func (p *BaseProvider) AddPermissions(permissions ...ProviderPermission) {
 		existing = make([]ProviderPermission, 0)
 	}
 
-	combined := append(existing, permissions...)
+	combined := append(existing, FilterDuplicates(
+		permissions,
+		p.rbac.permissionsMap,
+		func(p ProviderPermission) []string {
+			return []string{p.Name}
+		},
+	)...)
 	p.SetPermissions(combined)
 }
 
 func (p *BaseProvider) SetRoles(roles []ProviderRole) {
-	p.SetRolesWithKey(roles, func(r *ProviderRole) string {
-		return r.Name
-	})
+	p.SetRolesWithKey(roles, CreateKeysFromRoles)
+}
+
+func CreateKeysFromRoles(r ProviderRole) []string {
+	return []string{r.Name}
 }
 
 func (p *BaseProvider) SetRolesWithKey(
 	roles []ProviderRole,
-	keyFunc func(r *ProviderRole) string) {
+	keyFunc func(r ProviderRole) []string) {
 
 	if p.rbac == nil {
 		return
@@ -177,9 +185,11 @@ func (p *BaseProvider) SetRolesWithKey(
 	// Create the roles map
 	p.rbac.rolesMap = make(map[string]*ProviderRole)
 	for i := range roles {
-		role := &roles[i]
-		keyName := keyFunc(role)
-		p.rbac.rolesMap[strings.ToLower(keyName)] = role
+		role := roles[i]
+		keyNames := keyFunc(role)
+		for _, keyName := range keyNames {
+			p.rbac.rolesMap[strings.ToLower(keyName)] = &role
+		}
 	}
 
 	// Trigger reindex
@@ -204,19 +214,25 @@ func (p *BaseProvider) AddRoles(roles ...ProviderRole) {
 		existing = make([]ProviderRole, 0)
 	}
 
-	combined := append(existing, roles...)
+	combined := append(existing, FilterDuplicates(
+		roles,
+		p.rbac.rolesMap,
+		CreateKeysFromRoles,
+	)...)
 	p.SetRoles(combined)
 }
 
 func (p *BaseProvider) SetResources(resources []ProviderResource) {
-	p.SetResourcesWithKey(resources, func(r *ProviderResource) string {
-		return r.Id
-	})
+	p.SetResourcesWithKey(resources, CreateKeysFromResources)
+}
+
+func CreateKeysFromResources(r ProviderResource) []string {
+	return []string{r.Id}
 }
 
 func (p *BaseProvider) SetResourcesWithKey(
 	resources []ProviderResource,
-	keyFunc func(r *ProviderResource) string,
+	keyFunc func(r ProviderResource) []string,
 ) {
 
 	if p.rbac == nil {
@@ -235,9 +251,11 @@ func (p *BaseProvider) SetResourcesWithKey(
 	// Create the resources map
 	p.rbac.resourcesMap = make(map[string]*ProviderResource)
 	for i := range resources {
-		resource := &resources[i]
-		keyName := keyFunc(resource)
-		p.rbac.resourcesMap[strings.ToLower(keyName)] = resource
+		resource := resources[i]
+		keyNames := keyFunc(resource)
+		for _, keyName := range keyNames {
+			p.rbac.resourcesMap[strings.ToLower(keyName)] = &resource
+		}
 	}
 
 	// Trigger reindex
@@ -261,33 +279,64 @@ func (p *BaseProvider) AddResources(resources ...ProviderResource) {
 		existing = make([]ProviderResource, 0)
 	}
 
-	combined := append(existing, resources...)
+	combined := append(existing, FilterDuplicates(
+		resources,
+		p.rbac.resourcesMap,
+		CreateKeysFromResources,
+	)...)
 	p.SetResources(combined)
 }
 
+func FilterDuplicates[T any](items []T, existing map[string]*T, keyFunc func(i T) []string) []T {
+
+	var result []T
+
+	for _, item := range items {
+
+		keys := keyFunc(item)
+		found := false
+
+		for _, key := range keys {
+			lowerKey := strings.ToLower(key)
+			if _, exists := existing[lowerKey]; exists {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			result = append(result, item)
+		}
+	}
+
+	return result
+}
+
+func CreateKeysFromIdentity(i Identity) []string {
+	var keys []string
+	keys = append(keys, i.ID)
+	keys = append(keys, i.Label)
+	if i.User != nil && len(i.User.Email) != 0 {
+		keys = append(keys, i.User.Email)
+	}
+	if i.Group != nil {
+		if len(i.Group.Name) != 0 {
+			keys = append(keys, i.Group.Name)
+		}
+		if len(i.Group.Email) != 0 {
+			keys = append(keys, i.Group.Email)
+		}
+	}
+	return keys
+}
+
 func (p *BaseProvider) SetIdentities(identities []Identity) {
-	p.SetIdentitiesWithKey(identities, func(i *Identity) []string {
-		var keys []string
-		keys = append(keys, i.ID)
-		keys = append(keys, i.Label)
-		if i.User != nil && len(i.User.Email) != 0 {
-			keys = append(keys, i.User.Email)
-		}
-		if i.Group != nil {
-			if len(i.Group.Name) != 0 {
-				keys = append(keys, i.Group.Name)
-			}
-			if len(i.Group.Email) != 0 {
-				keys = append(keys, i.Group.Email)
-			}
-		}
-		return keys
-	})
+	p.SetIdentitiesWithKey(identities, CreateKeysFromIdentity)
 }
 
 func (p *BaseProvider) SetIdentitiesWithKey(
 	identities []Identity,
-	keyFunc func(i *Identity) []string,
+	keyFunc func(i Identity) []string,
 ) {
 
 	if p.identity == nil {
@@ -306,12 +355,12 @@ func (p *BaseProvider) SetIdentitiesWithKey(
 	// Build the identities map
 	for i := range identities {
 
-		identity := &identities[i]
+		identity := identities[i]
 
 		keys := keyFunc(identity)
 
 		for _, key := range keys {
-			p.identity.identitiesMap[strings.ToLower(key)] = identity
+			p.identity.identitiesMap[strings.ToLower(key)] = &identity
 		}
 	}
 
@@ -336,7 +385,11 @@ func (p *BaseProvider) AddIdentities(identities ...Identity) {
 		existing = make([]Identity, 0)
 	}
 
-	combined := append(existing, identities...)
+	combined := append(existing, FilterDuplicates(
+		identities,
+		p.identity.identitiesMap,
+		CreateKeysFromIdentity,
+	)...)
 	p.SetIdentities(combined)
 }
 

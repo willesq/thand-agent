@@ -4,8 +4,6 @@ go 1.25
 
 toolchain go1.25.0
 
-replace github.com/serverlessworkflow/sdk-go/v3 => github.com/hughneale/serverless-sdk-go/v3 v3.0.0-20251022183658-27de3226307f
-
 require (
 	cloud.google.com/go/compute/metadata v0.9.0
 	cloud.google.com/go/kms v1.23.2
@@ -56,7 +54,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go v1.90.0
 	github.com/okta/okta-sdk-golang/v2 v2.20.0
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
-	github.com/serverlessworkflow/sdk-go/v3 v3.1.1
+	github.com/serverlessworkflow/sdk-go/v3 v3.2.0
 	github.com/simpleforce/simpleforce v0.0.0-20220429021116-acf4ac67ef68
 	github.com/sirupsen/logrus v1.9.3
 	github.com/slack-go/slack v0.17.3

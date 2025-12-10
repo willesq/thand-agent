@@ -506,11 +506,8 @@ func (c *Config) RegisterWithThandServer() error {
 
 	*/
 
-	loginUrl := c.DiscoverThandServerApiUrl(
-		c.GetThandServerUrl(),
-	)
-
-	registraion, err := c.syncWithEndpoint(loginUrl, c.Thand.ApiKey)
+	thandLoginUrl := c.DiscoverThandServerApiUrl()
+	registraion, err := c.syncWithEndpoint(thandLoginUrl, c.Thand.ApiKey)
 
 	if err != nil {
 		return fmt.Errorf("failed to register with thand server: %w", err)
@@ -536,19 +533,6 @@ func (c *Config) RegisterWithThandServer() error {
 		}
 
 	}
-
-	go func() {
-
-		// Kick off thand.io sync
-		logrus.Infof("Starting synchronization with %s..", c.Thand.Endpoint)
-
-		err := c.KickStartThandSync(registraion)
-
-		if err != nil {
-			logrus.WithError(err).Errorln("Failed to start thand sync workflow")
-		}
-
-	}()
 
 	return nil
 
