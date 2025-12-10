@@ -2,6 +2,8 @@ package config
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
@@ -45,7 +47,10 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 		if c.HasThandService() {
 
 			baseUrl := c.DiscoverThandServerApiUrl()
-			providerSyncUrl := baseUrl + "/providers/sync"
+			providerSyncUrl := fmt.Sprintf("%s/providers/%s/sync",
+				strings.TrimSuffix(baseUrl, "/"),
+				strings.ToLower(impl.GetIdentifier()),
+			)
 
 			syncRequest.Upstream = &model.Endpoint{
 				EndpointConfig: &model.EndpointConfiguration{

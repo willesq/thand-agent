@@ -74,7 +74,7 @@ func (c *Config) ApplyProviders(foundProviders []*models.ProviderDefinitions) (m
 		// Add providers defined directly in config
 		logrus.Debugln("Adding providers defined directly in config: ", len(c.Providers.Definitions))
 
-		defaultVersion := version.Must(version.NewVersion("1.0"))
+		defaultVersion := version.Must(version.NewVersion("1.0.0"))
 
 		for providerKey, provider := range c.Providers.Definitions {
 			foundProviders = append(foundProviders, &models.ProviderDefinitions{
@@ -163,7 +163,7 @@ type initResult struct {
 }
 
 // InitializeProviders initializes all providers in parallel using channels
-func (c *Config) InitializeProviders() (map[string]models.Provider, error) {
+func (c *Config) InitializeProviders() error {
 
 	defs := c.GetProviders().Definitions
 
@@ -241,8 +241,12 @@ func (c *Config) InitializeProviders() (map[string]models.Provider, error) {
 
 	}
 
+	c.mu.Lock()
+	c.Providers.Definitions = results
+	c.mu.Unlock()
+
 	logrus.Debugln("All providers initialized successfully")
-	return results, nil
+	return nil
 }
 
 // initializeSingleProvider initializes a single provider

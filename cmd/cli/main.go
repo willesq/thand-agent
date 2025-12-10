@@ -108,7 +108,7 @@ func preRunConfigE(cmd *cobra.Command, mode config.Mode) error {
 		}
 
 		// Now we can initalize our providers
-		_, err = cfg.InitializeProviders()
+		err = cfg.InitializeProviders()
 		if err != nil {
 			logrus.WithError(err).Errorln("Failed to initialize providers")
 			return fmt.Errorf("failed to initialize providers: %w", err)

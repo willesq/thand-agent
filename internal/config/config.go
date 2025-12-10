@@ -274,7 +274,6 @@ func setupLogging(config *Config, v *viper.Viper) error {
 
 func (c *Config) ReloadConfig() error {
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 	var foundErrors []error
 
 	// Load roles in parallel
@@ -282,14 +281,14 @@ func (c *Config) ReloadConfig() error {
 		roles, err := c.LoadRoles()
 		if err != nil {
 			logrus.WithError(err).Errorln("Error loading roles")
-			mu.Lock()
+			c.mu.Lock()
 			foundErrors = append(foundErrors, fmt.Errorf("loading roles: %w", err))
-			mu.Unlock()
+			c.mu.Unlock()
 		} else if len(roles) > 0 {
 			logrus.Infoln("Loaded roles from external source:", len(roles))
-			mu.Lock()
+			c.mu.Lock()
 			c.Roles.Definitions = roles
-			mu.Unlock()
+			c.mu.Unlock()
 		} else {
 			logrus.Warningln("No roles loaded from external source")
 		}
@@ -300,14 +299,14 @@ func (c *Config) ReloadConfig() error {
 		workflows, err := c.LoadWorkflows()
 		if err != nil {
 			logrus.WithError(err).Errorln("Error loading workflows")
-			mu.Lock()
+			c.mu.Lock()
 			foundErrors = append(foundErrors, fmt.Errorf("loading workflows: %w", err))
-			mu.Unlock()
+			c.mu.Unlock()
 		} else if len(workflows) > 0 {
 			logrus.Infoln("Loaded workflows from external source:", len(workflows))
-			mu.Lock()
+			c.mu.Lock()
 			c.Workflows.Definitions = workflows
-			mu.Unlock()
+			c.mu.Unlock()
 		} else {
 			logrus.Warningln("No workflows loaded from external source")
 		}
@@ -318,14 +317,14 @@ func (c *Config) ReloadConfig() error {
 		providers, err := c.LoadProviders()
 		if err != nil {
 			logrus.WithError(err).Errorln("Error loading providers")
-			mu.Lock()
+			c.mu.Lock()
 			foundErrors = append(foundErrors, fmt.Errorf("loading providers: %w", err))
-			mu.Unlock()
+			c.mu.Unlock()
 		} else if len(providers) > 0 {
 			logrus.Infoln("Loaded providers from external source:", len(providers))
-			mu.Lock()
+			c.mu.Lock()
 			c.Providers.Definitions = providers
-			mu.Unlock()
+			c.mu.Unlock()
 		} else {
 			logrus.Warningln("No providers loaded from external source")
 		}
@@ -463,7 +462,7 @@ func (c *Config) SyncWithLoginServer() error {
 	}
 
 	// Now lets initialize our providers
-	_, err = c.InitializeProviders()
+	err = c.InitializeProviders()
 
 	if err != nil {
 		logrus.WithError(err).Errorln("Failed to initialize providers after login server sync")

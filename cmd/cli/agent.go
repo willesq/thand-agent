@@ -35,7 +35,7 @@ This will run the web service that handles authentication and authorization requ
 		}
 
 		// Initialize providers
-		_, err = cfg.InitializeProviders()
+		err = cfg.InitializeProviders()
 
 		if err != nil {
 			logrus.WithError(err).Errorln("Failed to initialize providers")

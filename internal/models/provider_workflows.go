@@ -62,6 +62,7 @@ func GetNameFromFunction(i any) string {
 func runSyncLoop[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 	ctx workflow.Context,
 	providerID string,
+	syncRequest *SynchronizeRequest,
 	activityMethod SynchronizeCapability,
 	req Req,
 ) error {
@@ -130,7 +131,8 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 	}
 
 	log := workflow.GetLogger(ctx)
-	log.Info("Starting synchronization workflow for provider: ", syncReq.ProviderIdentifier)
+	log.Info("Starting synchronization workflow for provider: ",
+		syncReq.ProviderIdentifier)
 
 	errChan := workflow.NewChannel(ctx)
 	syncCount := 0
@@ -149,6 +151,7 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeIdentitiesRequest, SynchronizeIdentitiesResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
+				&syncReq,
 				SynchronizeIdentities,
 				&SynchronizeIdentitiesRequest{},
 			)
@@ -163,6 +166,7 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeUsersRequest, SynchronizeUsersResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
+				&syncReq,
 				SynchronizeUsers,
 				&SynchronizeUsersRequest{},
 			)
@@ -177,6 +181,7 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeGroupsRequest, SynchronizeGroupsResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
+				&syncReq,
 				SynchronizeGroups,
 				&SynchronizeGroupsRequest{},
 			)
@@ -191,6 +196,7 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeResourcesRequest, SynchronizeResourcesResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
+				&syncReq,
 				SynchronizeResources,
 				&SynchronizeResourcesRequest{},
 			)
@@ -205,6 +211,7 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeRolesRequest, SynchronizeRolesResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
+				&syncReq,
 				SynchronizeRoles,
 				&SynchronizeRolesRequest{},
 			)
@@ -219,6 +226,7 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizePermissionsRequest, SynchronizePermissionsResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
+				&syncReq,
 				SynchronizePermissions,
 				&SynchronizePermissionsRequest{},
 			)

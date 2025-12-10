@@ -62,6 +62,7 @@ type Config struct {
 	// Internal mode of operation
 	mode   Mode
 	logger thandLogger
+	mu     sync.RWMutex
 
 	// Cached services client
 	initializeServiceClientOnce sync.Once
