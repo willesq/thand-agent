@@ -23,6 +23,9 @@ Configuration is loaded in this order (later sources override earlier ones):
 3. Environment variables (prefixed with `THAND_`)
 4. Command line flags
 
+{: .warning }
+> **Important:** If you are using Temporal (recommended for production), you must configure specific Search Attributes in your Temporal Namespace. See **[Temporal Configuration](temporal.md)** for critical setup instructions.
+
 ---
 
 ## Basic Configuration Structure
