@@ -2,6 +2,9 @@ package config
 
 import (
 	"fmt"
+
+	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/activity"
 )
 
 func (c *Config) setupTemporalServices() error {
@@ -53,6 +56,17 @@ func (c *Config) registerTemporalActivities() error {
 	if temporalWorker == nil {
 		return fmt.Errorf("temporal worker is not initialized")
 	}
+
+	thandActivities := &thandActivities{
+		config: c,
+	}
+
+	temporalWorker.RegisterActivityWithOptions(
+		thandActivities.PatchProviderUpstream,
+		activity.RegisterOptions{
+			Name: models.TemporalPatchProviderUpstreamActivityName,
+		},
+	)
 
 	return nil
 

@@ -2,14 +2,11 @@ package models
 
 import (
 	"fmt"
-	"reflect"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
-	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -43,26 +40,9 @@ func CreateTemporalWorkflowIdentifier(workflowName string) string {
 	return strings.ToLower(fmt.Sprintf("%s-%s", common.GetClientIdentifier(), workflowName))
 }
 
-func GetNameFromFunction(i any) string {
-	v := reflect.ValueOf(i)
-	if v.Kind() == reflect.Func && v.Type().NumIn() > 0 {
-		receiverType := v.Type().In(0)
-		for j := 0; j < receiverType.NumMethod(); j++ {
-			method := receiverType.Method(j)
-			if method.Func.Pointer() == v.Pointer() {
-				return method.Name
-			}
-		}
-	}
-	fullName := runtime.FuncForPC(v.Pointer()).Name()
-	parts := strings.Split(fullName, ".")
-	return strings.TrimSuffix(parts[len(parts)-1], "-fm")
-}
-
 func runSyncLoop[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 	ctx workflow.Context,
 	providerID string,
-	syncRequest *SynchronizeRequest,
 	activityMethod SynchronizeCapability,
 	req Req,
 ) error {
@@ -83,14 +63,28 @@ func runSyncLoop[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 
 		var resp Resp
 
+		activityName := CreateTemporalProviderWorkflowName(
+			providerID,
+			string(activityMethod),
+		)
+
 		err := workflow.ExecuteLocalActivity(
 			ctx,
-			CreateTemporalProviderWorkflowName(
-				providerID,
-				GetNameFromFunction(activityMethod),
-			),
+			activityName,
 			req,
 		).Get(ctx, &resp)
+
+		if err != nil {
+			return err
+		}
+
+		err = workflow.ExecuteLocalActivity(
+			ctx,
+			TemporalPatchProviderUpstreamActivityName,
+			activityMethod,
+			providerID,
+			resp,
+		).Get(ctx, nil)
 
 		if err != nil {
 			return err
@@ -104,21 +98,6 @@ func runSyncLoop[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 
 		req.SetPagination(pagination)
 
-		// Make patch request
-		err = providerUpstreamPatchRequest(
-			activityMethod,
-			&resp,
-			SynchronizeRequest{
-				ProviderIdentifier: providerID,
-			},
-		)
-
-		if err != nil {
-
-			logrus.WithError(err).Errorln("Failed to send pagination patch to server")
-			return err
-
-		}
 	}
 
 	return nil
@@ -151,7 +130,6 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeIdentitiesRequest, SynchronizeIdentitiesResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
-				&syncReq,
 				SynchronizeIdentities,
 				&SynchronizeIdentitiesRequest{},
 			)
@@ -166,7 +144,6 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeUsersRequest, SynchronizeUsersResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
-				&syncReq,
 				SynchronizeUsers,
 				&SynchronizeUsersRequest{},
 			)
@@ -181,7 +158,6 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeGroupsRequest, SynchronizeGroupsResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
-				&syncReq,
 				SynchronizeGroups,
 				&SynchronizeGroupsRequest{},
 			)
@@ -196,7 +172,6 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeResourcesRequest, SynchronizeResourcesResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
-				&syncReq,
 				SynchronizeResources,
 				&SynchronizeResourcesRequest{},
 			)
@@ -211,7 +186,6 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizeRolesRequest, SynchronizeRolesResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
-				&syncReq,
 				SynchronizeRoles,
 				&SynchronizeRolesRequest{},
 			)
@@ -226,7 +200,6 @@ func ProviderSynchronizeWorkflow(ctx workflow.Context, syncReq SynchronizeReques
 			err := runSyncLoop[*SynchronizePermissionsRequest, SynchronizePermissionsResponse](
 				ctx,
 				syncReq.ProviderIdentifier,
-				&syncReq,
 				SynchronizePermissions,
 				&SynchronizePermissionsRequest{},
 			)

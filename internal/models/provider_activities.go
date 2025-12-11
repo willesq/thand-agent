@@ -45,14 +45,14 @@ func (a *ProviderActivities) RevokeRole(
 
 func (a *ProviderActivities) SynchronizeIdentities(
 	ctx context.Context,
-	req SynchronizeIdentitiesRequest,
+	req *SynchronizeIdentitiesRequest,
 ) (*SynchronizeIdentitiesResponse, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeIdentities activity")
 
-	result, err := handleNotImplementedError(a.provider.SynchronizeIdentities(ctx, req))
+	result, err := handleNotImplementedError(a.provider.SynchronizeIdentities(ctx, *req))
 
 	if err == nil {
 		a.provider.AddIdentities(result.Identities...)
@@ -63,14 +63,14 @@ func (a *ProviderActivities) SynchronizeIdentities(
 
 func (a *ProviderActivities) SynchronizeResources(
 	ctx context.Context,
-	req SynchronizeResourcesRequest,
+	req *SynchronizeResourcesRequest,
 ) (*SynchronizeResourcesResponse, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeResources activity")
 
-	result, err := handleNotImplementedError(a.provider.SynchronizeResources(ctx, req))
+	result, err := handleNotImplementedError(a.provider.SynchronizeResources(ctx, *req))
 
 	if err == nil {
 		a.provider.AddResources(result.Resources...)
@@ -84,14 +84,14 @@ func (a *ProviderActivities) SynchronizeResources(
 // within the same process context
 func (a *ProviderActivities) SynchronizeUsers(
 	ctx context.Context,
-	req SynchronizeUsersRequest,
+	req *SynchronizeUsersRequest,
 ) (*SynchronizeUsersResponse, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeUsers activity")
 
-	result, err := handleNotImplementedError(a.provider.SynchronizeUsers(ctx, req))
+	result, err := handleNotImplementedError(a.provider.SynchronizeUsers(ctx, *req))
 
 	if err == nil {
 		a.provider.AddIdentities(result.Identities...)
@@ -106,14 +106,14 @@ func (a *ProviderActivities) SynchronizeUsers(
 // within the same process context
 func (a *ProviderActivities) SynchronizeGroups(
 	ctx context.Context,
-	req SynchronizeGroupsRequest,
+	req *SynchronizeGroupsRequest,
 ) (*SynchronizeGroupsResponse, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeGroups activity")
 
-	result, err := handleNotImplementedError(a.provider.SynchronizeGroups(ctx, req))
+	result, err := handleNotImplementedError(a.provider.SynchronizeGroups(ctx, *req))
 
 	if err == nil {
 		a.provider.AddIdentities(result.Identities...)
@@ -127,14 +127,14 @@ func (a *ProviderActivities) SynchronizeGroups(
 // within the same process context
 func (a *ProviderActivities) SynchronizePermissions(
 	ctx context.Context,
-	req SynchronizePermissionsRequest,
+	req *SynchronizePermissionsRequest,
 ) (*SynchronizePermissionsResponse, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizePermissions activity")
 
-	result, err := handleNotImplementedError(a.provider.SynchronizePermissions(ctx, req))
+	result, err := handleNotImplementedError(a.provider.SynchronizePermissions(ctx, *req))
 
 	if err == nil {
 		a.provider.AddPermissions(result.Permissions...)
@@ -148,14 +148,14 @@ func (a *ProviderActivities) SynchronizePermissions(
 // within the same process context
 func (a *ProviderActivities) SynchronizeRoles(
 	ctx context.Context,
-	req SynchronizeRolesRequest,
+	req *SynchronizeRolesRequest,
 ) (*SynchronizeRolesResponse, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"pagination": req.Pagination,
 	}).Infoln("Starting SynchronizeRoles activity")
 
-	result, err := handleNotImplementedError(a.provider.SynchronizeRoles(ctx, req))
+	result, err := handleNotImplementedError(a.provider.SynchronizeRoles(ctx, *req))
 
 	if err == nil {
 		a.provider.AddRoles(result.Roles...)

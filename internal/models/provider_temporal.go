@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"go.temporal.io/sdk/activity"
@@ -11,13 +12,14 @@ import (
 )
 
 const TemporalSynchronizeWorkflowName = "synchronize"
+const TemporalPatchProviderUpstreamActivityName = "patch-provider-upstream"
 
 func CreateTemporalProviderWorkflowIdentifier(identifier, base string) string {
 	return CreateTemporalWorkflowIdentifier(fmt.Sprintf("%s-%s", identifier, base))
 }
 
 func CreateTemporalProviderWorkflowName(identifier, base string) string {
-	return fmt.Sprintf("%s-%s", identifier, base)
+	return strings.ToLower(fmt.Sprintf("%s-%s", identifier, base))
 }
 
 // BaseProvider provides a base implementation of the ProviderImpl interface

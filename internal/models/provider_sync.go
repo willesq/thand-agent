@@ -252,17 +252,21 @@ func executeSync[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 
 			go func() {
 				if syncRequest.Upstream != nil {
-					providerUpstreamPatchRequest(name, resp, *syncRequest)
+					PatchProviderUpstream(
+						name,
+						syncRequest.Upstream,
+						resp,
+					)
 				}
 			}()
 		}
 	})
 }
 
-func providerUpstreamPatchRequest(
+func PatchProviderUpstream(
 	name SynchronizeCapability,
+	uptstream *model.Endpoint,
 	payload any,
-	syncRequest SynchronizeRequest,
 ) error {
 	logrus.Debugln("Sending synchronization updates back to server")
 
@@ -270,22 +274,22 @@ func providerUpstreamPatchRequest(
 
 	switch name {
 	case SynchronizeIdentities:
-		identitiesResp, ok := payload.(*SynchronizeIdentitiesResponse)
+		identitiesResp, ok := payload.(SynchronizeIdentitiesResponse)
 		if ok {
 			providerReq.Identities = identitiesResp.Identities
 		}
 	case SynchronizeRoles:
-		rolesResp, ok := payload.(*SynchronizeRolesResponse)
+		rolesResp, ok := payload.(SynchronizeRolesResponse)
 		if ok {
 			providerReq.Roles = rolesResp.Roles
 		}
 	case SynchronizePermissions:
-		permissionsResp, ok := payload.(*SynchronizePermissionsResponse)
+		permissionsResp, ok := payload.(SynchronizePermissionsResponse)
 		if ok {
 			providerReq.Permissions = permissionsResp.Permissions
 		}
 	case SynchronizeResources:
-		resourcesResp, ok := payload.(*SynchronizeResourcesResponse)
+		resourcesResp, ok := payload.(SynchronizeResourcesResponse)
 		if ok {
 			providerReq.Resources = resourcesResp.Resources
 		}
@@ -293,11 +297,11 @@ func providerUpstreamPatchRequest(
 
 	data, err := json.Marshal(providerReq)
 
-	if err == nil && len(data) > 0 && syncRequest.Upstream != nil {
+	if err == nil && len(data) > 0 && uptstream != nil {
 
 		resp, err := common.InvokeHttpRequest(&model.HTTPArguments{
 			Method:   http.MethodPatch,
-			Endpoint: syncRequest.Upstream,
+			Endpoint: uptstream,
 			Body:     data,
 		})
 
