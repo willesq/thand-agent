@@ -73,8 +73,3 @@ type TemporalTerminationRequest struct {
 	EntryPoint  string     `json:"entrypoint,omitempty"`
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 }
-
-type ConfigurationCursor struct {
-	Section string `json:"section"`
-	Offset  int    `json:"offset"`
-}

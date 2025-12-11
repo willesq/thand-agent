@@ -248,17 +248,20 @@ func executeSync[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 
 			req.SetPagination(pagination)
 
-			// Now send the patch to the server
-
-			go func() {
-				if syncRequest.Upstream != nil {
-					PatchProviderUpstream(
-						name,
-						syncRequest.Upstream,
-						resp,
-					)
-				}
-			}()
+			/*
+				// Disable this for now for non-thand instances.
+				// If there is no temporal provided by thand.io
+				// then don't attempt to patch upstream.
+					go func() {
+						if syncRequest.Upstream != nil {
+							PatchProviderUpstream(
+								name,
+								syncRequest.Upstream,
+								resp,
+							)
+						}
+					}()
+			*/
 		}
 	})
 }

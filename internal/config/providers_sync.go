@@ -2,10 +2,7 @@ package config
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
-	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -42,28 +39,6 @@ func (c *Config) synchronizeProvider(p *models.Provider) {
 
 		syncRequest := models.SynchronizeRequest{
 			ProviderIdentifier: impl.GetIdentifier(),
-		}
-
-		if c.HasThandService() {
-
-			baseUrl := c.DiscoverThandServerApiUrl()
-			providerSyncUrl := fmt.Sprintf("%s/providers/%s/sync",
-				strings.TrimSuffix(baseUrl, "/"),
-				strings.ToLower(impl.GetIdentifier()),
-			)
-
-			syncRequest.Upstream = &model.Endpoint{
-				EndpointConfig: &model.EndpointConfiguration{
-					URI: &model.LiteralUri{Value: providerSyncUrl},
-					Authentication: &model.ReferenceableAuthenticationPolicy{
-						AuthenticationPolicy: &model.AuthenticationPolicy{
-							Bearer: &model.BearerAuthenticationPolicy{
-								Token: c.Thand.ApiKey,
-							},
-						},
-					},
-				},
-			}
 		}
 
 		err := impl.Synchronize(

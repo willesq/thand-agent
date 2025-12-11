@@ -162,7 +162,7 @@ func (p *BaseProvider) SetRoles(roles []ProviderRole) {
 }
 
 func CreateKeysFromRoles(r ProviderRole) []string {
-	return []string{r.Name}
+	return []string{r.Id, r.Name}
 }
 
 func (p *BaseProvider) SetRolesWithKey(
@@ -227,7 +227,7 @@ func (p *BaseProvider) SetResources(resources []ProviderResource) {
 }
 
 func CreateKeysFromResources(r ProviderResource) []string {
-	return []string{r.Id}
+	return []string{r.Id, r.Name}
 }
 
 func (p *BaseProvider) SetResourcesWithKey(

@@ -16,6 +16,7 @@ type ProviderPermissionsResponse struct {
 }
 
 type ProviderPermission struct {
+	Id          string `json:"id"`
 	Name        string `json:"name"`
 	Title       string `json:"title"`
 	Description string `json:"description"`

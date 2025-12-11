@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/thand-io/agent/internal/common"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -26,9 +25,6 @@ const (
 type SynchronizeRequest struct {
 	ProviderIdentifier string                  `json:"provider"` // Provider name
 	Requests           []SynchronizeCapability `json:"requests,omitempty"`
-	// TODO: I don't like embedding the upstream here. I'd ideally like to call in
-	// via the pimary code workflow activity code.
-	Upstream *model.Endpoint `json:"upstream,omitempty"`
 }
 
 type SynchronizeResponse struct {
