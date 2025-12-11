@@ -16,7 +16,7 @@ type ProviderRolesResponse struct {
 }
 
 type ProviderRole struct {
-	Id          string `json:"id,omitempty"`
+	ID          string `json:"id,omitempty"`
 	Name        string `json:"name"`
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`

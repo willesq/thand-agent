@@ -479,11 +479,9 @@ func (c *Config) RegisterWithThandServer() error {
 		return fmt.Errorf("thand services can only be set up in server mode")
 	}
 
-	if len(c.Thand.Endpoint) == 0 {
-
+	if !c.HasThandService() {
 		logrus.Debugln("Thand endpoint not configured, skipping registration with thand server")
 		return nil
-
 	}
 
 	/*

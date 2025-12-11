@@ -47,7 +47,7 @@ func (p *cloudflareProvider) SynchronizeRoles(ctx context.Context, req models.Sy
 
 	for _, role := range roles {
 		providerRoles = append(providerRoles, models.ProviderRole{
-			Id:   role.ID,
+			ID:   role.ID,
 			Name: role.Name,
 			Role: role,
 		})

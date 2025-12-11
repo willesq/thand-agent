@@ -46,6 +46,7 @@ func (p *cloudflareProvider) SynchronizePermissions(ctx context.Context, req mod
 
 	for _, role := range roles {
 		providerPermissions = append(providerPermissions, models.ProviderPermission{
+			ID:          role.ID,
 			Name:        role.Name,
 			Description: role.Description,
 			Permission:  role,

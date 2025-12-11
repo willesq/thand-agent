@@ -295,8 +295,8 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 			if providerRole != nil {
 				if len(providerRole.Name) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Name)
-				} else if len(providerRole.Id) != 0 {
-					remainingInherits = append(remainingInherits, providerRole.Id)
+				} else if len(providerRole.ID) != 0 {
+					remainingInherits = append(remainingInherits, providerRole.ID)
 				}
 				continue
 			}
@@ -314,8 +314,8 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 			if providerRole != nil {
 				if len(providerRole.Name) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Name)
-				} else if len(providerRole.Id) != 0 {
-					remainingInherits = append(remainingInherits, providerRole.Id)
+				} else if len(providerRole.ID) != 0 {
+					remainingInherits = append(remainingInherits, providerRole.ID)
 				}
 				continue
 			}

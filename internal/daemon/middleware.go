@@ -29,6 +29,12 @@ func CORSMiddleware(cfg models.CORSConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
+		if len(origin) == 0 {
+			// No origin header, skip CORS processing
+			c.Next()
+			return
+		}
+
 		logrus.WithFields(logrus.Fields{
 			"origin":         origin,
 			"method":         c.Request.Method,

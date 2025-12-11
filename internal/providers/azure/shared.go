@@ -2,6 +2,7 @@ package azure
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,6 +65,7 @@ func loadPermissions() ([]models.ProviderPermission, error) {
 
 	for _, operation := range azureOperations {
 		permission := models.ProviderPermission{
+			ID:          strings.ToLower(operation.Name),
 			Name:        operation.Name,
 			Description: operation.Description,
 		}

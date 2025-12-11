@@ -301,9 +301,9 @@ func (p *cloudflareProvider) getRoleIDsFromInherits(inherits []string) ([]string
 		}
 
 		// Add unique role IDs
-		if !seenIDs[cfRole.Id] {
-			roleIDs = append(roleIDs, cfRole.Id)
-			seenIDs[cfRole.Id] = true
+		if !seenIDs[cfRole.ID] {
+			roleIDs = append(roleIDs, cfRole.ID)
+			seenIDs[cfRole.ID] = true
 		}
 	}
 
