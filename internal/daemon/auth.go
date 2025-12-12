@@ -64,10 +64,11 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 		loginServerURL, loginServerErr := url.Parse(config.GetLoginServerUrl())
 
 		if callbackErr == nil && loginServerErr == nil {
-			// Block only if it's the same host and the callback would loop back to /api/v1/auth/request
+			// Block if it's the same host and the callback would loop back to auth endpoints
 			if callbackURL.Host == loginServerURL.Host &&
-				strings.HasPrefix(callbackURL.Path, "/api/v1/auth/request") {
-				s.getErrorPage(c, http.StatusBadRequest, "Callback cannot be the auth request endpoint - this would create an infinite loop")
+				(strings.HasPrefix(callbackURL.Path, "/api/v1/auth/request") ||
+					strings.HasPrefix(callbackURL.Path, "/api/v1/auth/callback")) {
+				s.getErrorPage(c, http.StatusBadRequest, "Callback cannot be the auth request or callback endpoint - this would create an infinite loop")
 				return
 			}
 		} else {
@@ -203,11 +204,26 @@ func (s *Server) postAuthCallback(c *gin.Context) {
 	if len(relayState) == 0 {
 		// Check if this is a SAML callback with SAMLResponse
 		if len(samlResponse) > 0 {
-			// IdP-initiated flow: create a default auth wrapper
+			// IdP-initiated flow: validate provider allows this
 			providerName := c.Param("provider")
+
+			// Get provider config to verify IdP-initiated is allowed
+			_, err := s.GetConfig().GetProviderByName(providerName)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"provider": providerName,
+					"error":    err,
+				}).Warn("Provider not found for IdP-initiated SAML flow")
+				s.getErrorPage(c, http.StatusBadRequest, "Provider not configured")
+				return
+			}
+
+			// Security logging for IdP-initiated flows (for audit/monitoring)
 			logrus.WithFields(logrus.Fields{
-				"provider": providerName,
-			}).Info("Handling IdP-initiated SAML flow")
+				"provider":   providerName,
+				"source_ip":  c.ClientIP(),
+				"user_agent": c.Request.UserAgent(),
+			}).Info("Processing IdP-initiated SAML authentication - verify this is expected")
 
 			authWrapper := models.AuthWrapper{
 				Callback: "", // No callback for IdP-initiated

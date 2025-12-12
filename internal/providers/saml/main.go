@@ -109,6 +109,7 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 
 	p.middleware = samlSP
 	p.idpMetadata = idpMetadata
+	// Store certificates if configured (defensive check - keyPair is only populated when cert/key are provided)
 	if keyPair.Certificate != nil {
 		p.certificates = []tls.Certificate{keyPair}
 	}
@@ -158,8 +159,10 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 	}).Debugln("Attempting to parse SAML response")
 
 	// Parse the SAML response
-	// IMPORTANT: The URL in the request must match the ACS URL for validation to pass
-	// We need to use PostForm instead of Form for POST requests
+	// IMPORTANT: The URL in the request must match the ACS URL for validation to pass.
+	// SAML signature validation requires the request URL to match the ACS URL exactly.
+	// We must use PostForm (not Form) for POST requests because Form merges query and post parameters,
+	// which can cause SAML signature validation to fail or introduce security issues if parameters are mixed.
 	req := &http.Request{
 		Method: "POST",
 		URL:    &p.middleware.ServiceProvider.AcsURL,
@@ -178,21 +181,13 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		errMsg := err.Error()
 		errType := fmt.Sprintf("%T", err)
 
-		// Check if it's an InvalidResponseError and try to extract more info
-		var invalidErr *saml.InvalidResponseError
-		if errors.As(err, &invalidErr) {
-			logrus.WithFields(logrus.Fields{
-				"error":     errMsg,
-				"errorType": errType,
-				"entityID":  p.middleware.ServiceProvider.EntityID,
-				"acsURL":    p.middleware.ServiceProvider.AcsURL.String(),
-			}).Errorln("Failed to parse SAML response")
-		} else {
-			logrus.WithFields(logrus.Fields{
-				"error":     errMsg,
-				"errorType": errType,
-			}).Errorln("Failed to parse SAML response")
-		}
+		// Log with additional context - include entity/ACS info for all errors
+		logrus.WithFields(logrus.Fields{
+			"error":     errMsg,
+			"errorType": errType,
+			"entityID":  p.middleware.ServiceProvider.EntityID,
+			"acsURL":    p.middleware.ServiceProvider.AcsURL.String(),
+		}).Errorln("Failed to parse SAML response")
 
 		// InvalidResponseError typically means:
 		// 1. Signature validation failed (most common)
@@ -367,8 +362,15 @@ func (p *samlProvider) extractUserFromAssertion(assertion *saml.Assertion) (*mod
 			nameID := assertion.Subject.NameID.Value
 			// Use NameID as email if it looks like an email
 			if strings.Contains(nameID, "@") {
-				email = nameID
-				username = strings.Split(nameID, "@")[0]
+				// Validate email format more carefully
+				parts := strings.Split(nameID, "@")
+				if len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0 {
+					email = nameID
+					username = parts[0]
+				} else {
+					// Malformed email-like string, treat as username
+					username = nameID
+				}
 			} else {
 				username = nameID
 			}
@@ -477,12 +479,19 @@ func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig,
 				return nil, fmt.Errorf("failed to parse SAML certificate from config: %w", err)
 			}
 		} else {
+			// Parse inline certificate without key (for verification only)
 			block, _ := pem.Decode([]byte(cert))
 			if block == nil {
 				return nil, fmt.Errorf("failed to parse certificate PEM")
 			}
+			// Parse the certificate to populate keyPair.Leaf
+			leaf, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse certificate: %w", err)
+			}
 			keyPair = tls.Certificate{
 				Certificate: [][]byte{block.Bytes},
+				Leaf:        leaf,
 			}
 		}
 	} else if certFile != "" {
@@ -492,6 +501,7 @@ func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig,
 				return nil, fmt.Errorf("failed to load SAML certificate: %w", err)
 			}
 		} else {
+			// Parse certificate file without key (for verification only)
 			certBytes, err := os.ReadFile(certFile)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read certificate file: %w", err)
@@ -500,8 +510,14 @@ func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig,
 			if block == nil {
 				return nil, fmt.Errorf("failed to parse certificate PEM from file")
 			}
+			// Parse the certificate to populate keyPair.Leaf
+			leaf, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse certificate from file: %w", err)
+			}
 			keyPair = tls.Certificate{
 				Certificate: [][]byte{block.Bytes},
+				Leaf:        leaf,
 			}
 		}
 	}
