@@ -5,10 +5,12 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -32,12 +34,11 @@ type samlProvider struct {
 
 // SAMLConfig represents the SAML provider configuration
 type SAMLConfig struct {
-	IDPMetadataURL string `yaml:"idp_metadata_url" json:"idp_metadata_url"`
-	EntityID       string `yaml:"entity_id" json:"entity_id"`
-	RootURL        string `yaml:"root_url" json:"root_url"`
-	CertFile       string `yaml:"cert_file" json:"cert_file"`
-	KeyFile        string `yaml:"key_file" json:"key_file"`
-	SignRequests   bool   `yaml:"sign_requests" json:"sign_requests"`
+	IDPMetadataURL string          `yaml:"idp_metadata_url" json:"idp_metadata_url"`
+	EntityID       string          `yaml:"entity_id" json:"entity_id"`
+	RootURL        string          `yaml:"root_url" json:"root_url"`
+	KeyPair        tls.Certificate `yaml:"-" json:"-"`
+	SignRequests   bool            `yaml:"sign_requests" json:"sign_requests"`
 }
 
 func (p *samlProvider) Initialize(identifier string, provider models.Provider) error {
@@ -54,15 +55,13 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 	}
 
 	// Load certificate and key for SAML signing
-	keyPair, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
-	if err != nil {
-		return fmt.Errorf("failed to load SAML certificate: %w", err)
-	}
+	keyPair := config.KeyPair
 
-	// Parse the certificate
-	keyPair.Leaf, err = x509.ParseCertificate(keyPair.Certificate[0])
-	if err != nil {
-		return fmt.Errorf("failed to parse SAML certificate: %w", err)
+	var privateKey *rsa.PrivateKey
+	if keyPair.PrivateKey != nil {
+		if pk, ok := keyPair.PrivateKey.(*rsa.PrivateKey); ok {
+			privateKey = pk
+		}
 	}
 
 	// Fetch IdP metadata
@@ -93,7 +92,7 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 	// Create the ServiceProvider directly for more control
 	sp := &saml.ServiceProvider{
 		EntityID:          config.EntityID,
-		Key:               keyPair.PrivateKey.(*rsa.PrivateKey),
+		Key:               privateKey,
 		Certificate:       keyPair.Leaf,
 		MetadataURL:       metadataURL,
 		AcsURL:            acsURL,
@@ -110,7 +109,9 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 
 	p.middleware = samlSP
 	p.idpMetadata = idpMetadata
-	p.certificates = []tls.Certificate{keyPair}
+	if keyPair.Certificate != nil {
+		p.certificates = []tls.Certificate{keyPair}
+	}
 
 	logrus.WithFields(logrus.Fields{
 		"provider":    provider.Name,
@@ -202,71 +203,16 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 	}
 
 	// Extract user information from SAML assertion
-	username := "saml_user"
-	email := "user@example.com"
-	name := ""
-	userID := ""
-	groups := []string{}
-
-	// Extract attributes from the assertion
-	if assertion != nil {
-		// Get NameID (usually the username or email)
-		if assertion.Subject != nil && assertion.Subject.NameID != nil {
-			nameID := assertion.Subject.NameID.Value
-			// Use NameID as email if it looks like an email
-			if strings.Contains(nameID, "@") {
-				email = nameID
-				username = strings.Split(nameID, "@")[0]
-			} else {
-				username = nameID
-			}
-		}
-
-		// Extract attributes
-		for _, stmt := range assertion.AttributeStatements {
-			for _, attr := range stmt.Attributes {
-				switch attr.Name {
-				case "email", "Email", "emailAddress", "mail":
-					if len(attr.Values) > 0 {
-						email = attr.Values[0].Value
-					}
-				case "name", "displayName", "Name", "cn", "commonName":
-					if len(attr.Values) > 0 {
-						name = attr.Values[0].Value
-					}
-				case "username", "Username", "sAMAccountName":
-					if len(attr.Values) > 0 {
-						username = attr.Values[0].Value
-					}
-				case "userid", "UserID", "uid", "objectGUID":
-					if len(attr.Values) > 0 {
-						userID = attr.Values[0].Value
-					}
-				case "groups", "Groups", "memberOf":
-					for _, v := range attr.Values {
-						groups = append(groups, v.Value)
-					}
-				}
-			}
-		}
-	}
-
-	user := &models.User{
-		ID:       userID,
-		Username: username,
-		Email:    email,
-		Name:     name,
-		Source:   "saml",
-		Groups:   groups,
+	user, err := p.extractUserFromAssertion(assertion)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create session
 	session := &models.Session{
-		UUID:         uuid.New(),
-		User:         user,
-		AccessToken:  uuid.New().String(),
-		RefreshToken: uuid.New().String(),
-		Expiry:       time.Now().Add(24 * time.Hour),
+		UUID:   uuid.New(),
+		User:   user,
+		Expiry: time.Now().Add(24 * time.Hour),
 	}
 
 	// Log session creation without PII details
@@ -286,11 +232,6 @@ func (p *samlProvider) ValidateSession(ctx context.Context, session *models.Sess
 	// Check if session has expired
 	if time.Now().After(session.Expiry) {
 		return fmt.Errorf("session has expired")
-	}
-
-	// Validate access token (in a real implementation, you might validate against IdP)
-	if len(session.AccessToken) == 0 {
-		return fmt.Errorf("invalid access token")
 	}
 
 	// Validate user information
@@ -315,11 +256,9 @@ func (p *samlProvider) RenewSession(ctx context.Context, session *models.Session
 
 	// Create a new session with extended expiry
 	newSession := &models.Session{
-		UUID:         uuid.New(),
-		User:         session.User,
-		AccessToken:  uuid.New().String(),
-		RefreshToken: uuid.New().String(),
-		Expiry:       time.Now().Add(24 * time.Hour),
+		UUID:   uuid.New(),
+		User:   session.User,
+		Expiry: time.Now().Add(24 * time.Hour),
 	}
 
 	logrus.Infof("Renewed SAML session for user: %s", session.User.Username)
@@ -413,6 +352,78 @@ func (p *samlProvider) SendNotification(ctx context.Context, notification models
 	return fmt.Errorf("SendNotification not implemented for SAML provider")
 }
 
+// extractUserFromAssertion extracts user information from a SAML assertion
+func (p *samlProvider) extractUserFromAssertion(assertion *saml.Assertion) (*models.User, error) {
+	var userID string
+	var username string
+	var email string
+	var name string
+	var groups []string
+
+	// Extract attributes from the assertion
+	if assertion != nil {
+		// Get NameID (usually the username or email)
+		if assertion.Subject != nil && assertion.Subject.NameID != nil {
+			nameID := assertion.Subject.NameID.Value
+			// Use NameID as email if it looks like an email
+			if strings.Contains(nameID, "@") {
+				email = nameID
+				username = strings.Split(nameID, "@")[0]
+			} else {
+				username = nameID
+			}
+		}
+
+		// Extract attributes
+		for _, stmt := range assertion.AttributeStatements {
+			for _, attr := range stmt.Attributes {
+				switch attr.Name {
+				case "email", "Email", "emailAddress", "mail":
+					if len(attr.Values) > 0 {
+						email = attr.Values[0].Value
+					}
+				case "name", "displayName", "Name", "cn", "commonName":
+					if len(attr.Values) > 0 {
+						name = attr.Values[0].Value
+					}
+				case "username", "Username", "sAMAccountName":
+					if len(attr.Values) > 0 {
+						username = attr.Values[0].Value
+					}
+				case "userid", "UserID", "uid", "objectGUID":
+					if len(attr.Values) > 0 {
+						userID = attr.Values[0].Value
+					}
+				case "groups", "Groups", "memberOf":
+					for _, v := range attr.Values {
+						groups = append(groups, v.Value)
+					}
+				}
+			}
+		}
+	}
+
+	if len(email) == 0 {
+		return nil, fmt.Errorf("missing required user attributes in SAML assertion")
+	}
+
+	if len(userID) == 0 {
+		userID = email
+	}
+
+	// Create user identity
+	user := &models.User{
+		ID:       userID,
+		Username: username,
+		Email:    email,
+		Name:     name,
+		Source:   "saml",
+		Groups:   groups,
+	}
+
+	return user, nil
+}
+
 // parseSAMLConfig parses the SAML configuration from the provider config
 func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig, error) {
 	if config == nil {
@@ -422,41 +433,98 @@ func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig,
 	samlConfig := &SAMLConfig{}
 
 	// Parse required fields
-	if idpURL, ok := (*config)["idp_metadata_url"].(string); ok {
+	if idpURL, ok := config.GetString("idp_metadata_url"); ok {
 		samlConfig.IDPMetadataURL = idpURL
 	} else {
 		return nil, fmt.Errorf("idp_metadata_url is required")
 	}
 
-	if entityID, ok := (*config)["entity_id"].(string); ok {
+	if entityID, ok := config.GetString("entity_id"); ok {
 		samlConfig.EntityID = entityID
 	} else {
 		return nil, fmt.Errorf("entity_id is required")
 	}
 
-	if rootURL, ok := (*config)["root_url"].(string); ok {
+	if rootURL, ok := config.GetString("root_url"); ok {
 		samlConfig.RootURL = rootURL
 	} else {
 		return nil, fmt.Errorf("root_url is required")
 	}
 
-	if certFile, ok := (*config)["cert_file"].(string); ok {
-		samlConfig.CertFile = certFile
-	} else {
-		return nil, fmt.Errorf("cert_file is required")
+	var certFile, cert string
+	if v, ok := config.GetString("cert_file"); ok {
+		certFile = v
+	}
+	if v, ok := config.GetString("cert"); ok {
+		cert = v
 	}
 
-	if keyFile, ok := (*config)["key_file"].(string); ok {
-		samlConfig.KeyFile = keyFile
-	} else {
-		return nil, fmt.Errorf("key_file is required")
+	var keyFile, key string
+	if v, ok := config.GetString("key_file"); ok {
+		keyFile = v
+	}
+	if v, ok := config.GetString("key"); ok {
+		key = v
+	}
+
+	var keyPair tls.Certificate
+	var err error
+
+	if cert != "" {
+		if key != "" {
+			keyPair, err = tls.X509KeyPair([]byte(cert), []byte(key))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse SAML certificate from config: %w", err)
+			}
+		} else {
+			block, _ := pem.Decode([]byte(cert))
+			if block == nil {
+				return nil, fmt.Errorf("failed to parse certificate PEM")
+			}
+			keyPair = tls.Certificate{
+				Certificate: [][]byte{block.Bytes},
+			}
+		}
+	} else if certFile != "" {
+		if keyFile != "" {
+			keyPair, err = tls.LoadX509KeyPair(certFile, keyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load SAML certificate: %w", err)
+			}
+		} else {
+			certBytes, err := os.ReadFile(certFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read certificate file: %w", err)
+			}
+			block, _ := pem.Decode(certBytes)
+			if block == nil {
+				return nil, fmt.Errorf("failed to parse certificate PEM from file")
+			}
+			keyPair = tls.Certificate{
+				Certificate: [][]byte{block.Bytes},
+			}
+		}
+	}
+
+	if len(keyPair.Certificate) > 0 {
+		// Parse the certificate leaf
+		keyPair.Leaf, err = x509.ParseCertificate(keyPair.Certificate[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse SAML certificate leaf: %w", err)
+		}
+		samlConfig.KeyPair = keyPair
 	}
 
 	// Parse optional fields
-	if signRequests, ok := (*config)["sign_requests"].(bool); ok {
+	if signRequests, ok := config.GetBool("sign_requests"); ok {
 		samlConfig.SignRequests = signRequests
 	} else {
 		samlConfig.SignRequests = false // Default to false
+	}
+
+	// Validation: If signing is enabled, we MUST have a private key
+	if samlConfig.SignRequests && samlConfig.KeyPair.PrivateKey == nil {
+		return nil, fmt.Errorf("sign_requests is set to true, but no private key was provided (cert/key or cert_file/key_file)")
 	}
 
 	return samlConfig, nil
