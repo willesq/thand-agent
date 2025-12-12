@@ -436,6 +436,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 
 			api.GET("/auth/request/:provider", s.getAuthRequest)
 			api.GET("/auth/callback/:provider", s.getAuthCallback)
+			api.POST("/auth/callback/:provider", s.getAuthCallback)
 			api.GET("/auth/logout/:provider", s.getLogoutPage)
 			api.GET("/auth/logout", s.getLogoutPage)
 

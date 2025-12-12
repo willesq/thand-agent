@@ -5,9 +5,11 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/crewjam/saml"
@@ -80,24 +82,43 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 		return fmt.Errorf("invalid root URL: %w", err)
 	}
 
-	// Create SAML service provider
-	samlSP, err := samlsp.New(samlsp.Options{
-		URL:         *rootURL,
-		Key:         keyPair.PrivateKey.(*rsa.PrivateKey),
-		Certificate: keyPair.Leaf,
-		IDPMetadata: idpMetadata,
-		EntityID:    config.EntityID,
-		SignRequest: config.SignRequests,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create SAML service provider: %w", err)
+	// Create SAML service provider with custom ACS URL
+	// The ACS URL must match what's configured in Okta: /api/v1/auth/callback/{provider-name}
+	acsURL := *rootURL
+	acsURL.Path = fmt.Sprintf("/api/v1/auth/callback/%s", identifier)
+
+	metadataURL := *rootURL
+	metadataURL.Path = "/saml/metadata"
+
+	// Create the ServiceProvider directly for more control
+	sp := &saml.ServiceProvider{
+		EntityID:          config.EntityID,
+		Key:               keyPair.PrivateKey.(*rsa.PrivateKey),
+		Certificate:       keyPair.Leaf,
+		MetadataURL:       metadataURL,
+		AcsURL:            acsURL,
+		IDPMetadata:       idpMetadata,
+		AuthnNameIDFormat: saml.EmailAddressNameIDFormat,
+		// Allow IDP-initiated flows (Okta can initiate)
+		AllowIDPInitiated: true,
+	}
+
+	// Create middleware wrapper
+	samlSP := &samlsp.Middleware{
+		ServiceProvider: *sp,
 	}
 
 	p.middleware = samlSP
 	p.idpMetadata = idpMetadata
 	p.certificates = []tls.Certificate{keyPair}
 
-	logrus.Infof("SAML provider %s initialized successfully", provider.Name)
+	logrus.WithFields(logrus.Fields{
+		"provider":    provider.Name,
+		"entityID":    samlSP.ServiceProvider.EntityID,
+		"acsURL":      samlSP.ServiceProvider.AcsURL.String(),
+		"metadataURL": samlSP.ServiceProvider.MetadataURL.String(),
+		"idpIssuer":   idpMetadata.EntityID,
+	}).Infof("SAML provider %s initialized successfully", provider.Name)
 	return nil
 }
 
@@ -113,6 +134,8 @@ func (p *samlProvider) AuthorizeSession(ctx context.Context, authRequest *models
 		return nil, fmt.Errorf("failed to create SAML authentication request: %w", err)
 	}
 
+	logrus.Debugln("SAML auth request generated")
+
 	return &models.AuthorizeSessionResponse{
 		Url: authURL.String(),
 	}, nil
@@ -123,33 +146,135 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		return nil, fmt.Errorf("SAML provider not initialized")
 	}
 
-	// In a real implementation, this would parse the SAML response from the authorization code
-	// For now, we'll create a basic session structure
-	// The authRequest.Code should contain the SAML response or a reference to it
-
 	if len(authRequest.Code) == 0 {
-		return nil, fmt.Errorf("no SAML response code provided")
+		return nil, fmt.Errorf("no SAML response provided")
+	}
+
+	// Log minimal debugging information without sensitive data
+	logrus.WithFields(logrus.Fields{
+		"entityID": p.middleware.ServiceProvider.EntityID,
+		"acsURL":   p.middleware.ServiceProvider.AcsURL.String(),
+	}).Debugln("Attempting to parse SAML response")
+
+	// Parse the SAML response
+	// IMPORTANT: The URL in the request must match the ACS URL for validation to pass
+	// We need to use PostForm instead of Form for POST requests
+	req := &http.Request{
+		Method: "POST",
+		URL:    &p.middleware.ServiceProvider.AcsURL,
+		PostForm: url.Values{
+			"SAMLResponse": {authRequest.Code},
+		},
+	}
+
+	assertion, err := p.middleware.ServiceProvider.ParseResponse(
+		req,
+		[]string{authRequest.State},
+	)
+
+	if err != nil {
+		// Log error without sensitive SAML response data
+		errMsg := err.Error()
+		errType := fmt.Sprintf("%T", err)
+
+		// Check if it's an InvalidResponseError and try to extract more info
+		var invalidErr *saml.InvalidResponseError
+		if errors.As(err, &invalidErr) {
+			logrus.WithFields(logrus.Fields{
+				"error":     errMsg,
+				"errorType": errType,
+				"entityID":  p.middleware.ServiceProvider.EntityID,
+				"acsURL":    p.middleware.ServiceProvider.AcsURL.String(),
+			}).Errorln("Failed to parse SAML response")
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"error":     errMsg,
+				"errorType": errType,
+			}).Errorln("Failed to parse SAML response")
+		}
+
+		// InvalidResponseError typically means:
+		// 1. Signature validation failed (most common)
+		// 2. Time validation failed (NotBefore/NotOnOrAfter)
+		// 3. Audience restriction mismatch
+
+		return nil, fmt.Errorf("failed to parse SAML response: %w", err)
 	}
 
 	// Extract user information from SAML assertion
-	// This is a simplified implementation - in practice you'd parse the actual SAML response
+	username := "saml_user"
+	email := "user@example.com"
+	name := ""
+	userID := ""
+	groups := []string{}
+
+	// Extract attributes from the assertion
+	if assertion != nil {
+		// Get NameID (usually the username or email)
+		if assertion.Subject != nil && assertion.Subject.NameID != nil {
+			nameID := assertion.Subject.NameID.Value
+			// Use NameID as email if it looks like an email
+			if strings.Contains(nameID, "@") {
+				email = nameID
+				username = strings.Split(nameID, "@")[0]
+			} else {
+				username = nameID
+			}
+		}
+
+		// Extract attributes
+		for _, stmt := range assertion.AttributeStatements {
+			for _, attr := range stmt.Attributes {
+				switch attr.Name {
+				case "email", "Email", "emailAddress", "mail":
+					if len(attr.Values) > 0 {
+						email = attr.Values[0].Value
+					}
+				case "name", "displayName", "Name", "cn", "commonName":
+					if len(attr.Values) > 0 {
+						name = attr.Values[0].Value
+					}
+				case "username", "Username", "sAMAccountName":
+					if len(attr.Values) > 0 {
+						username = attr.Values[0].Value
+					}
+				case "userid", "UserID", "uid", "objectGUID":
+					if len(attr.Values) > 0 {
+						userID = attr.Values[0].Value
+					}
+				case "groups", "Groups", "memberOf":
+					for _, v := range attr.Values {
+						groups = append(groups, v.Value)
+					}
+				}
+			}
+		}
+	}
+
 	user := &models.User{
-		Username: "saml_user",        // Extract from SAML assertion
-		Email:    "user@example.com", // Extract from SAML assertion
+		ID:       userID,
+		Username: username,
+		Email:    email,
+		Name:     name,
 		Source:   "saml",
-		Groups:   []string{}, // Extract groups from SAML assertion
+		Groups:   groups,
 	}
 
 	// Create session
 	session := &models.Session{
 		UUID:         uuid.New(),
 		User:         user,
-		AccessToken:  uuid.New().String(), // Generate or extract from SAML
+		AccessToken:  uuid.New().String(),
 		RefreshToken: uuid.New().String(),
-		Expiry:       time.Now().Add(24 * time.Hour), // Configurable session duration
+		Expiry:       time.Now().Add(24 * time.Hour),
 	}
 
-	logrus.Infof("Created SAML session for user: %s", user.Username)
+	// Log session creation without PII details
+	logrus.WithFields(logrus.Fields{
+		"sessionUUID": session.UUID.String(),
+		"source":      "saml",
+	}).Info("Created SAML session successfully")
+
 	return session, nil
 }
 

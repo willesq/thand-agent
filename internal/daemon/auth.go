@@ -42,9 +42,27 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 
 	config := s.GetConfig()
 
-	if len(callback) > 0 && strings.Compare(callback, config.GetLoginServerUrl()) == 0 {
-		s.getErrorPage(c, http.StatusBadRequest, "Callback cannot be the login server")
-		return
+	// Validate callback URL to prevent infinite loops
+	// Only block callbacks that would loop back to the auth request endpoint
+	if len(callback) > 0 {
+		callbackURL, callbackErr := url.Parse(callback)
+		loginServerURL, loginServerErr := url.Parse(config.GetLoginServerUrl())
+
+		if callbackErr == nil && loginServerErr == nil {
+			// Block only if it's the same host and the callback would loop back to /api/v1/auth/request
+			if callbackURL.Host == loginServerURL.Host &&
+				strings.HasPrefix(callbackURL.Path, "/api/v1/auth/request") {
+				s.getErrorPage(c, http.StatusBadRequest, "Callback cannot be the auth request endpoint - this would create an infinite loop")
+				return
+			}
+		} else {
+			// If we can't parse the URLs, log the error but allow the request to proceed
+			logrus.WithFields(logrus.Fields{
+				"callback":       callback,
+				"callbackErr":    callbackErr,
+				"loginServerErr": loginServerErr,
+			}).Warnln("Failed to parse callback or login server URL for validation")
+		}
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -63,22 +81,29 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 
 	client := common.GetClientIdentifier()
 
+	encodedState := models.EncodingWrapper{
+		Type: models.ENCODED_AUTH,
+		Data: models.NewAuthWrapper(
+			callback,        // where are we returning to
+			client.String(), // server identifier
+			provider,        // provider name
+			code,            // the code sent by the client
+		),
+	}.EncodeAndEncrypt(
+		s.Config.GetServices().GetEncryption(),
+	)
+
+	logrus.WithFields(logrus.Fields{
+		"encodedState": encodedState,
+		"stateLength":  len(encodedState),
+	}).Debugln("Encoded state for auth request")
+
 	authResponse, err := providerConfig.GetClient().AuthorizeSession(
 		context.Background(),
 		// This creates the state payload for the auth request
 		&models.AuthorizeUser{
-			Scopes: []string{"email", "profile"},
-			State: models.EncodingWrapper{
-				Type: models.ENCODED_AUTH,
-				Data: models.NewAuthWrapper(
-					callback,        // where are we returning to
-					client.String(), // server identifier
-					provider,        // provider name
-					code,            // the code sent by the client
-				),
-			}.EncodeAndEncrypt(
-				s.Config.GetServices().GetEncryption(),
-			),
+			Scopes:      []string{"email", "profile"},
+			State:       encodedState,
 			RedirectUri: s.GetConfig().GetAuthCallbackUrl(provider),
 		},
 	)
@@ -114,9 +139,48 @@ func (s *Server) getAuthCallback(c *gin.Context) {
 	// Check if the callback is a workflow resumption or
 	// a local callback response
 
-	state := c.Query("state")
+	// For OAuth2 callbacks, state comes in query parameters (GET)
+	// For SAML callbacks, state comes in RelayState form parameter (POST)
 
+	// Read form values FIRST before any other form access
+	relayState := c.PostForm("RelayState")
+	stateQuery := c.Query("state")
+
+	state := stateQuery
 	if len(state) == 0 {
+		state = relayState
+	}
+
+	// Debug logging to see what we're receiving
+	logrus.WithFields(logrus.Fields{
+		"method":      c.Request.Method,
+		"state_query": stateQuery,
+		"state_form":  relayState,
+		"state_final": state,
+	}).Debugln("Auth callback parameters")
+
+	// Handle IDP-initiated SAML flow (no state parameter)
+	if len(state) == 0 {
+		// Check if this is a SAML callback with SAMLResponse
+		samlResponse := c.PostForm("SAMLResponse")
+		if len(samlResponse) > 0 {
+			// IDP-initiated flow: create a default auth wrapper
+			providerName := c.Param("provider")
+			logrus.WithFields(logrus.Fields{
+				"provider": providerName,
+			}).Info("Handling IDP-initiated SAML flow")
+
+			authWrapper := models.AuthWrapper{
+				Callback: "", // No callback for IDP-initiated
+				Provider: providerName,
+				Code:     "", // No client code
+				Client:   "", // No client identifier
+			}
+			s.getAuthCallbackPage(c, authWrapper)
+			return
+		}
+
+		// Not a SAML IDP-initiated flow, state is required
 		s.getErrorPage(c, http.StatusBadRequest, "State is required")
 		return
 	}
@@ -251,8 +315,17 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 		return
 	}
 
+	// For OAuth2: state and code come in query parameters (GET)
+	// For SAML: RelayState and SAMLResponse come in form parameters (POST)
 	state := c.Query("state")
+	if len(state) == 0 {
+		state = c.PostForm("RelayState")
+	}
+
 	code := c.Query("code") // This is the code from the provider - not the client
+	if len(code) == 0 {
+		code = c.PostForm("SAMLResponse")
+	}
 
 	session, err := provider.GetClient().CreateSession(c, &models.AuthorizeUser{
 		State:       state,
@@ -292,7 +365,8 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 	}
 
 	if len(auth.Callback) == 0 {
-		c.Redirect(http.StatusTemporaryRedirect, "/")
+		// Use 303 See Other to force a GET redirect from the POST callback
+		c.Redirect(http.StatusSeeOther, "/")
 	} else {
 		s.renderHtml(c, "auth_callback.html", data)
 	}
