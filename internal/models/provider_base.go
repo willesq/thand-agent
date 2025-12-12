@@ -428,7 +428,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 	if provider.HasCapability(ProviderCapabilityIdentities) {
 		// Synchronize Identities
 		runSync(SynchronizeIdentities, func() error {
-			req := SynchronizeUsersRequest{}
+			req := SynchronizeIdentitiesRequest{}
 			for {
 				resp, err := provider.SynchronizeIdentities(ctx, req)
 				if err != nil {
@@ -550,7 +550,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return fmt.Errorf("synchronization failed: %v", errs)
+		logrus.WithError(errors.Join(errs...)).Error("Synchronization completed with errors")
 	}
 
 	if len(syncResponse.Identities) > 0 {

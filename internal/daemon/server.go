@@ -426,6 +426,7 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			api.GET("/provider/:provider", s.getProviderByName)
 			api.GET("/provider/:provider/permissions", s.getProviderPermissions)
 			api.GET("/provider/:provider/roles", s.getProviderRoles)
+			api.GET("/provider/:provider/identities", s.getProviderIdentities)
 			api.POST("/provider/:provider/authorizeSession", s.postProviderAuthorizeSession)
 
 			api.GET("/identities", s.getIdentities)

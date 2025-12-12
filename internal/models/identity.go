@@ -12,10 +12,10 @@ type Identity struct {
 
 	// User contains the user details if this identity represents a user.
 	// Will be nil if this identity represents a group.
-	User *User `json:"user"`
+	User *User `json:"user,omitempty"`
 	// Group contains the group details if this identity represents a group.
 	// Will be nil if this identity represents a user.
-	Group *Group `json:"group"`
+	Group *Group `json:"group,omitempty"`
 
 	// The providers this identity is associated with
 	// Format is map[provider_name]provider_type

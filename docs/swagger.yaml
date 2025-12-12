@@ -111,6 +111,16 @@ definitions:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_config.WorkflowConfig'
         description: These are workflows to run for role associated workflows
     type: object
+  github_com_thand-io_agent_internal_config.Mode:
+    enum:
+    - server
+    - agent
+    - client
+    type: string
+    x-enum-varnames:
+    - ModeServer
+    - ModeAgent
+    - ModeClient
   github_com_thand-io_agent_internal_config.ProviderConfig:
     properties:
       definitions:
@@ -138,6 +148,8 @@ definitions:
         $ref: '#/definitions/models.EnvironmentConfig'
       identifier:
         type: string
+      mode:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_config.Mode'
       version:
         type: string
     type: object
@@ -224,6 +236,19 @@ definitions:
       max_age:
         type: integer
     type: object
+  github_com_thand-io_agent_internal_models.Group:
+    properties:
+      email:
+        description: Email is the email address associated with the group (e.g., a
+          mailing list).
+        type: string
+      id:
+        description: ID is the unique identifier for the group.
+        type: string
+      name:
+        description: Name is the human-readable name of the group.
+        type: string
+    type: object
   github_com_thand-io_agent_internal_models.Groups:
     properties:
       allow:
@@ -244,6 +269,36 @@ definitions:
         default: /health
         description: Don't use /healthz as it conflicts with google k8s health checks
         type: string
+    type: object
+  github_com_thand-io_agent_internal_models.Identity:
+    properties:
+      group:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Group'
+        description: |-
+          Group contains the group details if this identity represents a group.
+          Will be nil if this identity represents a user.
+      id:
+        description: |-
+          ID is the unique identifier for this identity. This will most likely be an email for users
+          or a group name for groups. This will be used to tie identities across providers.
+        type: string
+      label:
+        description: Label is a human-readable name or description for this identity.
+        type: string
+      providers:
+        additionalProperties:
+          type: string
+        description: |-
+          The providers this identity is associated with
+          Format is map[provider_name]provider_type
+        type: object
+      user:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.User'
+        description: |-
+          User contains the user details if this identity represents a user.
+          Will be nil if this identity represents a group.
     type: object
   github_com_thand-io_agent_internal_models.LocalSession:
     properties:
@@ -1215,6 +1270,17 @@ definitions:
         type: string
       workflows_count:
         type: integer
+    type: object
+  models.ProviderIdentitiesResponse:
+    properties:
+      identities:
+        items:
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Identity'
+        type: array
+      provider:
+        type: string
+      version:
+        type: string
     type: object
   models.ProviderPermission:
     properties:
@@ -2188,6 +2254,43 @@ paths:
       security:
       - BearerAuth: []
       summary: Authorize provider session
+      tags:
+      - providers
+  /provider/{provider}/identities:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of identities available in a specific provider
+      parameters:
+      - description: Provider name
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: Filter query
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider roles
+          schema:
+            $ref: '#/definitions/models.ProviderIdentitiesResponse'
+        "404":
+          description: Provider not found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List provider identities
       tags:
       - providers
   /provider/{provider}/permissions:

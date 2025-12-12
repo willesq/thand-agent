@@ -4,8 +4,6 @@ go 1.25
 
 toolchain go1.25.0
 
-replace github.com/serverlessworkflow/sdk-go/v3 => github.com/hughneale/serverless-sdk-go/v3 v3.0.0-20251022183658-27de3226307f
-
 require (
 	cloud.google.com/go/compute/metadata v0.9.0
 	cloud.google.com/go/kms v1.23.2
@@ -16,16 +14,16 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.4.0
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets v1.4.0
-	github.com/aws/aws-sdk-go-v2 v1.40.1
+	github.com/aws/aws-sdk-go-v2 v1.41.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.3
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.15
-	github.com/aws/aws-sdk-go-v2/service/iam v1.52.3
+	github.com/aws/aws-sdk-go-v2/service/iam v1.53.1
 	github.com/aws/aws-sdk-go-v2/service/identitystore v1.34.6
 	github.com/aws/aws-sdk-go-v2/service/kms v1.49.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.40.1
-	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.55.0
-	github.com/aws/aws-sdk-go-v2/service/ssoadmin v1.36.9
+	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.58.0
+	github.com/aws/aws-sdk-go-v2/service/ssoadmin v1.36.12
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.3
 	github.com/aws/smithy-go v1.24.0
 	github.com/blevesearch/bleve/v2 v2.5.5
@@ -46,17 +44,16 @@ require (
 	github.com/google/flatbuffers v25.9.23+incompatible
 	github.com/google/go-github/v57 v57.0.0
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/go-tfe v1.96.0
+	github.com/hashicorp/go-tfe v1.97.0
 	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/vault/api v1.22.0
 	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf
 	github.com/itchyny/gojq v0.12.17
 	github.com/kardianos/service v1.2.4
-	github.com/microsoftgraph/msgraph-sdk-go v1.90.0
-	github.com/octokit/go-sdk v0.0.30
+	github.com/microsoftgraph/msgraph-sdk-go v1.91.0
 	github.com/okta/okta-sdk-golang/v2 v2.20.0
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
-	github.com/serverlessworkflow/sdk-go/v3 v3.1.1
+	github.com/serverlessworkflow/sdk-go/v3 v3.2.0
 	github.com/simpleforce/simpleforce v0.0.0-20220429021116-acf4ac67ef68
 	github.com/sirupsen/logrus v1.9.3
 	github.com/slack-go/slack v0.17.3
@@ -106,10 +103,10 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.14.4 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.15 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.15 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.16 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.16 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.14 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.16 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.3 // indirect
@@ -227,7 +224,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0 // indirect
-	github.com/kfcampbell/ghinstallation v0.0.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

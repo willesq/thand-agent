@@ -43,45 +43,17 @@ func (p *oktaProvider) SynchronizeResources(ctx context.Context, req models.Sync
 		}
 	}
 
-	// Load applications
-	appResources, nextPageToken, err := p.loadApplicationResources(ctx, req.Pagination)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load application resources: %w", err)
-	}
-
-	response := models.SynchronizeResourcesResponse{
-		Resources: appResources,
-	}
-
-	if len(nextPageToken) != 0 {
-		response.Pagination = &models.PaginationOptions{
-			Token:    nextPageToken,
-			PageSize: req.Pagination.PageSize,
-		}
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"resources": len(appResources),
-	}).Debug("Loaded Okta resources")
-
-	return &response, nil
-}
-
-// loadApplicationResources loads application resources from the Okta API
-// and stores full application details in the Resource field for later use
-func (p *oktaProvider) loadApplicationResources(ctx context.Context, pagination *models.PaginationOptions) ([]models.ProviderResource, string, error) {
-
 	queryParams := &query.Params{
-		Limit: int64(pagination.PageSize),
+		Limit: int64(req.Pagination.PageSize),
 	}
 
-	if len(pagination.Token) != 0 {
-		queryParams.After = pagination.Token
+	if len(req.Pagination.Token) != 0 {
+		queryParams.After = req.Pagination.Token
 	}
 
 	apps, resp, err := p.client.Application.ListApplications(ctx, queryParams)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to list applications: %w", err)
+		return nil, fmt.Errorf("failed to list applications: %w", err)
 	}
 
 	var resources []models.ProviderResource
@@ -99,5 +71,25 @@ func (p *oktaProvider) loadApplicationResources(ctx context.Context, pagination 
 		}
 	}
 
-	return resources, resp.NextPage, nil
+	response := models.SynchronizeResourcesResponse{
+		Resources: resources,
+	}
+
+	if len(resp.NextPage) != 0 {
+
+		token := p.GetNextTokenFromResponse(resp)
+
+		if len(token) > 0 {
+			response.Pagination = &models.PaginationOptions{
+				Token:    token,
+				PageSize: req.Pagination.PageSize,
+			}
+		}
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"resources": len(resources),
+	}).Debug("Loaded Okta resources")
+
+	return &response, nil
 }

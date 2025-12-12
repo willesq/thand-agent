@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 )
 
@@ -26,6 +27,13 @@ type ProviderPermission struct {
 
 func (p *BaseProvider) GetPermission(ctx context.Context, permission string) (*ProviderPermission, error) {
 
+	if p.rbac == nil || !p.HasCapability(
+		ProviderCapabilityRBAC,
+	) {
+		logrus.Warningln("provider has no permissions")
+		return nil, fmt.Errorf("provider has no permissions")
+	}
+
 	permission = strings.ToLower(permission)
 	// Fast map lookup
 	if perm, exists := p.rbac.permissionsMap[permission]; exists {
@@ -35,6 +43,14 @@ func (p *BaseProvider) GetPermission(ctx context.Context, permission string) (*P
 }
 
 func (p *BaseProvider) ListPermissions(ctx context.Context, filters ...string) ([]ProviderPermission, error) {
+
+	if p.rbac == nil || !p.HasCapability(
+		ProviderCapabilityRBAC,
+	) {
+		logrus.Warningln("provider has no permissions")
+		return nil, fmt.Errorf("provider has no permissions")
+	}
+
 	// If no filters, return all permissions
 	if len(filters) == 0 {
 		return p.rbac.permissions, nil
