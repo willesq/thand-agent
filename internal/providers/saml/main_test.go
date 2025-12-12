@@ -26,6 +26,20 @@ import (
 )
 
 func TestSAMLProvider_ParseSAMLConfig(t *testing.T) {
+	// Create test certificate and key for use in tests
+	cert, key := createTestCert(t)
+	certFile, keyFile := writeCertAndKeyToFiles(t, cert, key)
+
+	// Create PEM encoded strings
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	})
+	keyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+
 	tests := []struct {
 		name           string
 		config         *models.BasicConfig
@@ -48,13 +62,13 @@ func TestSAMLProvider_ParseSAMLConfig(t *testing.T) {
 			errorContains: "is required",
 		},
 		{
-			name: "Valid config with all fields",
+			name: "Valid config with file-based certs",
 			config: &models.BasicConfig{
 				"idp_metadata_url": "https://example.com/metadata",
 				"entity_id":        "https://myapp.com/saml",
 				"root_url":         "https://myapp.com",
-				"cert_file":        "/path/to/cert.pem",
-				"key_file":         "/path/to/key.pem",
+				"cert_file":        certFile,
+				"key_file":         keyFile,
 				"sign_requests":    true,
 			},
 			expectError: false,
@@ -63,6 +77,59 @@ func TestSAMLProvider_ParseSAMLConfig(t *testing.T) {
 				assert.Equal(t, "https://myapp.com/saml", cfg.EntityID)
 				assert.Equal(t, "https://myapp.com", cfg.RootURL)
 				assert.True(t, cfg.SignRequests)
+				assert.NotNil(t, cfg.KeyPair.PrivateKey)
+				assert.NotNil(t, cfg.KeyPair.Leaf)
+			},
+		},
+		{
+			name: "Valid config with inline certs",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert":             string(certPEM),
+				"key":              string(keyPEM),
+				"sign_requests":    false,
+			},
+			expectError: false,
+			validateResult: func(t *testing.T, cfg *SAMLConfig) {
+				assert.Equal(t, "https://example.com/metadata", cfg.IDPMetadataURL)
+				assert.Equal(t, "https://myapp.com/saml", cfg.EntityID)
+				assert.Equal(t, "https://myapp.com", cfg.RootURL)
+				assert.False(t, cfg.SignRequests)
+				assert.NotNil(t, cfg.KeyPair.PrivateKey)
+				assert.NotNil(t, cfg.KeyPair.Leaf)
+			},
+		},
+		{
+			name: "Valid config with cert only (no key)",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert":             string(certPEM),
+				"sign_requests":    false,
+			},
+			expectError: false,
+			validateResult: func(t *testing.T, cfg *SAMLConfig) {
+				assert.NotNil(t, cfg.KeyPair.Leaf)
+				assert.Nil(t, cfg.KeyPair.PrivateKey)
+				assert.False(t, cfg.SignRequests)
+			},
+		},
+		{
+			name: "Valid config with cert_file only (no key_file)",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert_file":        certFile,
+				"sign_requests":    false,
+			},
+			expectError: false,
+			validateResult: func(t *testing.T, cfg *SAMLConfig) {
+				assert.NotNil(t, cfg.KeyPair.Leaf)
+				assert.Nil(t, cfg.KeyPair.PrivateKey)
 			},
 		},
 		{
@@ -71,12 +138,86 @@ func TestSAMLProvider_ParseSAMLConfig(t *testing.T) {
 				"idp_metadata_url": "https://example.com/metadata",
 				"entity_id":        "https://myapp.com/saml",
 				"root_url":         "https://myapp.com",
-				"cert_file":        "/path/to/cert.pem",
-				"key_file":         "/path/to/key.pem",
+				"cert_file":        certFile,
+				"key_file":         keyFile,
 			},
 			expectError: false,
 			validateResult: func(t *testing.T, cfg *SAMLConfig) {
 				assert.False(t, cfg.SignRequests)
+			},
+		},
+		{
+			name: "Error: sign_requests true without private key",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert":             string(certPEM),
+				"sign_requests":    true,
+			},
+			expectError:   true,
+			errorContains: "sign_requests is set to true, but no private key was provided",
+		},
+		{
+			name: "Error: invalid inline cert PEM",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert":             "not-a-valid-pem",
+				"key":              string(keyPEM),
+			},
+			expectError:   true,
+			errorContains: "failed to parse SAML certificate from config",
+		},
+		{
+			name: "Error: invalid inline key",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert":             string(certPEM),
+				"key":              "not-a-valid-key",
+			},
+			expectError:   true,
+			errorContains: "failed to parse SAML certificate from config",
+		},
+		{
+			name: "Error: nonexistent cert file",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert_file":        "/nonexistent/cert.pem",
+				"key_file":         "/nonexistent/key.pem",
+			},
+			expectError:   true,
+			errorContains: "failed to load SAML certificate",
+		},
+		{
+			name: "Error: nonexistent single cert file (no key)",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"cert_file":        "/nonexistent/cert.pem",
+			},
+			expectError:   true,
+			errorContains: "failed to read certificate file",
+		},
+		{
+			name: "Valid config with no certs (signing disabled)",
+			config: &models.BasicConfig{
+				"idp_metadata_url": "https://example.com/metadata",
+				"entity_id":        "https://myapp.com/saml",
+				"root_url":         "https://myapp.com",
+				"sign_requests":    false,
+			},
+			expectError: false,
+			validateResult: func(t *testing.T, cfg *SAMLConfig) {
+				assert.False(t, cfg.SignRequests)
+				assert.Nil(t, cfg.KeyPair.Leaf)
+				assert.Nil(t, cfg.KeyPair.PrivateKey)
 			},
 		},
 	}
@@ -119,9 +260,8 @@ func TestSAMLProvider_SessionValidation(t *testing.T) {
 		{
 			name: "Session without user",
 			session: &models.Session{
-				UUID:        uuid.New(),
-				AccessToken: "test-token",
-				Expiry:      time.Now().Add(1 * time.Hour),
+				UUID:   uuid.New(),
+				Expiry: time.Now().Add(1 * time.Hour),
 			},
 			expectError:   true,
 			errorContains: "user is nil",
@@ -129,32 +269,19 @@ func TestSAMLProvider_SessionValidation(t *testing.T) {
 		{
 			name: "Expired session",
 			session: &models.Session{
-				UUID:        uuid.New(),
-				User:        &models.User{Username: "testuser"},
-				AccessToken: "test-token",
-				Expiry:      time.Now().Add(-1 * time.Hour),
+				UUID:   uuid.New(),
+				User:   &models.User{Username: "testuser"},
+				Expiry: time.Now().Add(-1 * time.Hour),
 			},
 			expectError:   true,
 			errorContains: "expired",
 		},
 		{
-			name: "Session without access token",
-			session: &models.Session{
-				UUID:        uuid.New(),
-				User:        &models.User{Username: "testuser"},
-				AccessToken: "",
-				Expiry:      time.Now().Add(1 * time.Hour),
-			},
-			expectError:   true,
-			errorContains: "invalid access token",
-		},
-		{
 			name: "Valid session",
 			session: &models.Session{
-				UUID:        uuid.New(),
-				User:        &models.User{Username: "testuser"},
-				AccessToken: "test-token",
-				Expiry:      time.Now().Add(1 * time.Hour),
+				UUID:   uuid.New(),
+				User:   &models.User{Username: "testuser"},
+				Expiry: time.Now().Add(1 * time.Hour),
 			},
 			expectError: false,
 		},
@@ -207,6 +334,99 @@ func TestSAMLProvider_AuthorizeRole(t *testing.T) {
 			},
 			expectError:   true,
 			errorContains: "must be provided",
+		},
+		{
+			name: "User without permission",
+			request: &models.AuthorizeRoleRequest{
+				RoleRequest: &models.RoleRequest{
+					User: &models.User{
+						Username: "testuser",
+						Email:    "test@example.com",
+						Groups:   []string{"group1"},
+					},
+					Role: &models.Role{
+						Name: "admin-role",
+						Scopes: &models.RoleScopes{
+							Groups: []string{"admin-group"},
+						},
+					},
+				},
+			},
+			expectError:   true,
+			errorContains: "does not have permission",
+		},
+		{
+			name: "User with permission via group",
+			request: &models.AuthorizeRoleRequest{
+				RoleRequest: &models.RoleRequest{
+					User: &models.User{
+						Username: "testuser",
+						Email:    "test@example.com",
+						Groups:   []string{"admin-group"},
+					},
+					Role: &models.Role{
+						Name: "admin-role",
+						Scopes: &models.RoleScopes{
+							Groups: []string{"admin-group"},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "User with permission via user list (email)",
+			request: &models.AuthorizeRoleRequest{
+				RoleRequest: &models.RoleRequest{
+					User: &models.User{
+						Username: "testuser",
+						Email:    "admin@example.com",
+					},
+					Role: &models.Role{
+						Name: "admin-role",
+						Scopes: &models.RoleScopes{
+							Users: []string{"admin@example.com"},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "User with permission via user list (username)",
+			request: &models.AuthorizeRoleRequest{
+				RoleRequest: &models.RoleRequest{
+					User: &models.User{
+						Username: "admin-user",
+						Email:    "test@example.com",
+					},
+					Role: &models.Role{
+						Name: "admin-role",
+						Scopes: &models.RoleScopes{
+							Users: []string{"admin-user"},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "User with permission via domain",
+			request: &models.AuthorizeRoleRequest{
+				RoleRequest: &models.RoleRequest{
+					User: &models.User{
+						Username: "testuser",
+						Email:    "test@example.com",
+					},
+					Role: &models.Role{
+						Name: "admin-role",
+						Scopes: &models.RoleScopes{
+							Domains: []string{"example.com"},
+						},
+					},
+				},
+			},
+			expectError: false,
 		},
 	}
 
@@ -617,6 +837,168 @@ func TestSAMLProvider_CreateSession(t *testing.T) {
 	}
 }
 
+// TestSAMLProvider_ExtractUserFromAssertion tests SAML user attribute extraction
+func TestSAMLProvider_ExtractUserFromAssertion(t *testing.T) {
+	provider := &samlProvider{}
+
+	tests := []struct {
+		name          string
+		assertion     *saml.Assertion
+		expectError   bool
+		errorContains string
+		validateUser  func(t *testing.T, user *models.User)
+	}{
+		{
+			name: "Extract email from attribute",
+			assertion: &saml.Assertion{
+				AttributeStatements: []saml.AttributeStatement{
+					{
+						Attributes: []saml.Attribute{
+							{
+								Name:   "email",
+								Values: []saml.AttributeValue{{Value: "user@example.com"}},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+			validateUser: func(t *testing.T, user *models.User) {
+				assert.Equal(t, "user@example.com", user.Email)
+				assert.Equal(t, "user@example.com", user.ID) // Falls back to email
+			},
+		},
+		{
+			name: "Extract all attributes",
+			assertion: &saml.Assertion{
+				Subject: &saml.Subject{
+					NameID: &saml.NameID{Value: "testuser"},
+				},
+				AttributeStatements: []saml.AttributeStatement{
+					{
+						Attributes: []saml.Attribute{
+							{Name: "email", Values: []saml.AttributeValue{{Value: "test@example.com"}}},
+							{Name: "name", Values: []saml.AttributeValue{{Value: "Test User"}}},
+							{Name: "username", Values: []saml.AttributeValue{{Value: "testuser"}}},
+							{Name: "userid", Values: []saml.AttributeValue{{Value: "user123"}}},
+							{Name: "groups", Values: []saml.AttributeValue{{Value: "group1"}, {Value: "group2"}}},
+						},
+					},
+				},
+			},
+			expectError: false,
+			validateUser: func(t *testing.T, user *models.User) {
+				assert.Equal(t, "test@example.com", user.Email)
+				assert.Equal(t, "Test User", user.Name)
+				assert.Equal(t, "testuser", user.Username)
+				assert.Equal(t, "user123", user.ID)
+				assert.Equal(t, []string{"group1", "group2"}, user.Groups)
+				assert.Equal(t, "saml", user.Source)
+			},
+		},
+		{
+			name: "Extract email from NameID",
+			assertion: &saml.Assertion{
+				Subject: &saml.Subject{
+					NameID: &saml.NameID{Value: "user@example.com"},
+				},
+			},
+			expectError: false,
+			validateUser: func(t *testing.T, user *models.User) {
+				assert.Equal(t, "user@example.com", user.Email)
+				assert.Equal(t, "user", user.Username) // Extracted from email
+			},
+		},
+		{
+			name: "Extract username from NameID (not email)",
+			assertion: &saml.Assertion{
+				Subject: &saml.Subject{
+					NameID: &saml.NameID{Value: "johndoe"},
+				},
+				AttributeStatements: []saml.AttributeStatement{
+					{
+						Attributes: []saml.Attribute{
+							{Name: "email", Values: []saml.AttributeValue{{Value: "john@example.com"}}},
+						},
+					},
+				},
+			},
+			expectError: false,
+			validateUser: func(t *testing.T, user *models.User) {
+				assert.Equal(t, "john@example.com", user.Email)
+				assert.Equal(t, "johndoe", user.Username)
+			},
+		},
+		{
+			name: "Missing email returns error",
+			assertion: &saml.Assertion{
+				Subject: &saml.Subject{
+					NameID: &saml.NameID{Value: "testuser"},
+				},
+				AttributeStatements: []saml.AttributeStatement{
+					{
+						Attributes: []saml.Attribute{
+							{Name: "name", Values: []saml.AttributeValue{{Value: "Test User"}}},
+						},
+					},
+				},
+			},
+			expectError:   true,
+			errorContains: "missing required user attributes",
+		},
+		{
+			name:          "Nil assertion returns error",
+			assertion:     nil,
+			expectError:   true,
+			errorContains: "missing required user attributes",
+		},
+		{
+			name: "Alternative attribute names (Email, displayName, etc.)",
+			assertion: &saml.Assertion{
+				AttributeStatements: []saml.AttributeStatement{
+					{
+						Attributes: []saml.Attribute{
+							{Name: "Email", Values: []saml.AttributeValue{{Value: "user@example.com"}}},
+							{Name: "displayName", Values: []saml.AttributeValue{{Value: "Display Name"}}},
+							{Name: "Username", Values: []saml.AttributeValue{{Value: "displayuser"}}},
+							{Name: "UserID", Values: []saml.AttributeValue{{Value: "uid456"}}},
+							{Name: "Groups", Values: []saml.AttributeValue{{Value: "admins"}}},
+						},
+					},
+				},
+			},
+			expectError: false,
+			validateUser: func(t *testing.T, user *models.User) {
+				assert.Equal(t, "user@example.com", user.Email)
+				assert.Equal(t, "Display Name", user.Name)
+				assert.Equal(t, "displayuser", user.Username)
+				assert.Equal(t, "uid456", user.ID)
+				assert.Equal(t, []string{"admins"}, user.Groups)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			user, err := provider.extractUserFromAssertion(tt.assertion)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, user)
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, user)
+				if tt.validateUser != nil {
+					tt.validateUser(t, user)
+				}
+			}
+		})
+	}
+}
+
 // TestSAMLProvider_AuthorizeSession tests SAML authorization request generation
 func TestSAMLProvider_AuthorizeSession(t *testing.T) {
 	tests := []struct {
@@ -695,11 +1077,9 @@ func TestSAMLProvider_RenewSession(t *testing.T) {
 		{
 			name: "Renew valid session",
 			session: &models.Session{
-				UUID:         uuid.New(),
-				User:         &models.User{Username: "testuser"},
-				AccessToken:  "test-token",
-				RefreshToken: "test-refresh-token",
-				Expiry:       time.Now().Add(1 * time.Hour),
+				UUID:   uuid.New(),
+				User:   &models.User{Username: "testuser"},
+				Expiry: time.Now().Add(1 * time.Hour),
 			},
 			expectError: false,
 			validateResult: func(t *testing.T, original *models.Session, renewed *models.Session) {
@@ -711,11 +1091,9 @@ func TestSAMLProvider_RenewSession(t *testing.T) {
 		{
 			name: "Cannot renew expired session",
 			session: &models.Session{
-				UUID:         uuid.New(),
-				User:         &models.User{Username: "testuser"},
-				AccessToken:  "test-token",
-				RefreshToken: "test-refresh-token",
-				Expiry:       time.Now().Add(-1 * time.Hour),
+				UUID:   uuid.New(),
+				User:   &models.User{Username: "testuser"},
+				Expiry: time.Now().Add(-1 * time.Hour),
 			},
 			expectError:   true,
 			errorContains: "cannot renew expired session",
