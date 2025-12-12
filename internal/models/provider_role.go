@@ -9,6 +9,12 @@ import (
 	"github.com/thand-io/agent/internal/common"
 )
 
+type ProviderIdentitiesResponse struct {
+	Version    string     `json:"version"`
+	Provider   string     `json:"provider"`
+	Identities []Identity `json:"identities"`
+}
+
 type ProviderRolesResponse struct {
 	Version  string         `json:"version"`
 	Provider string         `json:"provider"`

@@ -247,11 +247,20 @@
             
             if (data && data.identities && Array.isArray(data.identities)) {
                 data.identities.forEach(identity => {
-                    const label = identity.label 
-                        ? `${identity.label} (${identity.id})` 
-                        : identity.id;
-
+                    
                     const type = identity.user ? 'user' : (identity.group ? 'group' : 'unknown');
+
+                    if (type === 'user') {
+                        var title = identity.user?.email || identity.user?.id;
+                    } else if (type === 'group') {
+                        var title = identity.group?.id;
+                    } else {
+                        var title = identity.id;
+                    }
+
+                    const label = identity.label 
+                        ? `${identity.label} (${title})` 
+                        : identity.id;
 
                     choices.push({
                         value: identity.id,

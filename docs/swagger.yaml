@@ -106,11 +106,27 @@ definitions:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.ServicesConfig'
         description: External services / non-core services
+      thand:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.ThandConfig'
+        description: |-
+          This is ONLY if the agent is running in server mode
+          and you want to use https://www.thand.io hosted services
       workflows:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_config.WorkflowConfig'
         description: These are workflows to run for role associated workflows
     type: object
+  github_com_thand-io_agent_internal_config.Mode:
+    enum:
+    - server
+    - agent
+    - client
+    type: string
+    x-enum-varnames:
+    - ModeServer
+    - ModeAgent
+    - ModeClient
   github_com_thand-io_agent_internal_config.ProviderConfig:
     properties:
       definitions:
@@ -138,6 +154,8 @@ definitions:
         $ref: '#/definitions/models.EnvironmentConfig'
       identifier:
         type: string
+      mode:
+        $ref: '#/definitions/github_com_thand-io_agent_internal_config.Mode'
       version:
         type: string
     type: object
@@ -275,9 +293,6 @@ definitions:
     type: object
   github_com_thand-io_agent_internal_models.LoginConfig:
     properties:
-      api_key:
-        description: API key for authenticating with the login server
-        type: string
       base:
         default: /
         description: Base path for login endpoint e.g. /
@@ -349,6 +364,8 @@ definitions:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
         description: The base role for this provider
+      version:
+        $ref: '#/definitions/version.Version'
     type: object
   github_com_thand-io_agent_internal_models.RateLimitConfig:
     properties:
@@ -365,6 +382,17 @@ definitions:
       path:
         default: /ready
         type: string
+    type: object
+  github_com_thand-io_agent_internal_models.Resources:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
     type: object
   github_com_thand-io_agent_internal_models.Role:
     properties:
@@ -402,12 +430,14 @@ definitions:
         type: array
       resources:
         allOf:
-        - $ref: '#/definitions/models.Resources'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Resources'
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
+      version:
+        $ref: '#/definitions/version.Version'
       workflows:
         description: The workflows to execute
         items:
@@ -487,6 +517,23 @@ definitions:
         - $ref: '#/definitions/models.ServiceConfig'
         description: Vault - used for storing sensitive data
     type: object
+  github_com_thand-io_agent_internal_models.ThandConfig:
+    properties:
+      api_key:
+        description: The API key for authenticating with Thand.io
+        type: string
+      base:
+        default: /
+        description: Base path for login endpoint e.g. /
+        type: string
+      endpoint:
+        default: https://app.thand.io/
+        type: string
+      sync:
+        default: true
+        description: Whether to enable synchronization with Thand.io
+        type: boolean
+    type: object
   github_com_thand-io_agent_internal_models.User:
     properties:
       email:
@@ -525,6 +572,8 @@ definitions:
         type: boolean
       name:
         type: string
+      version:
+        $ref: '#/definitions/version.Version'
       workflow:
         $ref: '#/definitions/model.Workflow'
     type: object
@@ -1220,6 +1269,8 @@ definitions:
     properties:
       description:
         type: string
+      id:
+        type: string
       name:
         type: string
       title:
@@ -1279,17 +1330,6 @@ definitions:
       version:
         type: string
     type: object
-  models.Resources:
-    properties:
-      allow:
-        items:
-          type: string
-        type: array
-      deny:
-        items:
-          type: string
-        type: array
-    type: object
   models.RoleResponse:
     properties:
       authenticators:
@@ -1326,12 +1366,14 @@ definitions:
         type: array
       resources:
         allOf:
-        - $ref: '#/definitions/models.Resources'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Resources'
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
+      version:
+        $ref: '#/definitions/version.Version'
       workflows:
         description: The workflows to execute
         items:
@@ -1447,6 +1489,8 @@ definitions:
     - Second
     - Minute
     - Hour
+  version.Version:
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -2188,6 +2232,43 @@ paths:
       security:
       - BearerAuth: []
       summary: Authorize provider session
+      tags:
+      - providers
+  /provider/{provider}/identities:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of identities available in a specific provider
+      parameters:
+      - description: Provider name
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: Filter query
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider roles
+          schema:
+            $ref: '#/definitions/models.ProviderRolesResponse'
+        "404":
+          description: Provider not found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List provider identities
       tags:
       - providers
   /provider/{provider}/permissions:

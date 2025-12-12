@@ -1114,6 +1114,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/provider/{provider}/identities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of identities available in a specific provider",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "providers"
+                ],
+                "summary": "List provider identities",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Provider name",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter query",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Provider roles",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProviderRolesResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Provider not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/provider/{provider}/permissions": {
             "get": {
                 "security": [
@@ -1969,6 +2026,14 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "thand": {
+                    "description": "This is ONLY if the agent is running in server mode\nand you want to use https://www.thand.io hosted services",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.ThandConfig"
+                        }
+                    ]
+                },
                 "workflows": {
                     "description": "These are workflows to run for role associated workflows",
                     "allOf": [
@@ -1978,6 +2043,19 @@ const docTemplate = `{
                     ]
                 }
             }
+        },
+        "github_com_thand-io_agent_internal_config.Mode": {
+            "type": "string",
+            "enum": [
+                "server",
+                "agent",
+                "client"
+            ],
+            "x-enum-varnames": [
+                "ModeServer",
+                "ModeAgent",
+                "ModeClient"
+            ]
         },
         "github_com_thand-io_agent_internal_config.ProviderConfig": {
             "type": "object",
@@ -2020,6 +2098,9 @@ const docTemplate = `{
                 },
                 "identifier": {
                     "type": "string"
+                },
+                "mode": {
+                    "$ref": "#/definitions/github_com_thand-io_agent_internal_config.Mode"
                 },
                 "version": {
                     "type": "string"
@@ -2226,10 +2307,6 @@ const docTemplate = `{
         "github_com_thand-io_agent_internal_models.LoginConfig": {
             "type": "object",
             "properties": {
-                "api_key": {
-                    "description": "API key for authenticating with the login server",
-                    "type": "string"
-                },
                 "base": {
                     "description": "Base path for login endpoint e.g. /",
                     "type": "string",
@@ -2323,6 +2400,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Role"
                         }
                     ]
+                },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
                 }
             }
         },
@@ -2347,6 +2427,23 @@ const docTemplate = `{
                 "path": {
                     "type": "string",
                     "default": "/ready"
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.Resources": {
+            "type": "object",
+            "properties": {
+                "allow": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "deny": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2405,7 +2502,7 @@ const docTemplate = `{
                     "description": "resource access rules, apis, files, systems etc",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.Resources"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Resources"
                         }
                     ]
                 },
@@ -2416,6 +2513,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_thand-io_agent_internal_models.RoleScopes"
                         }
                     ]
+                },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
                 },
                 "workflows": {
                     "description": "The workflows to execute",
@@ -2548,6 +2648,29 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_thand-io_agent_internal_models.ThandConfig": {
+            "type": "object",
+            "properties": {
+                "api_key": {
+                    "description": "The API key for authenticating with Thand.io",
+                    "type": "string"
+                },
+                "base": {
+                    "description": "Base path for login endpoint e.g. /",
+                    "type": "string",
+                    "default": "/"
+                },
+                "endpoint": {
+                    "type": "string",
+                    "default": "https://app.thand.io/"
+                },
+                "sync": {
+                    "description": "Whether to enable synchronization with Thand.io",
+                    "type": "boolean",
+                    "default": true
+                }
+            }
+        },
         "github_com_thand-io_agent_internal_models.User": {
             "type": "object",
             "properties": {
@@ -2597,6 +2720,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
                 },
                 "workflow": {
                     "$ref": "#/definitions/model.Workflow"
@@ -3628,6 +3754,9 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "id": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -3719,23 +3848,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Resources": {
-            "type": "object",
-            "properties": {
-                "allow": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "deny": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
         "models.RoleResponse": {
             "type": "object",
             "properties": {
@@ -3791,7 +3903,7 @@ const docTemplate = `{
                     "description": "resource access rules, apis, files, systems etc",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.Resources"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Resources"
                         }
                     ]
                 },
@@ -3802,6 +3914,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_thand-io_agent_internal_models.RoleScopes"
                         }
                     ]
+                },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
                 },
                 "workflows": {
                     "description": "The workflows to execute",
@@ -3962,6 +4077,9 @@ const docTemplate = `{
                 "Minute",
                 "Hour"
             ]
+        },
+        "version.Version": {
+            "type": "object"
         }
     },
     "securityDefinitions": {

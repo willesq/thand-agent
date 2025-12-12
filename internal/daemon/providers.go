@@ -11,6 +11,50 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// getProviderIdentities lists identities available in a provider
+//
+//	@Summary		List provider identities
+//	@Description	Get a list of identities available in a specific provider
+//	@Tags			providers
+//	@Accept			json
+//	@Produce		json
+//	@Param			provider	path		string								true	"Provider name"
+//	@Param			q			query		string								false	"Filter query"
+//	@Success		200			{object}	models.ProviderRolesResponse		"Provider roles"
+//	@Failure		404			{object}	map[string]any				"Provider not found"
+//	@Failure		500			{object}	map[string]any				"Internal server error"
+//	@Router			/provider/{provider}/identities [get]
+//	@Security		BearerAuth
+func (s *Server) getProviderIdentities(c *gin.Context) {
+
+	providerName := c.Param("provider")
+	provider, foundProvider := s.Config.Providers.Definitions[providerName]
+
+	if !foundProvider {
+		s.getErrorPage(c, http.StatusNotFound, "Provider not found")
+		return
+	}
+
+	if provider.GetClient() == nil {
+		s.getErrorPage(c, http.StatusNotFound, "Provider has no client defined")
+		return
+	}
+
+	filter := c.Query("q")
+
+	identities, err := provider.GetClient().ListIdentities(context.Background(), filter)
+	if err != nil {
+		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list roles")
+		return
+	}
+
+	c.JSON(http.StatusOK, models.ProviderIdentitiesResponse{
+		Version:    "1.0",
+		Provider:   providerName,
+		Identities: identities,
+	})
+}
+
 // getProviderRoles lists roles available in a provider
 //
 //	@Summary		List provider roles
