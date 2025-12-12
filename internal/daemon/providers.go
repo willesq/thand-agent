@@ -20,7 +20,7 @@ import (
 //	@Produce		json
 //	@Param			provider	path		string								true	"Provider name"
 //	@Param			q			query		string								false	"Filter query"
-//	@Success		200			{object}	models.ProviderIdentitiesResponse		"Provider roles"
+//	@Success		200			{object}	models.ProviderIdentitiesResponse		"Provider identities"
 //	@Failure		404			{object}	map[string]any				"Provider not found"
 //	@Failure		500			{object}	map[string]any				"Internal server error"
 //	@Router			/provider/{provider}/identities [get]

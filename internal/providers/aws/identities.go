@@ -49,7 +49,7 @@ func (p *awsProvider) SynchronizeIdentities(ctx context.Context, req models.Sync
 
 		if req.Pagination == nil {
 
-			// This is an initial request. If we've failed to get any users
+			// This is an initial request. If we've failed to get any identities,
 			// this is probably a permission error.
 
 			return nil, temporal.NewNonRetryableApplicationError(

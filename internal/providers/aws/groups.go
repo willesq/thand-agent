@@ -30,7 +30,7 @@ func (p *awsProvider) SynchronizeGroups(ctx context.Context, req models.Synchron
 
 		if req.Pagination == nil {
 
-			// This is an initial request. If we've failed to get any users
+			// This is an initial request. If we've failed to get any groups,
 			// this is probably a permission error.
 
 			return nil, temporal.NewNonRetryableApplicationError(

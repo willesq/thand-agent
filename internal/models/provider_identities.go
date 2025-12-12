@@ -67,7 +67,7 @@ func (p *BaseProvider) GetIdentity(ctx context.Context, identity string) (*Ident
 	return nil, fmt.Errorf("identity not found: %s", identity)
 }
 
-// ListIdentities lists all identities (users and groups) from GCP IAM
+// ListIdentities lists all identities (users and groups) from the provider
 func (p *BaseProvider) ListIdentities(ctx context.Context, filters ...string) ([]Identity, error) {
 
 	if p.identity == nil || !p.HasCapability(
