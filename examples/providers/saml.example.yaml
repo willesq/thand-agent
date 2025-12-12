@@ -11,7 +11,7 @@ providers:
       idp_metadata_url: "https://your-idp.example.com/saml/metadata"
       
       # Required: Entity ID for this service provider
-      entity_id: "https://your-app.example.com/saml/metadata"
+      entity_id: "https://your-app.example.com/saml/sp"
       
       # Required: Root URL of your application
       root_url: "https://your-app.example.com"
