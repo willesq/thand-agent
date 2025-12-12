@@ -15,6 +15,21 @@ import (
 	"github.com/thand-io/agent/internal/models"
 )
 
+// Authentication Callback Handlers
+//
+// This file implements two separate callback handlers:
+//
+// 1. getAuthCallback() - OAuth2 GET callbacks
+//    - Expects state and code in query parameters
+//    - Used by OAuth2 providers (GitHub, Google, etc.)
+//
+// 2. postAuthCallback() - SAML POST callbacks
+//    - Expects RelayState and SAMLResponse in form parameters
+//    - Supports SP-initiated (with RelayState) and IdP-initiated (no RelayState)
+//    - Used by SAML providers (Okta, Azure AD, etc.)
+//
+// Both handlers delegate to getAuthCallbackPage() for session creation.
+
 // getAuthRequest initiates the authentication flow
 //
 //	@Summary		Initiate authentication
@@ -119,9 +134,9 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 	)
 }
 
-// getAuthCallback handles the OAuth2 callback
+// getAuthCallback handles OAuth2 GET callback requests
 //
-//	@Summary		Authentication callback
+//	@Summary		OAuth2 authentication callback
 //	@Description	Handle the OAuth2 callback from the provider
 //	@Tags			auth
 //	@Accept			json
@@ -133,45 +148,69 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 //	@Failure		400			{object}	map[string]any	"Bad request"
 //	@Router			/auth/callback/{provider} [get]
 func (s *Server) getAuthCallback(c *gin.Context) {
+	// OAuth2 flow: state and code come in query parameters (GET)
+	state := c.Query("state")
 
-	// Handle the callback to the CLI to store the users session state
+	// Debug logging
+	logrus.WithFields(logrus.Fields{
+		"method": c.Request.Method,
+		"state":  state,
+	}).Debugln("OAuth2 callback parameters")
 
-	// Check if the callback is a workflow resumption or
-	// a local callback response
-
-	// For OAuth2 callbacks, state comes in query parameters (GET)
-	// For SAML callbacks, state comes in RelayState form parameter (POST)
-
-	// Read form values FIRST before any other form access
-	relayState := c.PostForm("RelayState")
-	stateQuery := c.Query("state")
-
-	state := stateQuery
+	// Validate state parameter is required for OAuth2
 	if len(state) == 0 {
-		state = relayState
+		s.getErrorPage(c, http.StatusBadRequest, "State is required for OAuth2 flow")
+		return
 	}
 
-	// Debug logging to see what we're receiving
-	logrus.WithFields(logrus.Fields{
-		"method":      c.Request.Method,
-		"state_query": stateQuery,
-		"state_form":  relayState,
-		"state_final": state,
-	}).Debugln("Auth callback parameters")
+	// Decode and decrypt state
+	decoded, err := s.decodeState(state)
+	if err != nil {
+		s.getErrorPage(c, http.StatusBadRequest, "Invalid state", err)
+		return
+	}
 
-	// Handle IDP-initiated SAML flow (no state parameter)
-	if len(state) == 0 {
+	// Process decoded state
+	s.processDecodedState(c, decoded)
+}
+
+// postAuthCallback handles SAML POST callback requests
+//
+//	@Summary		SAML authentication callback
+//	@Description	Handle the SAML POST callback from the provider
+//	@Tags			auth
+//	@Accept			x-www-form-urlencoded
+//	@Produce		json
+//	@Param			provider		path		string	true	"Provider name"
+//	@Param			RelayState		formData	string	false	"SAML RelayState (SP-initiated)"
+//	@Param			SAMLResponse	formData	string	true	"SAML Response"
+//	@Success		200				"Authentication successful"
+//	@Failure		400				{object}	map[string]any	"Bad request"
+//	@Router			/auth/callback/{provider} [post]
+func (s *Server) postAuthCallback(c *gin.Context) {
+	// SAML flow: RelayState and SAMLResponse come in form parameters (POST)
+	relayState := c.PostForm("RelayState")
+	samlResponse := c.PostForm("SAMLResponse")
+
+	// Debug logging
+	logrus.WithFields(logrus.Fields{
+		"method":       c.Request.Method,
+		"relay_state":  relayState,
+		"has_response": len(samlResponse) > 0,
+	}).Debugln("SAML callback parameters")
+
+	// Handle IdP-initiated SAML flow (no RelayState parameter)
+	if len(relayState) == 0 {
 		// Check if this is a SAML callback with SAMLResponse
-		samlResponse := c.PostForm("SAMLResponse")
 		if len(samlResponse) > 0 {
-			// IDP-initiated flow: create a default auth wrapper
+			// IdP-initiated flow: create a default auth wrapper
 			providerName := c.Param("provider")
 			logrus.WithFields(logrus.Fields{
 				"provider": providerName,
-			}).Info("Handling IDP-initiated SAML flow")
+			}).Info("Handling IdP-initiated SAML flow")
 
 			authWrapper := models.AuthWrapper{
-				Callback: "", // No callback for IDP-initiated
+				Callback: "", // No callback for IdP-initiated
 				Provider: providerName,
 				Code:     "", // No client code
 				Client:   "", // No client identifier
@@ -180,26 +219,40 @@ func (s *Server) getAuthCallback(c *gin.Context) {
 			return
 		}
 
-		// Not a SAML IDP-initiated flow, state is required
-		s.getErrorPage(c, http.StatusBadRequest, "State is required")
+		// Not a SAML IdP-initiated flow, RelayState is required
+		s.getErrorPage(c, http.StatusBadRequest, "RelayState is required for SP-initiated SAML flow")
 		return
 	}
 
+	// SP-initiated flow: decode and decrypt RelayState
+	decoded, err := s.decodeState(relayState)
+	if err != nil {
+		s.getErrorPage(c, http.StatusBadRequest, "Invalid RelayState", err)
+		return
+	}
+
+	// Process decoded state
+	s.processDecodedState(c, decoded)
+}
+
+// decodeState decodes and decrypts the state parameter
+func (s *Server) decodeState(state string) (models.EncodingWrapper, error) {
 	decoded, err := models.EncodingWrapper{}.DecodeAndDecrypt(
 		state,
 		s.Config.GetServices().GetEncryption(),
 	)
-
 	if err != nil {
-		s.getErrorPage(c, http.StatusBadRequest, "Invalid state", err)
-		return
+		return models.EncodingWrapper{}, fmt.Errorf("failed to decode state: %w", err)
 	}
+	return *decoded, nil
+}
 
+// processDecodedState routes based on decoded state type
+func (s *Server) processDecodedState(c *gin.Context, decoded models.EncodingWrapper) {
 	switch decoded.Type {
 	case models.ENCODED_WORKFLOW_TASK:
 		s.getElevateAuthOAuth2(c)
 	case models.ENCODED_AUTH:
-
 		authWrapper := models.AuthWrapper{}
 		err := common.ConvertMapToInterface(
 			decoded.Data.(map[string]any), &authWrapper)
@@ -210,7 +263,6 @@ func (s *Server) getAuthCallback(c *gin.Context) {
 		}
 
 		s.getAuthCallbackPage(c, authWrapper)
-
 	default:
 		s.getErrorPage(c, http.StatusBadRequest, "Invalid state type")
 	}
