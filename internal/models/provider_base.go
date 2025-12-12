@@ -298,6 +298,9 @@ func FilterDuplicates[T any](items []T, existing map[string]*T, keyFunc func(i T
 
 		for _, key := range keys {
 			lowerKey := strings.ToLower(key)
+			if len(lowerKey) == 0 {
+				continue
+			}
 			if _, exists := existing[lowerKey]; exists {
 				found = true
 				break

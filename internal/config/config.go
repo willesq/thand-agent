@@ -338,6 +338,17 @@ func (c *Config) ReloadConfig() error {
 		return errors.Join(foundErrors...)
 	}
 
+	if c.GetServices() != nil && c.GetServices().GetTemporal() != nil {
+
+		logrus.Infoln("Setting up temporal services...")
+		err := c.setupTemporalServices()
+
+		if err != nil {
+			return fmt.Errorf("setting up temporal services: %w", err)
+		}
+
+	}
+
 	return nil
 }
 
@@ -518,17 +529,6 @@ func (c *Config) RegisterWithThandServer() error {
 
 	if err != nil {
 		logrus.WithError(err).Errorln("Failed to merge configuration from thand server")
-	}
-
-	if c.GetServices() != nil && c.GetServices().GetTemporal() != nil {
-
-		logrus.Infoln("Setting up temporal services...")
-		err := c.setupTemporalServices()
-
-		if err != nil {
-			return fmt.Errorf("setting up temporal services: %w", err)
-		}
-
 	}
 
 	return nil

@@ -1,12 +1,14 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/temporal"
 )
 
@@ -14,10 +16,22 @@ type thandActivities struct {
 	config *Config
 }
 
+// PatchProviderUpstreamDummy is a no-op activity for thand server/agents that are not
+// configured to use the Thand service
+func (t *thandActivities) PatchProviderUpstreamDummy(
+	ctx context.Context,
+	activityMethod models.SynchronizeCapability,
+	providerIdentifier string,
+	resp any,
+) error {
+	return nil
+}
+
 // PatchProviderUpstream patches the provider's upstream endpoint in the Thand server
 // This sends updates for users, groups, roles, permissions, resources, etc.
 // So that Thand can paginate through the data when the provider is synchronized
 func (t *thandActivities) PatchProviderUpstream(
+	ctx context.Context,
 	activityMethod models.SynchronizeCapability,
 	providerIdentifier string,
 	resp any,
@@ -25,7 +39,12 @@ func (t *thandActivities) PatchProviderUpstream(
 
 	c := t.config
 
+	log := activity.GetLogger(ctx)
+
 	if !c.HasThandService() {
+
+		log.Warn("Thand service is not configured; skipping PatchProviderUpstream activity")
+
 		return temporal.NewNonRetryableApplicationError(
 			"Thand service is not configured",
 			"ThandServiceNotConfigured",

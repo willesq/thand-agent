@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 	"go.temporal.io/sdk/activity"
 )
@@ -61,12 +62,28 @@ func (c *Config) registerTemporalActivities() error {
 		config: c,
 	}
 
-	temporalWorker.RegisterActivityWithOptions(
-		thandActivities.PatchProviderUpstream,
-		activity.RegisterOptions{
-			Name: models.TemporalPatchProviderUpstreamActivityName,
-		},
-	)
+	if c.HasThandService() {
+
+		logrus.Info("Registering upstream patching activities for Thand service")
+
+		temporalWorker.RegisterActivityWithOptions(
+			thandActivities.PatchProviderUpstream,
+			activity.RegisterOptions{
+				Name: models.TemporalPatchProviderUpstreamActivityName,
+			},
+		)
+
+	} else {
+
+		logrus.Info("Registering dummy upstream patching activities (Thand service not configured)")
+
+		temporalWorker.RegisterActivityWithOptions(
+			thandActivities.PatchProviderUpstreamDummy,
+			activity.RegisterOptions{
+				Name: models.TemporalPatchProviderUpstreamActivityName,
+			},
+		)
+	}
 
 	return nil
 
