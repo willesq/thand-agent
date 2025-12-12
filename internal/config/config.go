@@ -503,7 +503,7 @@ func (c *Config) RegisterWithThandServer() error {
 		4. Get back the roles, providers and workflow definitions
 		5. Check this incoming config version against local version
 		6. If remote version is newer then update local config
-		6.1. Commit the new config version to memeory
+		6.1. Commit the new config version to memory
 		7. If local version is newer then push local config to server
 		8. Check for provider roles, users, permissions etc. If these
 		   do not exist on the server then create them.
@@ -515,17 +515,17 @@ func (c *Config) RegisterWithThandServer() error {
 	*/
 
 	thandLoginUrl := c.DiscoverThandServerApiUrl()
-	registraion, err := c.syncWithEndpoint(thandLoginUrl, c.Thand.ApiKey)
+	registration, err := c.syncWithEndpoint(thandLoginUrl, c.Thand.ApiKey)
 
 	if err != nil {
 		return fmt.Errorf("failed to register with thand server: %w", err)
 	}
 
-	// Now that we are registed and configured. We need to compare our local config
+	// Now that we are registered and configured. We need to compare our local config
 	// with the remote config and update if needed. We need to compare the version
 	// numbers
 
-	err = c.MergeConfiguration(registraion)
+	err = c.MergeConfiguration(registration)
 
 	if err != nil {
 		logrus.WithError(err).Errorln("Failed to merge configuration from thand server")

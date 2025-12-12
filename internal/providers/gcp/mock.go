@@ -43,5 +43,5 @@ func (p *gcpProviderMock) Synchronize(
 	temporalService models.TemporalImpl,
 	req *models.SynchronizeRequest,
 ) error {
-	return PreSynchronizeActivities(ctx, temporalService, p, nil)
+	return PreSynchronizeActivities(ctx, temporalService, p, req)
 }

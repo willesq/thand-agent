@@ -101,7 +101,7 @@ func (a *ProviderActivities) SynchronizeUsers(
 
 }
 
-// SynchronizeUsers fetches users from the provider and adds them to the provider's identity store
+// SynchronizeGroups fetches groups from the provider and adds them to the provider's identity store
 // This must be called as a local activity to ensure that the provider's identity store is updated
 // within the same process context
 func (a *ProviderActivities) SynchronizeGroups(

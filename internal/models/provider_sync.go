@@ -268,7 +268,7 @@ func executeSync[Req SynchronizeRequestImpl, Resp SynchronizeResponseImpl](
 
 func PatchProviderUpstream(
 	name SynchronizeCapability,
-	uptstream *model.Endpoint,
+	upstream *model.Endpoint,
 	payload any,
 ) error {
 	logrus.Debugln("Sending synchronization updates back to server")
@@ -300,11 +300,11 @@ func PatchProviderUpstream(
 
 	data, err := json.Marshal(providerReq)
 
-	if err == nil && len(data) > 0 && uptstream != nil {
+	if err == nil && len(data) > 0 && upstream != nil {
 
 		resp, err := common.InvokeHttpRequest(&model.HTTPArguments{
 			Method:   http.MethodPatch,
-			Endpoint: uptstream,
+			Endpoint: upstream,
 			Body:     data,
 		})
 
