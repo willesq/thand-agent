@@ -104,6 +104,7 @@ func (p *thandProvider) CreateSession(ctx context.Context, authRequest *models.A
 			Email:    userInfo.Email,
 			Username: userInfo.PreferredUsername,
 			Name:     userInfo.Name,
+			Source:   ThandProviderName,
 		},
 		Expiry: time.Now().Add(1 * time.Hour), // Set session expiry to 1 hour
 	}

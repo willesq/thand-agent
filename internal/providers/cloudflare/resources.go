@@ -18,7 +18,7 @@ func (p *cloudflareProvider) CanSynchronizeResources() bool {
 }
 
 // SynchronizeResources loads Cloudflare resources (zones, accounts) from the API
-func (p *cloudflareProvider) SynchronizeResources(ctx context.Context, req models.SynchronizeResourcesRequest) (*models.SynchronizeResourcesResponse, error) {
+func (p *cloudflareProvider) SynchronizeResources(ctx context.Context, req *models.SynchronizeResourcesRequest) (*models.SynchronizeResourcesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

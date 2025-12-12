@@ -117,7 +117,7 @@ func MakeHttpRequest(httpCall model.HTTPArguments, finalURL string) (any, error)
 	builder, err := common.CreateRequestBuilderFromEndpoint(&httpCall)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute HTTP call for %s: %w", httpCall, err)
+		return nil, fmt.Errorf("failed to execute HTTP call for %s: %w", finalURL, err)
 	}
 
 	res, err := common.MakeRequestFromBuilder(builder, httpCall.Method, finalURL)

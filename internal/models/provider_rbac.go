@@ -123,9 +123,9 @@ func (r SynchronizeIdentitiesResponse) GetPagination() *PaginationOptions  { ret
 type ProviderRoleBasedAccessControl interface {
 
 	// Sync or Async load the roles, permissions, resources and identities
-	SynchronizeRoles(ctx context.Context, req SynchronizeRolesRequest) (*SynchronizeRolesResponse, error)
-	SynchronizePermissions(ctx context.Context, req SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error)
-	SynchronizeResources(ctx context.Context, req SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error)
+	SynchronizeRoles(ctx context.Context, req *SynchronizeRolesRequest) (*SynchronizeRolesResponse, error)
+	SynchronizePermissions(ctx context.Context, req *SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error)
+	SynchronizeResources(ctx context.Context, req *SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error)
 
 	// Overrides all existing roles, with the provided list
 	SetRoles(roles []ProviderRole)

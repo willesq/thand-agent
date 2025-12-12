@@ -13,7 +13,7 @@ func (p *salesForceProvider) CanSynchronizeRoles() bool {
 }
 
 // SynchronizeRoles fetches and caches roles from Salesforce
-func (p *salesForceProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
+func (p *salesForceProvider) SynchronizeRoles(ctx context.Context, req *models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
 	if req.Pagination == nil {
 		req.Pagination = &models.PaginationOptions{
 			Page:     1,

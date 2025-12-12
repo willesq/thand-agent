@@ -15,7 +15,7 @@ func (p *cloudflareProvider) CanSynchronizeUsers() bool {
 }
 
 // SynchronizeUsers fetches and caches user identities from Cloudflare
-func (p *cloudflareProvider) SynchronizeUsers(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
+func (p *cloudflareProvider) SynchronizeUsers(ctx context.Context, req *models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

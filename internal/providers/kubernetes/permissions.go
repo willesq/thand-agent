@@ -19,7 +19,7 @@ func (p *kubernetesProvider) CanSynchronizePermissions() bool {
 	return true
 }
 
-func (p *kubernetesProvider) SynchronizePermissions(ctx context.Context, req models.SynchronizePermissionsRequest) (*models.SynchronizePermissionsResponse, error) {
+func (p *kubernetesProvider) SynchronizePermissions(ctx context.Context, req *models.SynchronizePermissionsRequest) (*models.SynchronizePermissionsResponse, error) {
 	// Discover permissions dynamically from Kubernetes API server
 	permissions, err := p.discoverPermissionsFromAPI()
 	if err != nil {

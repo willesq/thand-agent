@@ -74,7 +74,7 @@ func (p *oktaProvider) CanSynchronizeRoles() bool {
 
 // Also load in user groups as these can have roles assigned too
 
-func (p *oktaProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
+func (p *oktaProvider) SynchronizeRoles(ctx context.Context, req *models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

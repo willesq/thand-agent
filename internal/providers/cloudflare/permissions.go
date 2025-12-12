@@ -15,7 +15,7 @@ func (p *cloudflareProvider) CanSynchronizePermissions() bool {
 }
 
 // SynchronizePermissions fetches and caches permissions from Cloudflare
-func (p *cloudflareProvider) SynchronizePermissions(ctx context.Context, req models.SynchronizePermissionsRequest) (*models.SynchronizePermissionsResponse, error) {
+func (p *cloudflareProvider) SynchronizePermissions(ctx context.Context, req *models.SynchronizePermissionsRequest) (*models.SynchronizePermissionsResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

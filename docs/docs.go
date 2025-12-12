@@ -1114,6 +1114,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/provider/{provider}/identities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a list of identities available in a specific provider",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "providers"
+                ],
+                "summary": "List provider identities",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Provider name",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter query",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Provider roles",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProviderIdentitiesResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Provider not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/provider/{provider}/permissions": {
             "get": {
                 "security": [
@@ -1979,6 +2036,19 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_thand-io_agent_internal_config.Mode": {
+            "type": "string",
+            "enum": [
+                "server",
+                "agent",
+                "client"
+            ],
+            "x-enum-varnames": [
+                "ModeServer",
+                "ModeAgent",
+                "ModeClient"
+            ]
+        },
         "github_com_thand-io_agent_internal_config.ProviderConfig": {
             "type": "object",
             "properties": {
@@ -2020,6 +2090,9 @@ const docTemplate = `{
                 },
                 "identifier": {
                     "type": "string"
+                },
+                "mode": {
+                    "$ref": "#/definitions/github_com_thand-io_agent_internal_config.Mode"
                 },
                 "version": {
                     "type": "string"
@@ -2152,6 +2225,23 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_thand-io_agent_internal_models.Group": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "description": "Email is the email address associated with the group (e.g., a mailing list).",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "ID is the unique identifier for the group.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Name is the human-readable name of the group.",
+                    "type": "string"
+                }
+            }
+        },
         "github_com_thand-io_agent_internal_models.Groups": {
             "type": "object",
             "properties": {
@@ -2180,6 +2270,42 @@ const docTemplate = `{
                     "description": "Don't use /healthz as it conflicts with google k8s health checks",
                     "type": "string",
                     "default": "/health"
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.Identity": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "description": "Group contains the group details if this identity represents a group.\nWill be nil if this identity represents a user.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Group"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "ID is the unique identifier for this identity. This will most likely be an email for users\nor a group name for groups. This will be used to tie identities across providers.",
+                    "type": "string"
+                },
+                "label": {
+                    "description": "Label is a human-readable name or description for this identity.",
+                    "type": "string"
+                },
+                "providers": {
+                    "description": "The providers this identity is associated with\nFormat is map[provider_name]provider_type",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "user": {
+                    "description": "User contains the user details if this identity represents a user.\nWill be nil if this identity represents a group.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.User"
+                        }
+                    ]
                 }
             }
         },
@@ -3619,6 +3745,23 @@ const docTemplate = `{
                 },
                 "workflows_count": {
                     "type": "integer"
+                }
+            }
+        },
+        "models.ProviderIdentitiesResponse": {
+            "type": "object",
+            "properties": {
+                "identities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Identity"
+                    }
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },

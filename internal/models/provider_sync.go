@@ -132,7 +132,7 @@ func Synchronize(
 		// Synchronize Identities
 		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeIdentities, &SynchronizeIdentitiesRequest{},
 			func(ctx context.Context, req *SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error) {
-				return provider.SynchronizeIdentities(ctx, *req)
+				return provider.SynchronizeIdentities(ctx, req)
 			},
 			func(resp *SynchronizeIdentitiesResponse) {
 				provider.AddIdentities(resp.Identities...)
@@ -141,7 +141,7 @@ func Synchronize(
 		// Synchronize Users
 		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeUsers, &SynchronizeUsersRequest{},
 			func(ctx context.Context, req *SynchronizeUsersRequest) (*SynchronizeUsersResponse, error) {
-				return provider.SynchronizeUsers(ctx, *req)
+				return provider.SynchronizeUsers(ctx, req)
 			},
 			func(resp *SynchronizeUsersResponse) {
 				provider.AddIdentities(resp.Identities...)
@@ -150,7 +150,7 @@ func Synchronize(
 		// Synchronize Groups
 		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeGroups, &SynchronizeGroupsRequest{},
 			func(ctx context.Context, req *SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error) {
-				return provider.SynchronizeGroups(ctx, *req)
+				return provider.SynchronizeGroups(ctx, req)
 			},
 			func(resp *SynchronizeGroupsResponse) {
 				provider.AddIdentities(resp.Identities...)
@@ -161,7 +161,7 @@ func Synchronize(
 		// Synchronize Resources
 		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeResources, &SynchronizeResourcesRequest{},
 			func(ctx context.Context, req *SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error) {
-				return provider.SynchronizeResources(ctx, *req)
+				return provider.SynchronizeResources(ctx, req)
 			},
 			func(resp *SynchronizeResourcesResponse) {
 				provider.AddResources(resp.Resources...)
@@ -170,7 +170,7 @@ func Synchronize(
 		// Synchronize Roles
 		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizeRoles, &SynchronizeRolesRequest{},
 			func(ctx context.Context, req *SynchronizeRolesRequest) (*SynchronizeRolesResponse, error) {
-				return provider.SynchronizeRoles(ctx, *req)
+				return provider.SynchronizeRoles(ctx, req)
 			},
 			func(resp *SynchronizeRolesResponse) {
 				provider.AddRoles(resp.Roles...)
@@ -179,7 +179,7 @@ func Synchronize(
 		// Synchronize Permissions
 		executeSync(ctx, &wg, &mu, &errs, syncRequest, SynchronizePermissions, &SynchronizePermissionsRequest{},
 			func(ctx context.Context, req *SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error) {
-				return provider.SynchronizePermissions(ctx, *req)
+				return provider.SynchronizePermissions(ctx, req)
 			},
 			func(resp *SynchronizePermissionsResponse) {
 				provider.AddPermissions(resp.Permissions...)

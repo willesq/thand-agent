@@ -15,7 +15,7 @@ func (p *cloudflareProvider) CanSynchronizeRoles() bool {
 }
 
 // SynchronizeRoles fetches and caches roles from Cloudflare
-func (p *cloudflareProvider) SynchronizeRoles(ctx context.Context, req models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
+func (p *cloudflareProvider) SynchronizeRoles(ctx context.Context, req *models.SynchronizeRolesRequest) (*models.SynchronizeRolesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

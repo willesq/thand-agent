@@ -12,14 +12,21 @@ import (
 	"github.com/thand-io/agent/internal/common"
 )
 
-func (p *BaseProvider) SynchronizeResources(ctx context.Context, req SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error) {
+func (p *BaseProvider) SynchronizeResources(ctx context.Context, req *SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error) {
 	return nil, ErrNotImplemented
 }
 
 func (p *BaseProvider) GetResource(ctx context.Context, resource string) (*ProviderResource, error) {
 
-	// If the role is a policy arn: arn:aws:iam::aws:policy/AdministratorAccess
-	// Then parse the role and extract the policy name and convert it to a role
+	if p.rbac == nil || !p.HasCapability(
+		ProviderCapabilityRBAC,
+	) {
+		logrus.Warningln("provider has no resources")
+		return nil, fmt.Errorf("provider has no resources")
+	}
+
+	// If the resource is a policy arn: arn:aws:iam::aws:policy/AdministratorAccess
+	// Then parse the resource and extract the policy name and convert it to a resource name
 	resource = strings.ToLower(resource)
 
 	// Fast map lookup
@@ -31,7 +38,15 @@ func (p *BaseProvider) GetResource(ctx context.Context, resource string) (*Provi
 }
 
 func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]ProviderResource, error) {
-	// If no filters, return all roles
+
+	if p.rbac == nil || !p.HasCapability(
+		ProviderCapabilityRBAC,
+	) {
+		logrus.Warningln("provider has no resources")
+		return nil, fmt.Errorf("provider has no resources")
+	}
+
+	// If no filters, return all resources
 	if len(filters) == 0 {
 		return p.rbac.resources, nil
 	}
