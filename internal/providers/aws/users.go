@@ -79,12 +79,23 @@ func (p *awsProvider) SynchronizeUsers(ctx context.Context, req models.Synchroni
 
 	var identities []models.Identity
 	for _, user := range usersResp.Users {
-		userId := *user.UserId
-		userName := *user.UserName
 
+		var userId string
+		var userName string
 		var email string
+
+		if user.UserId != nil && len(*user.UserId) > 0 {
+			userId = *user.UserId
+		} else {
+			continue
+		}
+
+		if user.UserName != nil && len(*user.UserName) > 0 {
+			userName = *user.UserName
+		}
+
 		// Emails is a list of Email objects
-		if len(user.Emails) > 0 {
+		if len(user.Emails) > 0 && user.Emails[0].Value != nil {
 			email = *user.Emails[0].Value
 		}
 

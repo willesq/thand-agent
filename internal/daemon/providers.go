@@ -20,7 +20,7 @@ import (
 //	@Produce		json
 //	@Param			provider	path		string								true	"Provider name"
 //	@Param			q			query		string								false	"Filter query"
-//	@Success		200			{object}	models.ProviderRolesResponse		"Provider roles"
+//	@Success		200			{object}	models.ProviderIdentitiesResponse		"Provider roles"
 //	@Failure		404			{object}	map[string]any				"Provider not found"
 //	@Failure		500			{object}	map[string]any				"Internal server error"
 //	@Router			/provider/{provider}/identities [get]
@@ -49,7 +49,7 @@ func (s *Server) getProviderIdentities(c *gin.Context) {
 
 	identities, err := provider.GetClient().ListIdentities(context.Background(), filter)
 	if err != nil {
-		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list roles")
+		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list identities", err)
 		return
 	}
 

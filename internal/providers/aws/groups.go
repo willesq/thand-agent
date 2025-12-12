@@ -79,8 +79,19 @@ func (p *awsProvider) SynchronizeGroups(ctx context.Context, req models.Synchron
 
 	var identities []models.Identity
 	for _, group := range groupsResp.Groups {
-		groupId := *group.GroupId
-		displayName := *group.DisplayName
+
+		var groupId string
+		var displayName string
+
+		if group.GroupId != nil && len(*group.GroupId) > 0 {
+			groupId = *group.GroupId
+		} else {
+			continue
+		}
+
+		if group.DisplayName != nil && len(*group.DisplayName) > 0 {
+			displayName = *group.DisplayName
+		}
 
 		identity := models.Identity{
 			ID:    groupId,

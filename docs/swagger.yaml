@@ -106,12 +106,6 @@ definitions:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.ServicesConfig'
         description: External services / non-core services
-      thand:
-        allOf:
-        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.ThandConfig'
-        description: |-
-          This is ONLY if the agent is running in server mode
-          and you want to use https://www.thand.io hosted services
       workflows:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_config.WorkflowConfig'
@@ -242,6 +236,19 @@ definitions:
       max_age:
         type: integer
     type: object
+  github_com_thand-io_agent_internal_models.Group:
+    properties:
+      email:
+        description: Email is the email address associated with the group (e.g., a
+          mailing list).
+        type: string
+      id:
+        description: ID is the unique identifier for the group.
+        type: string
+      name:
+        description: Name is the human-readable name of the group.
+        type: string
+    type: object
   github_com_thand-io_agent_internal_models.Groups:
     properties:
       allow:
@@ -262,6 +269,36 @@ definitions:
         default: /health
         description: Don't use /healthz as it conflicts with google k8s health checks
         type: string
+    type: object
+  github_com_thand-io_agent_internal_models.Identity:
+    properties:
+      group:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Group'
+        description: |-
+          Group contains the group details if this identity represents a group.
+          Will be nil if this identity represents a user.
+      id:
+        description: |-
+          ID is the unique identifier for this identity. This will most likely be an email for users
+          or a group name for groups. This will be used to tie identities across providers.
+        type: string
+      label:
+        description: Label is a human-readable name or description for this identity.
+        type: string
+      providers:
+        additionalProperties:
+          type: string
+        description: |-
+          The providers this identity is associated with
+          Format is map[provider_name]provider_type
+        type: object
+      user:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.User'
+        description: |-
+          User contains the user details if this identity represents a user.
+          Will be nil if this identity represents a group.
     type: object
   github_com_thand-io_agent_internal_models.LocalSession:
     properties:
@@ -293,6 +330,9 @@ definitions:
     type: object
   github_com_thand-io_agent_internal_models.LoginConfig:
     properties:
+      api_key:
+        description: API key for authenticating with the login server
+        type: string
       base:
         default: /
         description: Base path for login endpoint e.g. /
@@ -364,8 +404,6 @@ definitions:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
         description: The base role for this provider
-      version:
-        $ref: '#/definitions/version.Version'
     type: object
   github_com_thand-io_agent_internal_models.RateLimitConfig:
     properties:
@@ -382,17 +420,6 @@ definitions:
       path:
         default: /ready
         type: string
-    type: object
-  github_com_thand-io_agent_internal_models.Resources:
-    properties:
-      allow:
-        items:
-          type: string
-        type: array
-      deny:
-        items:
-          type: string
-        type: array
     type: object
   github_com_thand-io_agent_internal_models.Role:
     properties:
@@ -430,14 +457,12 @@ definitions:
         type: array
       resources:
         allOf:
-        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Resources'
+        - $ref: '#/definitions/models.Resources'
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
-      version:
-        $ref: '#/definitions/version.Version'
       workflows:
         description: The workflows to execute
         items:
@@ -517,23 +542,6 @@ definitions:
         - $ref: '#/definitions/models.ServiceConfig'
         description: Vault - used for storing sensitive data
     type: object
-  github_com_thand-io_agent_internal_models.ThandConfig:
-    properties:
-      api_key:
-        description: The API key for authenticating with Thand.io
-        type: string
-      base:
-        default: /
-        description: Base path for login endpoint e.g. /
-        type: string
-      endpoint:
-        default: https://app.thand.io/
-        type: string
-      sync:
-        default: true
-        description: Whether to enable synchronization with Thand.io
-        type: boolean
-    type: object
   github_com_thand-io_agent_internal_models.User:
     properties:
       email:
@@ -572,8 +580,6 @@ definitions:
         type: boolean
       name:
         type: string
-      version:
-        $ref: '#/definitions/version.Version'
       workflow:
         $ref: '#/definitions/model.Workflow'
     type: object
@@ -1265,11 +1271,20 @@ definitions:
       workflows_count:
         type: integer
     type: object
+  models.ProviderIdentitiesResponse:
+    properties:
+      identities:
+        items:
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Identity'
+        type: array
+      provider:
+        type: string
+      version:
+        type: string
+    type: object
   models.ProviderPermission:
     properties:
       description:
-        type: string
-      id:
         type: string
       name:
         type: string
@@ -1330,6 +1345,17 @@ definitions:
       version:
         type: string
     type: object
+  models.Resources:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
+    type: object
   models.RoleResponse:
     properties:
       authenticators:
@@ -1366,14 +1392,12 @@ definitions:
         type: array
       resources:
         allOf:
-        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Resources'
+        - $ref: '#/definitions/models.Resources'
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
-      version:
-        $ref: '#/definitions/version.Version'
       workflows:
         description: The workflows to execute
         items:
@@ -1489,8 +1513,6 @@ definitions:
     - Second
     - Minute
     - Hour
-  version.Version:
-    type: object
 host: localhost:8080
 info:
   contact:
@@ -2255,7 +2277,7 @@ paths:
         "200":
           description: Provider roles
           schema:
-            $ref: '#/definitions/models.ProviderRolesResponse'
+            $ref: '#/definitions/models.ProviderIdentitiesResponse'
         "404":
           description: Provider not found
           schema:

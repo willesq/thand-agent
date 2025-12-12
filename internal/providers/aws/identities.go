@@ -71,6 +71,8 @@ func (p *awsProvider) SynchronizeIdentities(ctx context.Context, req models.Sync
 			userId = *user.Arn
 		} else if user.UserId != nil && len(*user.UserId) > 0 {
 			userId = *user.UserId
+		} else {
+			continue
 		}
 
 		if user.UserName != nil && len(*user.UserName) > 0 {
