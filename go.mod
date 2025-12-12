@@ -4,8 +4,6 @@ go 1.25
 
 toolchain go1.25.0
 
-replace github.com/serverlessworkflow/sdk-go/v3 => github.com/hughneale/serverless-sdk-go/v3 v3.0.0-20251022183658-27de3226307f
-
 require (
 	cloud.google.com/go/compute/metadata v0.9.0
 	cloud.google.com/go/kms v1.23.2
