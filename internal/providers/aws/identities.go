@@ -49,8 +49,8 @@ func (p *awsProvider) SynchronizeIdentities(ctx context.Context, req models.Sync
 
 		if req.Pagination == nil {
 
-			// This is an inital request. If we've failed to get any users
-			// this is probabbly a permission error.
+			// This is an initial request. If we've failed to get any users
+			// this is probably a permission error.
 
 			return nil, temporal.NewNonRetryableApplicationError(
 				"Failed to list IAM users",

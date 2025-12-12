@@ -30,8 +30,8 @@ func (p *awsProvider) SynchronizeUsers(ctx context.Context, req models.Synchroni
 
 		if req.Pagination == nil {
 
-			// This is an inital request. If we've failed to get any users
-			// this is probabbly a permission error.
+			// This is an initial request. If we've failed to get any users
+			// this is probably a permission error.
 
 			return nil, temporal.NewNonRetryableApplicationError(
 				"Failed to list identity center instances",
@@ -53,8 +53,8 @@ func (p *awsProvider) SynchronizeUsers(ctx context.Context, req models.Synchroni
 		return nil, temporal.NewNonRetryableApplicationError(
 			"identity store ID not found in SSO instance",
 			"IdentityCenterRequest",
-			err,
 		)
+	}
 	}
 
 	if req.Pagination == nil {
