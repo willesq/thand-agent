@@ -24,3 +24,6 @@ providers:
       
       # Optional: Whether to sign SAML requests (default: false)
       sign_requests: true
+
+      # Optional: Allow IdP-initiated SSO (default: false)
+      allow_idp_initiated: true
