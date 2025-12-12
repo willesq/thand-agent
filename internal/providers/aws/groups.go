@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssoadmin"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/temporal"
 )
 
 func (p *awsProvider) CanSynchronizeGroups() bool {
@@ -26,6 +27,19 @@ func (p *awsProvider) SynchronizeGroups(ctx context.Context, req models.Synchron
 	// 1. Get Identity Store ID
 	resp, err := p.ssoAdminService.ListInstances(ctx, &ssoadmin.ListInstancesInput{})
 	if err != nil {
+
+		if req.Pagination == nil {
+
+			// This is an inital request. If we've failed to get any users
+			// this is probabbly a permission error.
+
+			return nil, temporal.NewNonRetryableApplicationError(
+				"Failed to list identity center instances",
+				"IdentityCenterRequest",
+				err,
+			)
+		}
+
 		return nil, fmt.Errorf("failed to list SSO instances: %w", err)
 	}
 
@@ -36,7 +50,11 @@ func (p *awsProvider) SynchronizeGroups(ctx context.Context, req models.Synchron
 
 	identityStoreId := resp.Instances[0].IdentityStoreId
 	if identityStoreId == nil {
-		return nil, fmt.Errorf("identity store ID not found in SSO instance")
+		return nil, temporal.NewNonRetryableApplicationError(
+			"identity store ID not found in SSO instance",
+			"IdentityCenterRequest",
+			err,
+		)
 	}
 
 	if req.Pagination == nil {

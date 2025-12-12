@@ -40,6 +40,11 @@ func (s *Server) getProviderIdentities(c *gin.Context) {
 		return
 	}
 
+	if !provider.GetClient().HasCapability(models.ProviderCapabilityIdentities) {
+		s.getErrorPage(c, http.StatusNotImplemented, "The provider does not implement identities")
+		return
+	}
+
 	filter := c.Query("q")
 
 	identities, err := provider.GetClient().ListIdentities(context.Background(), filter)
@@ -81,6 +86,11 @@ func (s *Server) getProviderRoles(c *gin.Context) {
 
 	if provider.GetClient() == nil {
 		s.getErrorPage(c, http.StatusNotFound, "Provider has no client defined")
+		return
+	}
+
+	if !provider.GetClient().HasCapability(models.ProviderCapabilityRBAC) {
+		s.getErrorPage(c, http.StatusNotImplemented, "The provider does not implement rbac")
 		return
 	}
 
@@ -156,6 +166,11 @@ func (s *Server) getProviderPermissions(c *gin.Context) {
 
 	if provider.GetClient() == nil {
 		s.getErrorPage(c, http.StatusNotFound, "Provider has no client defined")
+		return
+	}
+
+	if !provider.GetClient().HasCapability(models.ProviderCapabilityRBAC) {
+		s.getErrorPage(c, http.StatusNotImplemented, "The provider does not implement rbac")
 		return
 	}
 

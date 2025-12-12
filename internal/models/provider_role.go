@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve/v2/search"
+	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/common"
 )
 
@@ -40,6 +41,13 @@ func (p *BaseProvider) SynchronizeRoles(
 
 func (p *BaseProvider) GetRole(ctx context.Context, role string) (*ProviderRole, error) {
 
+	if p.identity == nil || !p.HasCapability(
+		ProviderCapabilityRBAC,
+	) {
+		logrus.Warningln("provider has no roles")
+		return nil, fmt.Errorf("provider has no roles")
+	}
+
 	// If the role is a policy arn: arn:aws:iam::aws:policy/AdministratorAccess
 	// Then parse the role and extract the policy name and convert it to a role
 	role = strings.TrimPrefix(role, "arn:aws:iam::aws:policy/")
@@ -54,6 +62,14 @@ func (p *BaseProvider) GetRole(ctx context.Context, role string) (*ProviderRole,
 }
 
 func (p *BaseProvider) ListRoles(ctx context.Context, filters ...string) ([]ProviderRole, error) {
+
+	if p.identity == nil || !p.HasCapability(
+		ProviderCapabilityRBAC,
+	) {
+		logrus.Warningln("provider has no roles")
+		return nil, fmt.Errorf("provider has no roles")
+	}
+
 	// If no filters, return all roles
 	if len(filters) == 0 {
 		return p.rbac.roles, nil

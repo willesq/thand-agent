@@ -17,14 +17,14 @@ type ProviderIdentities interface {
 	SetIdentities(identities []Identity)
 
 	// Some APIs support identities, users, groups service accoutns etc.
-	SynchronizeIdentities(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error)
+	SynchronizeIdentities(ctx context.Context, req SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error)
 	// Some require more granular user synchronization
 	SynchronizeUsers(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error)
 	// Others require group synchronization
 	SynchronizeGroups(ctx context.Context, req SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error)
 }
 
-func (p *BaseProvider) SynchronizeIdentities(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error) {
+func (p *BaseProvider) SynchronizeIdentities(ctx context.Context, req SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error) {
 	return nil, ErrNotImplemented
 }
 
@@ -38,6 +38,14 @@ func (p *BaseProvider) SynchronizeGroups(ctx context.Context, req SynchronizeGro
 
 // GetIdentity retrieves a specific identity (user or group) from GCP
 func (p *BaseProvider) GetIdentity(ctx context.Context, identity string) (*Identity, error) {
+
+	if p.identity == nil || !p.HasCapability(
+		ProviderCapabilityIdentities,
+	) {
+		logrus.Warningln("provider has no identities")
+		return nil, fmt.Errorf("provider has no identities")
+	}
+
 	// Try to get from cache first
 	p.identity.mu.RLock()
 	identitiesMap := p.identity.identitiesMap
@@ -61,6 +69,13 @@ func (p *BaseProvider) GetIdentity(ctx context.Context, identity string) (*Ident
 
 // ListIdentities lists all identities (users and groups) from GCP IAM
 func (p *BaseProvider) ListIdentities(ctx context.Context, filters ...string) ([]Identity, error) {
+
+	if p.identity == nil || !p.HasCapability(
+		ProviderCapabilityIdentities,
+	) {
+		logrus.Warningln("provider has no identities")
+		return nil, fmt.Errorf("provider has no identities")
+	}
 
 	p.identity.mu.RLock()
 	identities := p.identity.identities

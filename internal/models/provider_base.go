@@ -428,7 +428,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 	if provider.HasCapability(ProviderCapabilityIdentities) {
 		// Synchronize Identities
 		runSync(SynchronizeIdentities, func() error {
-			req := SynchronizeUsersRequest{}
+			req := SynchronizeIdentitiesRequest{}
 			for {
 				resp, err := provider.SynchronizeIdentities(ctx, req)
 				if err != nil {

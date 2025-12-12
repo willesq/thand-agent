@@ -45,8 +45,8 @@ func (a *ProviderActivities) RevokeRole(
 
 func (a *ProviderActivities) SynchronizeIdentities(
 	ctx context.Context,
-	req SynchronizeUsersRequest,
-) (*SynchronizeUsersResponse, error) {
+	req SynchronizeIdentitiesRequest,
+) (*SynchronizeIdentitiesResponse, error) {
 
 	logrus.WithFields(logrus.Fields{
 		"pagination": req.Pagination,

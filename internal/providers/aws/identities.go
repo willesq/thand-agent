@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
+	"go.temporal.io/sdk/temporal"
 )
 
 func (p *awsProvider) CanSynchronizeIdentities() bool {
@@ -22,7 +23,17 @@ func (p *awsProvider) SynchronizeIdentities(ctx context.Context, req models.Sync
 	}()
 
 	input := &iam.ListUsersInput{}
-	if req.Pagination != nil {
+
+	if req.Pagination == nil {
+
+		// No page request. This is the start of our sync. Check we have access first.
+		// If we don't then cancel the request.
+
+		maxItems := int32(100)
+		input.MaxItems = &maxItems
+
+	} else {
+
 		if len(req.Pagination.Token) != 0 {
 			input.Marker = &req.Pagination.Token
 		}
@@ -33,15 +44,38 @@ func (p *awsProvider) SynchronizeIdentities(ctx context.Context, req models.Sync
 	}
 
 	output, err := p.service.ListUsers(ctx, input)
+
 	if err != nil {
+
+		if req.Pagination == nil {
+
+			// This is an inital request. If we've failed to get any users
+			// this is probabbly a permission error.
+
+			return nil, temporal.NewNonRetryableApplicationError(
+				"Failed to list IAM users",
+				"IamUsersRequest",
+				err,
+			)
+		}
+
 		return nil, fmt.Errorf("failed to list IAM users: %w", err)
 	}
 
 	var identities []models.Identity
 	for _, user := range output.Users {
-		userId := *user.UserId
-		userName := *user.UserName
-		//arn := *user.Arn
+		var userId string
+		var userName string
+
+		if user.Arn != nil && len(*user.Arn) > 0 {
+			userId = *user.Arn
+		} else if user.UserId != nil && len(*user.UserId) > 0 {
+			userId = *user.UserId
+		}
+
+		if user.UserName != nil && len(*user.UserName) > 0 {
+			userName = *user.UserName
+		}
 
 		// IAM users don't have emails
 		identity := models.Identity{
@@ -52,9 +86,6 @@ func (p *awsProvider) SynchronizeIdentities(ctx context.Context, req models.Sync
 				Username: userName,
 				Name:     userName,
 				Source:   "iam",
-				//Metadata: map[string]any{
-				//	"arn": arn,
-				//},
 			},
 		}
 		identities = append(identities, identity)
