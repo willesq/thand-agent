@@ -61,9 +61,13 @@ func (p *oktaProvider) SynchronizeGroups(ctx context.Context, req models.Synchro
 
 	// Handle pagination
 	if len(resp.NextPage) != 0 {
-		response.Pagination = &models.PaginationOptions{
-			Token:    resp.NextPage,
-			PageSize: req.Pagination.PageSize,
+		token := p.GetNextTokenFromResponse(resp)
+
+		if len(token) > 0 {
+			response.Pagination = &models.PaginationOptions{
+				Token:    token,
+				PageSize: req.Pagination.PageSize,
+			}
 		}
 	}
 

@@ -550,7 +550,7 @@ func Synchronize(ctx context.Context, temporalService TemporalImpl, provider Pro
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return fmt.Errorf("synchronization failed: %v", errs)
+		logrus.WithError(errors.Join(errs...)).Error("Synchronization completed with errors")
 	}
 
 	if len(syncResponse.Identities) > 0 {
