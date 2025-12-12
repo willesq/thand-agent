@@ -1602,7 +1602,39 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Authentication callback
+      summary: OAuth2 authentication callback
+      tags:
+      - auth
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Handle the SAML POST callback from the provider
+      parameters:
+      - description: Provider name
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: SAML RelayState (SP-initiated)
+        in: formData
+        name: RelayState
+        type: string
+      - description: SAML Response
+        in: formData
+        name: SAMLResponse
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Authentication successful
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: SAML authentication callback
       tags:
       - auth
   /auth/logout:
@@ -2275,7 +2307,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Provider roles
+          description: Provider identities
           schema:
             $ref: '#/definitions/models.ProviderIdentitiesResponse'
         "404":

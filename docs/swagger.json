@@ -99,7 +99,7 @@
                 "tags": [
                     "auth"
                 ],
-                "summary": "Authentication callback",
+                "summary": "OAuth2 authentication callback",
                 "parameters": [
                     {
                         "type": "string",
@@ -120,6 +120,53 @@
                         "description": "OAuth code",
                         "name": "code",
                         "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Authentication successful"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Handle the SAML POST callback from the provider",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "SAML authentication callback",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Provider name",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "SAML RelayState (SP-initiated)",
+                        "name": "RelayState",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "SAML Response",
+                        "name": "SAMLResponse",
+                        "in": "formData",
                         "required": true
                     }
                 ],
@@ -1147,7 +1194,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Provider roles",
+                        "description": "Provider identities",
                         "schema": {
                             "$ref": "#/definitions/models.ProviderIdentitiesResponse"
                         }
