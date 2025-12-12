@@ -53,8 +53,8 @@ func (p *awsProvider) SynchronizeUsers(ctx context.Context, req models.Synchroni
 		return nil, temporal.NewNonRetryableApplicationError(
 			"identity store ID not found in SSO instance",
 			"IdentityCenterRequest",
+			fmt.Errorf("identity store ID is nil"),
 		)
-	}
 	}
 
 	if req.Pagination == nil {

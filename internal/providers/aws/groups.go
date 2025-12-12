@@ -53,7 +53,7 @@ func (p *awsProvider) SynchronizeGroups(ctx context.Context, req models.Synchron
 		return nil, temporal.NewNonRetryableApplicationError(
 			"identity store ID not found in SSO instance",
 			"IdentityCenterRequest",
-
+			fmt.Errorf("identity store ID is nil"),
 		)
 	}
 
