@@ -15,7 +15,7 @@ func (p *oktaProvider) CanSynchronizeGroups() bool {
 }
 
 // SynchronizeGroups fetches and caches group identities from Okta
-func (p *oktaProvider) SynchronizeGroups(ctx context.Context, req models.SynchronizeGroupsRequest) (*models.SynchronizeGroupsResponse, error) {
+func (p *oktaProvider) SynchronizeGroups(ctx context.Context, req *models.SynchronizeGroupsRequest) (*models.SynchronizeGroupsResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

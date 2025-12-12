@@ -93,17 +93,54 @@ type PaginationOptions struct {
 	Token    string `json:"token,omitempty"`
 }
 
+type SynchronizeRequestImpl interface {
+	SetPagination(p *PaginationOptions)
+}
+
+type SynchronizeResponseImpl interface {
+	GetPagination() *PaginationOptions
+}
+
+func (r *SynchronizeRolesRequest) SetPagination(p *PaginationOptions) { r.Pagination = p }
+func (r SynchronizeRolesResponse) GetPagination() *PaginationOptions  { return r.Pagination }
+
+func (r *SynchronizePermissionsRequest) SetPagination(p *PaginationOptions) { r.Pagination = p }
+func (r SynchronizePermissionsResponse) GetPagination() *PaginationOptions  { return r.Pagination }
+
+func (r *SynchronizeUsersRequest) SetPagination(p *PaginationOptions) { r.Pagination = p }
+func (r SynchronizeUsersResponse) GetPagination() *PaginationOptions  { return r.Pagination }
+
+func (r *SynchronizeGroupsRequest) SetPagination(p *PaginationOptions) { r.Pagination = p }
+func (r SynchronizeGroupsResponse) GetPagination() *PaginationOptions  { return r.Pagination }
+
+func (r *SynchronizeResourcesRequest) SetPagination(p *PaginationOptions) { r.Pagination = p }
+func (r SynchronizeResourcesResponse) GetPagination() *PaginationOptions  { return r.Pagination }
+
+func (r *SynchronizeIdentitiesRequest) SetPagination(p *PaginationOptions) { r.Pagination = p }
+func (r SynchronizeIdentitiesResponse) GetPagination() *PaginationOptions  { return r.Pagination }
+
 // ProviderRoleBasedAccessControl defines the interface for providers that support RBAC
 type ProviderRoleBasedAccessControl interface {
 
 	// Sync or Async load the roles, permissions, resources and identities
-	SynchronizeRoles(ctx context.Context, req SynchronizeRolesRequest) (*SynchronizeRolesResponse, error)
-	SynchronizePermissions(ctx context.Context, req SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error)
-	SynchronizeResources(ctx context.Context, req SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error)
+	SynchronizeRoles(ctx context.Context, req *SynchronizeRolesRequest) (*SynchronizeRolesResponse, error)
+	SynchronizePermissions(ctx context.Context, req *SynchronizePermissionsRequest) (*SynchronizePermissionsResponse, error)
+	SynchronizeResources(ctx context.Context, req *SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error)
 
+	// Overrides all existing roles, with the provided list
 	SetRoles(roles []ProviderRole)
+	// Appends new roles to the existing list
+	AddRoles(role ...ProviderRole)
+
+	// Overrides all existing permissions with the provided list
 	SetPermissions(permissions []ProviderPermission)
+	// Appends new permissions to the existing list
+	AddPermissions(permission ...ProviderPermission)
+
+	// Overrides all existing resources with the provided list
 	SetResources(resources []ProviderResource)
+	// Appends new resources to the existing list
+	AddResources(resource ...ProviderResource)
 
 	// Permissions are individual accesses. Used as part of a role
 	GetPermission(ctx context.Context, permission string) (*ProviderPermission, error)

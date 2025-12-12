@@ -14,25 +14,28 @@ type ProviderIdentities interface {
 	GetIdentity(ctx context.Context, identity string) (*Identity, error)
 	ListIdentities(ctx context.Context, filters ...string) ([]Identity, error)
 
+	// Overrides all existing identities with the provided list
 	SetIdentities(identities []Identity)
+	// Appends new identities to the existing list
+	AddIdentities(identities ...Identity)
 
 	// Some APIs support identities, users, groups service accoutns etc.
-	SynchronizeIdentities(ctx context.Context, req SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error)
+	SynchronizeIdentities(ctx context.Context, req *SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error)
 	// Some require more granular user synchronization
-	SynchronizeUsers(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error)
+	SynchronizeUsers(ctx context.Context, req *SynchronizeUsersRequest) (*SynchronizeUsersResponse, error)
 	// Others require group synchronization
-	SynchronizeGroups(ctx context.Context, req SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error)
+	SynchronizeGroups(ctx context.Context, req *SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error)
 }
 
-func (p *BaseProvider) SynchronizeIdentities(ctx context.Context, req SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error) {
+func (p *BaseProvider) SynchronizeIdentities(ctx context.Context, req *SynchronizeIdentitiesRequest) (*SynchronizeIdentitiesResponse, error) {
 	return nil, ErrNotImplemented
 }
 
-func (p *BaseProvider) SynchronizeUsers(ctx context.Context, req SynchronizeUsersRequest) (*SynchronizeUsersResponse, error) {
+func (p *BaseProvider) SynchronizeUsers(ctx context.Context, req *SynchronizeUsersRequest) (*SynchronizeUsersResponse, error) {
 	return nil, ErrNotImplemented
 }
 
-func (p *BaseProvider) SynchronizeGroups(ctx context.Context, req SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error) {
+func (p *BaseProvider) SynchronizeGroups(ctx context.Context, req *SynchronizeGroupsRequest) (*SynchronizeGroupsResponse, error) {
 	return nil, ErrNotImplemented
 }
 

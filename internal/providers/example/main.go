@@ -20,13 +20,14 @@ var ExampleSession = models.Session{
 }
 
 var ExamplePermission = models.ProviderPermission{
+	ID:          "1",
 	Name:        "example",
 	Title:       "Example",
 	Description: "Example Permission",
 }
 
 var ExampleRole = models.ProviderRole{
-	Id:          "1",
+	ID:          "1",
 	Name:        "example",
 	Title:       "Example",
 	Description: "Example Role",

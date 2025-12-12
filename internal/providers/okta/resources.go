@@ -30,7 +30,7 @@ func (p *oktaProvider) CanSynchronizeResources() bool {
 }
 
 // SynchronizeResources loads Okta resources (applications) from the API
-func (p *oktaProvider) SynchronizeResources(ctx context.Context, req models.SynchronizeResourcesRequest) (*models.SynchronizeResourcesResponse, error) {
+func (p *oktaProvider) SynchronizeResources(ctx context.Context, req *models.SynchronizeResourcesRequest) (*models.SynchronizeResourcesResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

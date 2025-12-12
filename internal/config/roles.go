@@ -111,6 +111,21 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 		foundRoles = importedRoles
 	}
 
+	if len(foundRoles) == 0 {
+		logrus.Warningln("No roles found from any source, loading defaults")
+		foundRoles, err = environment.GetDefaultRoles(c.Environment.Platform)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load default roles: %w", err)
+		}
+		logrus.Infoln("Loaded default roles:", len(foundRoles))
+	}
+
+	return c.ApplyRoles(foundRoles)
+}
+
+func (c *Config) ApplyRoles(foundRoles []*models.RoleDefinitions) (map[string]models.Role, error) {
+
+	// Add roles defined directly in config
 	if len(c.Roles.Definitions) > 0 {
 		logrus.Debugln("Adding roles defined directly in config: ", len(c.Roles.Definitions))
 		defaultVersion := version.Must(version.NewVersion("1.0"))
@@ -123,15 +138,6 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 		}
 	}
 
-	if len(foundRoles) == 0 {
-		logrus.Warningln("No roles found from any source, loading defaults")
-		foundRoles, err = environment.GetDefaultRoles(c.Environment.Platform)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load default roles: %w", err)
-		}
-		logrus.Infoln("Loaded default roles:", len(foundRoles))
-	}
-
 	defs := make(map[string]models.Role)
 	logrus.Debugln("Processing loaded roles: ", len(foundRoles))
 
@@ -141,13 +147,20 @@ func (c *Config) LoadRoles() (map[string]models.Role, error) {
 				logrus.Infoln("Role disabled:", roleKey)
 				continue
 			}
+
 			if _, exists := defs[roleKey]; exists {
 				logrus.Warningln("Duplicate role key found, skipping:", roleKey)
 				continue
 			}
+
+			if r.Version == nil {
+				r.Version = role.Version
+			}
+
 			if len(r.Name) == 0 {
 				r.Name = roleKey
 			}
+
 			// Validate role limits
 			if err := validateRoleLimits(roleKey, &r); err != nil {
 				logrus.WithError(err).Warnln("Role exceeds limits, skipping:", roleKey)
@@ -282,8 +295,8 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 			if providerRole != nil {
 				if len(providerRole.Name) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Name)
-				} else if len(providerRole.Id) != 0 {
-					remainingInherits = append(remainingInherits, providerRole.Id)
+				} else if len(providerRole.ID) != 0 {
+					remainingInherits = append(remainingInherits, providerRole.ID)
 				}
 				continue
 			}
@@ -301,8 +314,8 @@ func (c *Config) resolveCompositeRole(identity *models.Identity, baseRole *model
 			if providerRole != nil {
 				if len(providerRole.Name) != 0 {
 					remainingInherits = append(remainingInherits, providerRole.Name)
-				} else if len(providerRole.Id) != 0 {
-					remainingInherits = append(remainingInherits, providerRole.Id)
+				} else if len(providerRole.ID) != 0 {
+					remainingInherits = append(remainingInherits, providerRole.ID)
 				}
 				continue
 			}

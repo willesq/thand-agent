@@ -14,7 +14,7 @@ func (p *gsuiteProvider) CanSynchronizeGroups() bool {
 }
 
 // SynchronizeGroups fetches and caches group identities from GSuite
-func (p *gsuiteProvider) SynchronizeGroups(ctx context.Context, req models.SynchronizeGroupsRequest) (*models.SynchronizeGroupsResponse, error) {
+func (p *gsuiteProvider) SynchronizeGroups(ctx context.Context, req *models.SynchronizeGroupsRequest) (*models.SynchronizeGroupsResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

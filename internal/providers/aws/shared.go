@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,6 +61,7 @@ func loadPermissions() ([]models.ProviderPermission, error) {
 	// Convert to slice and create fast lookup map
 	for name, description := range docs {
 		perm := models.ProviderPermission{
+			ID:          strings.ToLower(name),
 			Name:        name,
 			Description: description,
 		}

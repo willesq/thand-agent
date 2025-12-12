@@ -29,13 +29,17 @@ func (p *awsProviderMock) Initialize(identifier string, provider models.Provider
 	)
 
 	// Load AWS Permissions and Roles from shared singleton
-	if err := p.Synchronize(context.Background(), nil); err != nil {
+	if err := p.Synchronize(context.Background(), nil, nil); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *awsProviderMock) Synchronize(ctx context.Context, temporalService models.TemporalImpl) error {
+func (p *awsProviderMock) Synchronize(
+	ctx context.Context,
+	temporalService models.TemporalImpl,
+	req *models.SynchronizeRequest,
+) error {
 	return PreSynchronizeActivities(ctx, temporalService, p)
 }

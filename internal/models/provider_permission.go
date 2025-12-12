@@ -17,6 +17,7 @@ type ProviderPermissionsResponse struct {
 }
 
 type ProviderPermission struct {
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
@@ -85,7 +86,7 @@ func (p *BaseProvider) ListPermissions(ctx context.Context, filters ...string) (
 
 func (p *BaseProvider) SynchronizePermissions(
 	ctx context.Context,
-	req SynchronizePermissionsRequest,
+	req *SynchronizePermissionsRequest,
 ) (*SynchronizePermissionsResponse, error) {
 	return nil, ErrNotImplemented
 }

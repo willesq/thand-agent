@@ -28,12 +28,13 @@ config:
 enabled: true
 */
 type Provider struct {
-	Name        string       `json:"name"`
-	Description string       `json:"description"`
-	Provider    string       `json:"provider"`         // e.g. aws, gcp, azure
-	Config      *BasicConfig `json:"config,omitempty"` // Provider-specific configuration
-	Role        *Role        `json:"role,omitempty"`   // The base role for this provider
-	Enabled     bool         `json:"enabled"`          // Whether this provider is enabled
+	Version     *version.Version `json:"version,omitempty"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Provider    string           `json:"provider"`         // e.g. aws, gcp, azure
+	Config      *BasicConfig     `json:"config,omitempty"` // Provider-specific configuration
+	Role        *Role            `json:"role,omitempty"`   // The base role for this provider
+	Enabled     bool             `json:"enabled"`          // Whether this provider is enabled
 
 	client ProviderImpl `json:"-" yaml:"-"`
 }
@@ -154,7 +155,7 @@ type ProviderImpl interface {
 	GetDescription() string
 	GetProvider() string
 
-	Synchronize(ctx context.Context, temporalClient TemporalImpl) error
+	Synchronize(ctx context.Context, temporalClient TemporalImpl, req *SynchronizeRequest) error
 
 	// Temporal
 	RegisterWorkflows(temporalClient TemporalImpl) error
