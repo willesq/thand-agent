@@ -109,9 +109,9 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 		s.Config.GetServices().GetEncryption(),
 	)
 
+	// Log state length only for debugging - avoid logging full encrypted state for security
 	logrus.WithFields(logrus.Fields{
-		"encodedState": encodedState,
-		"stateLength":  len(encodedState),
+		"stateLength": len(encodedState),
 	}).Debugln("Encoded state for auth request")
 
 	authResponse, err := providerConfig.GetClient().AuthorizeSession(
@@ -208,7 +208,7 @@ func (s *Server) postAuthCallback(c *gin.Context) {
 			providerName := c.Param("provider")
 
 			// Get provider config to verify IdP-initiated is allowed
-			_, err := s.GetConfig().GetProviderByName(providerName)
+			providerConfig, err := s.GetConfig().GetProviderByName(providerName)
 			if err != nil {
 				logrus.WithFields(logrus.Fields{
 					"provider": providerName,
@@ -218,12 +218,24 @@ func (s *Server) postAuthCallback(c *gin.Context) {
 				return
 			}
 
+			// Check if provider explicitly allows IdP-initiated flows (opt-in security)
+			// Administrator must set "allow_idp_initiated: true" in provider config
+			if allowIDPInitiated, ok := providerConfig.Config.GetBool("allow_idp_initiated"); !ok || !allowIDPInitiated {
+				logrus.WithFields(logrus.Fields{
+					"provider":   providerName,
+					"source_ip":  c.ClientIP(),
+					"user_agent": c.Request.UserAgent(),
+				}).Warn("IdP-initiated SAML flow rejected - not enabled in provider config (set allow_idp_initiated: true)")
+				s.getErrorPage(c, http.StatusForbidden, "IdP-initiated SAML flows are not enabled for this provider")
+				return
+			}
+
 			// Security logging for IdP-initiated flows (for audit/monitoring)
 			logrus.WithFields(logrus.Fields{
 				"provider":   providerName,
 				"source_ip":  c.ClientIP(),
 				"user_agent": c.Request.UserAgent(),
-			}).Info("Processing IdP-initiated SAML authentication - verify this is expected")
+			}).Info("Processing IdP-initiated SAML authentication (allow_idp_initiated=true)")
 
 			authWrapper := models.AuthWrapper{
 				Callback: "", // No callback for IdP-initiated
@@ -433,7 +445,8 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 	}
 
 	if len(auth.Callback) == 0 {
-		// Use 303 See Other to force a GET redirect from the POST callback
+		// Use HTTP 303 (See Other) for POST-to-GET redirects - correct REST semantic
+		// Prevents form resubmission on browser refresh
 		c.Redirect(http.StatusSeeOther, "/")
 	} else {
 		s.renderHtml(c, "auth_callback.html", data)

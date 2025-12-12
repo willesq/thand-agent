@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -26,18 +27,22 @@ const SamlProviderName = "saml"
 // samlProvider implements the ProviderImpl interface for SAML
 type samlProvider struct {
 	*models.BaseProvider
-	middleware   *samlsp.Middleware
-	idpMetadata  *saml.EntityDescriptor
-	certificates []tls.Certificate
+	middleware        *samlsp.Middleware
+	idpMetadata       *saml.EntityDescriptor
+	certificates      []tls.Certificate
+	sessionDuration   time.Duration // Configurable session expiry
+	allowIDPInitiated bool          // Whether to allow IdP-initiated SAML flows
 }
 
 // SAMLConfig represents the SAML provider configuration
 type SAMLConfig struct {
-	IDPMetadataURL string          `yaml:"idp_metadata_url" json:"idp_metadata_url"`
-	EntityID       string          `yaml:"entity_id" json:"entity_id"`
-	RootURL        string          `yaml:"root_url" json:"root_url"`
-	KeyPair        tls.Certificate `yaml:"-" json:"-"`
-	SignRequests   bool            `yaml:"sign_requests" json:"sign_requests"`
+	IDPMetadataURL     string          `yaml:"idp_metadata_url" json:"idp_metadata_url"`
+	EntityID           string          `yaml:"entity_id" json:"entity_id"`
+	RootURL            string          `yaml:"root_url" json:"root_url"`
+	KeyPair            tls.Certificate `yaml:"-" json:"-"`
+	SignRequests       bool            `yaml:"sign_requests" json:"sign_requests"`
+	SessionDuration    time.Duration   `yaml:"session_duration" json:"session_duration"`          // Optional: session expiry (default: 24h)
+	AllowIDPInitiated  bool            `yaml:"allow_idp_initiated" json:"allow_idp_initiated"`    // Optional: allow IdP-initiated flows (default: false)
 }
 
 func (p *samlProvider) Initialize(identifier string, provider models.Provider) error {
@@ -108,10 +113,19 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 
 	p.middleware = samlSP
 	p.idpMetadata = idpMetadata
-	// Store certificates if configured (defensive check - keyPair is only populated when cert/key are provided)
-	if keyPair.Certificate != nil {
+	// Store certificates if configured (Certificate is a slice, check if not empty)
+	if len(keyPair.Certificate) > 0 {
 		p.certificates = []tls.Certificate{keyPair}
 	}
+
+	// Store session duration (default to 24h if not configured)
+	p.sessionDuration = config.SessionDuration
+	if p.sessionDuration == 0 {
+		p.sessionDuration = 24 * time.Hour
+	}
+
+	// Store IdP-initiated flow setting (defaults to false for security)
+	p.allowIDPInitiated = config.AllowIDPInitiated
 
 	logrus.WithFields(logrus.Fields{
 		"provider":    provider.Name,
@@ -170,9 +184,16 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		},
 	}
 
+	// Handle state parameter for SP-initiated vs IdP-initiated flows
+	// For IdP-initiated flows, state may be empty - pass empty slice instead of []string{""}
+	var possibleRequestIDs []string
+	if authRequest.State != "" {
+		possibleRequestIDs = []string{authRequest.State}
+	}
+
 	assertion, err := p.middleware.ServiceProvider.ParseResponse(
 		req,
-		[]string{authRequest.State},
+		possibleRequestIDs,
 	)
 
 	if err != nil {
@@ -202,11 +223,11 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		return nil, err
 	}
 
-	// Create session
+	// Create session with configured duration (defaults to 24h if not set)
 	session := &models.Session{
 		UUID:   uuid.New(),
 		User:   user,
-		Expiry: time.Now().Add(24 * time.Hour),
+		Expiry: time.Now().Add(p.sessionDuration),
 	}
 
 	// Log session creation without PII details
@@ -346,6 +367,11 @@ func (p *samlProvider) SendNotification(ctx context.Context, notification models
 	return fmt.Errorf("SendNotification not implemented for SAML provider")
 }
 
+// IsIDPInitiatedAllowed checks if IdP-initiated SAML flows are permitted
+func (p *samlProvider) IsIDPInitiatedAllowed() bool {
+	return p.allowIDPInitiated
+}
+
 // extractUserFromAssertion extracts user information from a SAML assertion
 func (p *samlProvider) extractUserFromAssertion(assertion *saml.Assertion) (*models.User, error) {
 	var userID string
@@ -360,17 +386,16 @@ func (p *samlProvider) extractUserFromAssertion(assertion *saml.Assertion) (*mod
 		if assertion.Subject != nil && assertion.Subject.NameID != nil {
 			nameID := assertion.Subject.NameID.Value
 			// Use NameID as email if it looks like an email
-			if strings.Contains(nameID, "@") {
-				// Validate email format more carefully
-				parts := strings.Split(nameID, "@")
-				if len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0 {
-					email = nameID
-					username = parts[0]
-				} else {
-					// Malformed email-like string, treat as username
-					username = nameID
+			// Basic email regex: local@domain.tld (allows common valid patterns)
+			emailRegex := `^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`
+			if matched, _ := regexp.MatchString(emailRegex, nameID); matched {
+				email = nameID
+				// Extract username from email (part before @)
+				if atIndex := strings.Index(nameID, "@"); atIndex > 0 {
+					username = nameID[:atIndex]
 				}
 			} else {
+				// Not a valid email, use as username
 				username = nameID
 			}
 		}

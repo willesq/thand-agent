@@ -665,7 +665,9 @@ func writeCertAndKeyToFiles(t *testing.T, cert *x509.Certificate, key *rsa.Priva
 
 	tempDir := t.TempDir()
 
-	// Write certificate
+	// Write certificate (0644 is appropriate - certificates are public)
+	// SECURITY NOTE: Certificate files can be world-readable (0644)
+	// Only private key files should have restrictive permissions (0600)
 	certFile = filepath.Join(tempDir, "cert.pem")
 	certPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
