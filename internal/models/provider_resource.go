@@ -9,7 +9,6 @@ import (
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/common"
 )
 
 func (p *BaseProvider) SynchronizeResources(ctx context.Context, req *SynchronizeResourcesRequest) (*SynchronizeResourcesResponse, error) {
@@ -37,7 +36,7 @@ func (p *BaseProvider) GetResource(ctx context.Context, resource string) (*Provi
 	return nil, fmt.Errorf("resource not found")
 }
 
-func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]ProviderResource, error) {
+func (p *BaseProvider) ListResources(ctx context.Context, searchRequest *SearchRequest) ([]SearchResult[ProviderResource], error) {
 
 	if p.rbac == nil || !p.HasCapability(
 		ProviderCapabilityRBAC,
@@ -47,8 +46,8 @@ func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]
 	}
 
 	// If no filters, return all resources
-	if len(filters) == 0 {
-		return p.rbac.resources, nil
+	if searchRequest == nil || searchRequest.IsEmpty() {
+		return ReturnSearchResults(p.rbac.resources), nil
 	}
 
 	// Check if search index is ready
@@ -58,14 +57,14 @@ func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]
 
 	if resourcesIndex != nil {
 		// Use Bleve search for better search capabilities
-		return common.BleveListSearch(ctx, resourcesIndex, func(a *search.DocumentMatch, b ProviderResource) bool {
+		return BleveListSearch(ctx, resourcesIndex, func(a *search.DocumentMatch, b ProviderResource) bool {
 			return strings.Compare(a.ID, b.Name) == 0
-		}, p.rbac.resources, filters...)
+		}, p.rbac.resources, searchRequest)
 	}
 
 	// Fallback to simple substring filtering while index is being built
 	var filtered []ProviderResource
-	filterText := strings.ToLower(strings.Join(filters, " "))
+	filterText := strings.ToLower(strings.Join(searchRequest.Terms, " "))
 
 	for _, resource := range p.rbac.resources {
 		// Check if any filter matches the resource name
@@ -74,7 +73,7 @@ func (p *BaseProvider) ListResources(ctx context.Context, filters ...string) ([]
 		}
 	}
 
-	return filtered, nil
+	return ReturnSearchResults(filtered), nil
 }
 
 func (p *BaseProvider) buildResourceIndices() error {
@@ -93,8 +92,8 @@ func (p *BaseProvider) buildResourceIndices() error {
 
 	// Index resources
 	for _, resource := range p.rbac.resources {
-		if err := resourceIndex.Index(resource.Id, resource); err != nil {
-			return fmt.Errorf("failed to index resource %s: %v", resource.Id, err)
+		if err := resourceIndex.Index(resource.ID, resource); err != nil {
+			return fmt.Errorf("failed to index resource %s: %v", resource.ID, err)
 		}
 	}
 

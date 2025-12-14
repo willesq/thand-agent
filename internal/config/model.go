@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/blevesearch/bleve/v2"
 	"github.com/google/uuid"
 	"github.com/serverlessworkflow/sdk-go/v3/model"
 	"github.com/sirupsen/logrus"
@@ -223,6 +224,9 @@ type RoleConfig struct {
 
 	// Store everything in memory
 	Definitions map[string]models.Role `mapstructure:",remain" json:"definitions"`
+
+	// Search indexes
+	rolesIndex bleve.Index
 }
 
 func (r *RoleConfig) GetRoleByName(name string) (*models.Role, error) {

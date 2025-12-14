@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/blevesearch/bleve/v2"
 	"github.com/hashicorp/go-version"
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/config/environment"
@@ -171,6 +172,55 @@ func (c *Config) ApplyRoles(foundRoles []*models.RoleDefinitions) (map[string]mo
 	}
 
 	return defs, nil
+}
+
+func (c *Config) ReloadRoleIndexes() error {
+
+	// Create bleve index for roles
+	if c.Roles.Definitions == nil {
+		logrus.Debugln("No roles defined, skipping index creation")
+		return nil
+	}
+
+	availableRoles := c.Roles.Definitions
+
+	rolesMapping := bleve.NewIndexMapping()
+	rolesIndex, err := bleve.NewMemOnly(rolesMapping)
+	if err != nil {
+		logrus.WithError(err).Errorln("Failed to create roles index")
+		return fmt.Errorf("failed to create roles index: %w", err)
+	}
+
+	// Index roles
+	for roleId, role := range availableRoles {
+
+		// Before indexing the role, we first need to create a composite role
+		// This will ensure that any inherited permissions are included in the indexing
+		// This is important as a user might search for a permission that is only
+		// included via inheritance.
+
+		// No use provided so we can get the entire role. HOWEVER, if
+		// a role is scoped then we won't resolve the entire role.
+		// Just what is avaliable to ALL users.
+		compositeRole, err := c.GetCompositeRole(nil, &role)
+
+		if err != nil {
+			logrus.WithError(err).Errorf("Failed to create composite role for %s", roleId)
+			return fmt.Errorf("failed to create composite role for %s: %v", roleId, err)
+		}
+
+		if err := rolesIndex.Index(roleId, compositeRole); err != nil {
+			logrus.WithError(err).Errorf("Failed to index role %s", roleId)
+			return fmt.Errorf("failed to index role %s: %v", roleId, err)
+		}
+	}
+
+	c.mu.Lock()
+	c.Roles.rolesIndex = rolesIndex
+	c.mu.Unlock()
+
+	return nil
+
 }
 
 func (c *Config) loadRolesVaultData() (string, error) {

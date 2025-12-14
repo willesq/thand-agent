@@ -85,16 +85,24 @@ func (p *exampleProvider) GetPermission(ctx context.Context, permission string) 
 	return &ExamplePermission, nil
 }
 
-func (p *exampleProvider) ListPermissions(ctx context.Context, filters ...string) ([]models.ProviderPermission, error) {
-	return []models.ProviderPermission{ExamplePermission}, nil
+func (p *exampleProvider) ListPermissions(ctx context.Context, searchRequest *models.SearchRequest) ([]models.SearchResult[models.ProviderPermission], error) {
+	return []models.SearchResult[models.ProviderPermission]{
+		{
+			Result: ExamplePermission,
+		},
+	}, nil
 }
 
 func (p *exampleProvider) GetRole(ctx context.Context, role string) (*models.ProviderRole, error) {
 	return &ExampleRole, nil
 }
 
-func (p *exampleProvider) ListRoles(ctx context.Context, filters ...string) ([]models.ProviderRole, error) {
-	return []models.ProviderRole{ExampleRole}, nil
+func (p *exampleProvider) ListRoles(ctx context.Context, searchRequest *models.SearchRequest) ([]models.SearchResult[models.ProviderRole], error) {
+	return []models.SearchResult[models.ProviderRole]{
+		{
+			Result: ExampleRole,
+		},
+	}, nil
 }
 
 func init() {

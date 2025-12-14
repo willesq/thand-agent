@@ -205,6 +205,20 @@
                 searchFields: ['label', 'value'],
             });
 
+            // Set up search event listener using Choices.js event
+            const identityElement = document.getElementById('elevate-identities');
+            let searchTimeout;
+            
+            if (identityElement) {
+                identityElement.addEventListener('search', function(e) {
+                    clearTimeout(searchTimeout);
+                    const query = e.detail.value.trim();
+                    searchTimeout = setTimeout(() => {
+                        fetchIdentities([], query);
+                    }, 300);
+                });
+            }
+
             // Fetch and populate identities
             fetchIdentities(prefilledIdentities);
 
@@ -215,9 +229,14 @@
         /**
          * Fetch identities from the API and populate the Choices.js selector
          * @param {string[]} prefilledIdentities - Identity IDs to pre-select from URL params
+         * @param {string} query - Search query
          */
-        function fetchIdentities(prefilledIdentities) {
-            fetch(`${API_BASE_PATH}/identities`)
+        function fetchIdentities(prefilledIdentities, query = '') {
+            const url = query 
+                ? `${API_BASE_PATH}/identities?q=${encodeURIComponent(query)}`
+                : `${API_BASE_PATH}/identities`;
+
+            fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -225,10 +244,35 @@
                     return response.json();
                 })
                 .then(data => {
-                    const choices = parseIdentitiesResponse(data);
+                    // Sort by score descending
+                    if (data.identities) {
+                        data.identities.sort((a, b) => (b._score || 0) - (a._score || 0));
+                    }
+
+                    const newChoices = parseIdentitiesResponse(data);
                     
-                    if (choices.length > 0) {
-                        identityChoicesInstance.setChoices(choices, 'value', 'label', true);
+                    // Get current selection to preserve it
+                    const currentSelection = identityChoicesInstance.getValue();
+                    
+                    // Add currently selected items to the new choices if they aren't already there
+                    currentSelection.forEach(item => {
+                        const existingChoice = newChoices.find(c => c.value === item.value);
+                        if (!existingChoice) {
+                            newChoices.push({
+                                value: item.value,
+                                label: item.label,
+                                selected: true,
+                                customProperties: item.customProperties
+                            });
+                        } else {
+                            existingChoice.selected = true;
+                        }
+                    });
+
+                    // Replace choices
+                    identityChoicesInstance.setChoices(newChoices, 'value', 'label', true);
+                    
+                    if (!query) {
                         preselectIdentities(prefilledIdentities);
                     }
                 })
@@ -246,8 +290,14 @@
             const choices = [];
             
             if (data && data.identities && Array.isArray(data.identities)) {
-                data.identities.forEach(identity => {
+                data.identities.forEach(identityResult => {
                     
+                    if (!('_source' in identityResult)) {
+                        return;
+                    }
+
+                    const identity = identityResult._source;
+
                     const type = identity.user ? 'user' : (identity.group ? 'group' : 'unknown');
 
                     if (type === 'user') {

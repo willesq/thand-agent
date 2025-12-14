@@ -62,7 +62,7 @@ func (p *oktaProvider) SynchronizeResources(ctx context.Context, req *models.Syn
 		// The App interface wraps different application types
 		if appImpl, ok := app.(*okta.Application); ok {
 			resource := models.ProviderResource{
-				Id:       appImpl.Id,
+				ID:       appImpl.Id,
 				Type:     resourceTypeApplication,
 				Name:     appImpl.Label,
 				Resource: app, // In-memory only: stores the full app object to avoid GetApplication API calls later; not persisted due to json:"-" tag

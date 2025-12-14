@@ -42,12 +42,19 @@ func (s *Server) getIdentities(c *gin.Context) {
 	}
 
 	// Get filter parameter from query string
-	filter := c.Query("q")
+	query := c.Query("q")
 	identityType := strings.ToLower(c.Query("t"))
+
+	// Wildcard query to get more matches
+	if len(query) > 0 && !strings.HasSuffix(query, "*") {
+		query = query + "*"
+	}
 
 	identityProvidersCount := s.Config.GetProvidersByCapabilityWithUser(
 		foundUser.User, models.ProviderCapabilityIdentities)
-	identities, err := s.Config.GetIdentitiesWithFilter(foundUser.User, config.IdentityType(identityType), filter)
+	identities, err := s.Config.GetIdentitiesWithFilter(foundUser.User, config.IdentityType(identityType), &models.SearchRequest{
+		Query: query,
+	})
 
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to get identities", err)

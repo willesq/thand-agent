@@ -47,7 +47,11 @@ func (s *Server) getProviderIdentities(c *gin.Context) {
 
 	filter := c.Query("q")
 
-	identities, err := provider.GetClient().ListIdentities(context.Background(), filter)
+	identities, err := provider.GetClient().ListIdentities(
+		context.Background(), &models.SearchRequest{
+			Terms: []string{filter},
+		})
+
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list identities", err)
 		return
@@ -96,7 +100,10 @@ func (s *Server) getProviderRoles(c *gin.Context) {
 
 	filter := c.Query("q")
 
-	roles, err := provider.GetClient().ListRoles(context.Background(), filter)
+	roles, err := provider.GetClient().ListRoles(context.Background(), &models.SearchRequest{
+		Terms: []string{filter},
+	})
+
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list roles")
 		return
@@ -176,7 +183,10 @@ func (s *Server) getProviderPermissions(c *gin.Context) {
 
 	filter := c.Query("q")
 
-	permissions, err := provider.GetClient().ListPermissions(context.Background(), filter)
+	permissions, err := provider.GetClient().ListPermissions(context.Background(), &models.SearchRequest{
+		Terms: []string{filter},
+	})
+
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list permissions", err)
 		return
@@ -224,6 +234,7 @@ func (s *Server) getProvidersAsProviderResponse(
 		}
 
 		providerResponse[providerKey] = models.ProviderResponse{
+			ID:          providerKey,
 			Name:        providerName,
 			Description: provider.Description,
 			Provider:    provider.Provider,

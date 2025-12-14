@@ -7,13 +7,12 @@ import (
 
 	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/common"
 )
 
 type ProviderPermissionsResponse struct {
-	Version     string               `json:"version"`
-	Provider    string               `json:"provider"`
-	Permissions []ProviderPermission `json:"permissions"`
+	Version     string                             `json:"version"`
+	Provider    string                             `json:"provider"`
+	Permissions []SearchResult[ProviderPermission] `json:"permissions"`
 }
 
 type ProviderPermission struct {
@@ -43,7 +42,7 @@ func (p *BaseProvider) GetPermission(ctx context.Context, permission string) (*P
 	return nil, fmt.Errorf("permission not found")
 }
 
-func (p *BaseProvider) ListPermissions(ctx context.Context, filters ...string) ([]ProviderPermission, error) {
+func (p *BaseProvider) ListPermissions(ctx context.Context, searchReq *SearchRequest) ([]SearchResult[ProviderPermission], error) {
 
 	if p.rbac == nil || !p.HasCapability(
 		ProviderCapabilityRBAC,
@@ -53,8 +52,8 @@ func (p *BaseProvider) ListPermissions(ctx context.Context, filters ...string) (
 	}
 
 	// If no filters, return all permissions
-	if len(filters) == 0 {
-		return p.rbac.permissions, nil
+	if searchReq == nil || searchReq.IsEmpty() {
+		return ReturnSearchResults(p.rbac.permissions), nil
 	}
 
 	// Check if search index is ready
@@ -64,14 +63,14 @@ func (p *BaseProvider) ListPermissions(ctx context.Context, filters ...string) (
 
 	if permissionsIndex != nil {
 		// Use Bleve search for better search capabilities
-		return common.BleveListSearch(ctx, permissionsIndex, func(a *search.DocumentMatch, b ProviderPermission) bool {
+		return BleveListSearch(ctx, permissionsIndex, func(a *search.DocumentMatch, b ProviderPermission) bool {
 			return strings.EqualFold(a.ID, b.Name)
-		}, p.rbac.permissions, filters...)
+		}, p.rbac.permissions, searchReq)
 	}
 
 	// Fallback to simple substring filtering while index is being built
 	var filtered []ProviderPermission
-	filterText := strings.ToLower(strings.Join(filters, " "))
+	filterText := strings.ToLower(strings.Join(searchReq.Terms, " "))
 
 	for _, perm := range p.rbac.permissions {
 		// Check if any filter matches the permission name or description
@@ -81,7 +80,7 @@ func (p *BaseProvider) ListPermissions(ctx context.Context, filters ...string) (
 		}
 	}
 
-	return filtered, nil
+	return ReturnSearchResults(filtered), nil
 }
 
 func (p *BaseProvider) SynchronizePermissions(
