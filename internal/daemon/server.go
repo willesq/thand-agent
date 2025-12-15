@@ -88,6 +88,11 @@ type Server struct {
 	TotalRequests   int64
 	ElevateRequests int64
 	server          *http.Server
+
+	// Security components
+	rateLimiter     *RateLimiter     // IP-based rate limiting for SAML callbacks
+	assertionCache  *AssertionCache  // SAML assertion ID replay protection
+	csrfEnabled     bool             // Whether CSRF protection is enabled for IdP-initiated flows
 }
 
 func (s *Server) GetConfig() *config.Config {
