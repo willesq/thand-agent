@@ -227,7 +227,7 @@ func (p *BaseProvider) SetResources(resources []ProviderResource) {
 }
 
 func CreateKeysFromResources(r ProviderResource) []string {
-	return []string{r.Id, r.Name}
+	return []string{r.ID, r.Name}
 }
 
 func (p *BaseProvider) SetResourcesWithKey(

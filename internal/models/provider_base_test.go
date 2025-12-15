@@ -71,19 +71,19 @@ func TestBaseProvider_Resources(t *testing.T) {
 		},
 	}
 
-	res1 := ProviderResource{Id: "res1", Name: "res1"}
-	res2 := ProviderResource{Id: "res2", Name: "res2"}
+	res1 := ProviderResource{ID: "res1", Name: "res1"}
+	res2 := ProviderResource{ID: "res2", Name: "res2"}
 
 	// Test SetResources
 	p.SetResources([]ProviderResource{res1})
 	assert.Len(t, p.rbac.resources, 1)
-	assert.Equal(t, "res1", p.rbac.resources[0].Id)
+	assert.Equal(t, "res1", p.rbac.resources[0].ID)
 	assert.Contains(t, p.rbac.resourcesMap, "res1")
 
 	// Test AddResources
 	p.AddResources(res2)
 	assert.Len(t, p.rbac.resources, 2)
-	assert.Equal(t, "res2", p.rbac.resources[1].Id)
+	assert.Equal(t, "res2", p.rbac.resources[1].ID)
 	assert.Contains(t, p.rbac.resourcesMap, "res2")
 
 	// Test AddResources duplicate

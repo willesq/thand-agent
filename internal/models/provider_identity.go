@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search"
 	"github.com/sirupsen/logrus"
 )
 
 type ProviderIdentities interface {
 	GetIdentity(ctx context.Context, identity string) (*Identity, error)
-	ListIdentities(ctx context.Context, filters ...string) ([]Identity, error)
+	ListIdentities(ctx context.Context, searchRequest *SearchRequest) ([]SearchResult[Identity], error)
 
 	// Overrides all existing identities with the provided list
 	SetIdentities(identities []Identity)
@@ -71,7 +72,7 @@ func (p *BaseProvider) GetIdentity(ctx context.Context, identity string) (*Ident
 }
 
 // ListIdentities lists all identities (users and groups) from the provider
-func (p *BaseProvider) ListIdentities(ctx context.Context, filters ...string) ([]Identity, error) {
+func (p *BaseProvider) ListIdentities(ctx context.Context, searchRequest *SearchRequest) ([]SearchResult[Identity], error) {
 
 	if p.identity == nil || !p.HasCapability(
 		ProviderCapabilityIdentities,
@@ -84,14 +85,25 @@ func (p *BaseProvider) ListIdentities(ctx context.Context, filters ...string) ([
 	identities := p.identity.identities
 	p.identity.mu.RUnlock()
 
-	// If no filters, return all identities
-	if len(filters) == 0 {
-		return identities, nil
+	if searchRequest == nil || searchRequest.IsEmpty() {
+		return ReturnSearchResults(identities), nil
+	}
+
+	// Check if search index is ready
+	p.identity.mu.RLock()
+	identitiesIndex := p.identity.identitiesIndex
+	p.identity.mu.RUnlock()
+
+	if identitiesIndex != nil {
+		// Use Bleve search for better search capabilities
+		return BleveListSearch(ctx, identitiesIndex, func(a *search.DocumentMatch, b Identity) bool {
+			return strings.EqualFold(a.ID, b.ID)
+		}, identities, searchRequest)
 	}
 
 	// Apply filters
 	var filtered []Identity
-	filterText := strings.ToLower(strings.Join(filters, " "))
+	filterText := strings.ToLower(strings.Join(searchRequest.Terms, " "))
 
 	for _, identity := range identities {
 		// Check if any filter matches the identity
@@ -105,7 +117,7 @@ func (p *BaseProvider) ListIdentities(ctx context.Context, filters ...string) ([
 		}
 	}
 
-	return filtered, nil
+	return ReturnSearchResults(filtered), nil
 }
 
 func (p *BaseProvider) buildIdentitiyIndices() error {

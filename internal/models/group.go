@@ -12,6 +12,17 @@ type Group struct {
 	Email string `json:"email"`
 }
 
+func (g *Group) String() string {
+	if len(g.Name) > 0 && len(g.Email) > 0 {
+		return g.Name + " (" + g.Email + ")"
+	} else if len(g.Name) > 0 {
+		return g.Name
+	} else if len(g.Email) > 0 {
+		return g.Email
+	}
+	return ""
+}
+
 func (g *Group) GetID() string {
 	return g.ID
 }

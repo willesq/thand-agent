@@ -162,7 +162,7 @@ func TestSAMLProvider_NotImplementedMethods(t *testing.T) {
 		t.Error("Expected not implemented error for GetPermission")
 	}
 
-	permissions, err := provider.ListPermissions(ctx)
+	permissions, err := provider.ListPermissions(ctx, &models.SearchRequest{})
 	if err != nil {
 		t.Errorf("ListPermissions should not error: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestSAMLProvider_NotImplementedMethods(t *testing.T) {
 		t.Error("Expected not implemented error for GetRole")
 	}
 
-	roles, err := provider.ListRoles(ctx)
+	roles, err := provider.ListRoles(ctx, &models.SearchRequest{})
 	if err != nil {
 		t.Errorf("ListRoles should not error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestSAMLProvider_NotImplementedMethods(t *testing.T) {
 		t.Error("Expected not implemented error for GetResource")
 	}
 
-	resources, err := provider.ListResources(ctx)
+	resources, err := provider.ListResources(ctx, &models.SearchRequest{})
 	if err != nil {
 		t.Errorf("ListResources should not error: %v", err)
 	}
