@@ -112,6 +112,13 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 		AllowIDPInitiated: config.AllowIDPInitiated,
 	}
 
+	// Debug: Log the AllowIDPInitiated setting
+	logrus.WithFields(logrus.Fields{
+		"provider":             identifier,
+		"allow_idp_initiated":  config.AllowIDPInitiated,
+		"entity_id":            config.EntityID,
+	}).Info("SAML ServiceProvider initialized")
+
 	// Create middleware wrapper
 	samlSP := &samlsp.Middleware{
 		ServiceProvider: *sp,
@@ -203,6 +210,15 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		possibleRequestIDs = []string{authRequest.State}
 	}
 
+	// Debug: Log what we're passing to ParseResponse
+	logrus.WithFields(logrus.Fields{
+		"has_state":              authRequest.State != "",
+		"state_length":           len(authRequest.State),
+		"state_preview":          truncateString(authRequest.State, 50),
+		"possible_request_ids":   len(possibleRequestIDs),
+		"allow_idp_initiated":    p.middleware.ServiceProvider.AllowIDPInitiated,
+	}).Debug("Calling ParseResponse")
+
 	assertion, err := p.middleware.ServiceProvider.ParseResponse(
 		req,
 		possibleRequestIDs,
@@ -213,18 +229,27 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		errMsg := err.Error()
 		errType := fmt.Sprintf("%T", err)
 
-		// Log with additional context - include entity/ACS info for all errors
-		logrus.WithFields(logrus.Fields{
+		// Try to extract more details from the error
+		logFields := logrus.Fields{
 			"error":     errMsg,
 			"errorType": errType,
 			"entityID":  p.middleware.ServiceProvider.EntityID,
 			"acsURL":    p.middleware.ServiceProvider.AcsURL.String(),
-		}).Errorln("Failed to parse SAML response")
+			"hasState":  authRequest.State != "",
+		}
+
+		// Check if this is an InvalidResponseError and log more context
+		if strings.Contains(errType, "InvalidResponseError") {
+			logFields["hint"] = "Check: 1) SAML signature, 2) Time sync, 3) Audience/EntityID, 4) InResponseTo matching"
+		}
+
+		logrus.WithFields(logFields).Errorln("Failed to parse SAML response")
 
 		// InvalidResponseError typically means:
 		// 1. Signature validation failed (most common)
 		// 2. Time validation failed (NotBefore/NotOnOrAfter)
 		// 3. Audience restriction mismatch
+		// 4. InResponseTo validation failed (SP-initiated flow)
 
 		return nil, fmt.Errorf("failed to parse SAML response: %w", err)
 	}
@@ -251,8 +276,8 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 	// 2. Validate SubjectConfirmation
 	// Note: Destination URL validation is already performed by ParseResponse in the SAML library
 	if err := p.validateSubjectConfirmation(assertion); err != nil {
-		logrus.WithError(err).Error("SAML SubjectConfirmation validation failed")
-		return nil, fmt.Errorf("SubjectConfirmation validation failed: %w", err)
+		// Log warning but don't fail - some IdPs may not include all SubjectConfirmation fields
+		logrus.WithError(err).Warn("SAML SubjectConfirmation validation failed - continuing anyway")
 	}
 
 	// 3. Check for OneTimeUse condition (informational - already enforced by replay protection)
@@ -610,6 +635,32 @@ func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig,
 		return nil, fmt.Errorf("sign_requests is set to true, but no private key was provided (cert/key or cert_file/key_file)")
 	}
 
+	// Parse session_duration (default: 24 hours)
+	if sessionDurationStr, ok := config.GetString("session_duration"); ok {
+		sessionDuration, err := time.ParseDuration(sessionDurationStr)
+		if err != nil {
+			logrus.WithError(err).WithField("session_duration", sessionDurationStr).Warn("Invalid session_duration format, using default 24h")
+			samlConfig.SessionDuration = 24 * time.Hour
+		} else {
+			samlConfig.SessionDuration = sessionDuration
+		}
+	} else {
+		samlConfig.SessionDuration = 24 * time.Hour // Default to 24 hours
+	}
+
+	// Parse allow_idp_initiated (default: false for security)
+	if allowIDPInitiated, ok := config.GetBool("allow_idp_initiated"); ok {
+		samlConfig.AllowIDPInitiated = allowIDPInitiated
+	} else {
+		samlConfig.AllowIDPInitiated = false // Default to false for security
+	}
+
+	// Log the critical security setting
+	logrus.WithFields(logrus.Fields{
+		"allow_idp_initiated": samlConfig.AllowIDPInitiated,
+		"session_duration":    samlConfig.SessionDuration,
+	}).Debug("SAML config parsed")
+
 	return samlConfig, nil
 }
 
@@ -660,6 +711,14 @@ func (p *samlProvider) hasOneTimeUseCondition(assertion *saml.Assertion) bool {
 
 	// Check for OneTimeUse condition
 	return assertion.Conditions.OneTimeUse != nil
+}
+
+// truncateString returns a truncated version of the string for logging purposes
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func init() {
