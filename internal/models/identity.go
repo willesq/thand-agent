@@ -28,6 +28,24 @@ func (i *Identity) GetId() string {
 	return i.ID
 }
 
+func (i *Identity) String() string {
+	if i.IsUser() {
+		return i.User.String()
+	} else if i.IsGroup() {
+		return i.Group.String()
+	}
+	return ""
+}
+
+func (i *Identity) GetEmail() string {
+	if i.User != nil {
+		return i.User.Email
+	} else if i.Group != nil {
+		return i.Group.Email
+	}
+	return ""
+}
+
 func (i *Identity) GetMappableIdentifier() string {
 	return strings.ToLower(strings.TrimSpace(i.mapableIdentifier()))
 }

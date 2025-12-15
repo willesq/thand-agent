@@ -112,11 +112,19 @@ func (t *thandTask) executeNotify(
 	var notifyTasks []notifyTask
 	for _, recipient := range recipients {
 
-		recipientPayload := notify.GetPayload(recipient)
+		recipientIdentity := t.resolveIdentity(recipient)
+
+		if recipientIdentity == nil {
+			log.WithField("recipient", recipient).
+				Error("Failed to resolve recipient identity")
+			continue
+		}
+
+		recipientPayload := notify.GetPayload(recipientIdentity)
 
 		notifyTasks = append(notifyTasks, notifyTask{
 			Recipient: recipient,
-			CallFunc:  notify.GetCallFunction(recipient),
+			CallFunc:  notify.GetCallFunction(recipientIdentity),
 			Payload:   recipientPayload,
 			Provider:  notify.GetProviderName(),
 		})

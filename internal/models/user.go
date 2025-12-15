@@ -27,6 +27,23 @@ type User struct {
 	Groups []string `json:"groups,omitempty"`
 }
 
+func (u *User) String() string {
+
+	if len(u.Name) > 0 && len(u.Email) > 0 {
+		return u.Name + " (" + u.Email + ")"
+	} else if len(u.Name) > 0 && len(u.Username) > 0 {
+		return u.Name + " (" + u.Username + ")"
+	} else if len(u.Name) > 0 {
+		return u.Name
+	} else if len(u.Email) > 0 {
+		return u.Email
+	} else if len(u.Username) > 0 {
+		return u.Username
+	}
+
+	return ""
+}
+
 func (u *User) GetName() string {
 	if len(u.Name) > 0 {
 		return u.Name

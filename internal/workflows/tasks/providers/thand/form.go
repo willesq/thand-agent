@@ -255,11 +255,19 @@ func (t *thandTask) makeFormNotifications(
 
 		// Build notification tasks for each recipient
 		for _, recipient := range recipients {
-			recipientPayload := formNotifier.GetPayload(recipient)
+
+			recipientIdentity := t.resolveIdentity(recipient)
+
+			if recipientIdentity == nil {
+				logrus.WithField("recipient", recipient).Warn("Skipping form notification, identity not found")
+				continue
+			}
+
+			recipientPayload := formNotifier.GetPayload(recipientIdentity)
 
 			notifyTasks = append(notifyTasks, notifyTask{
 				Recipient: recipient,
-				CallFunc:  formNotifier.GetCallFunction(recipient),
+				CallFunc:  formNotifier.GetCallFunction(recipientIdentity),
 				Payload:   recipientPayload,
 				Provider:  formNotifier.GetProviderName(),
 			})

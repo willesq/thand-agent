@@ -132,7 +132,19 @@ func (t *thandTask) executeRevocationTask(
 				}
 			}
 
-			user := t.resolveUserFromIdentity(identity)
+			identityObj := t.resolveIdentity(identity)
+
+			if identityObj == nil {
+				log.WithField("identity", identity).Warn("Failed to resolve identity for revocation, skipping")
+				continue
+			}
+
+			user := identityObj.GetUser()
+
+			if user == nil {
+				log.WithField("identity", identity).Warn("Resolved identity has no user for revocation, skipping")
+				continue
+			}
 
 			revokeReq := models.RevokeRoleRequest{
 				RoleRequest: &models.RoleRequest{
@@ -357,11 +369,18 @@ func (t *thandTask) makeRevocationNotifications(
 		// Build notification tasks for each recipient
 		for _, recipient := range recipients {
 
-			recipientPayload := revokeNotifier.GetPayload(recipient)
+			recipientIdentity := t.resolveIdentity(recipient)
+
+			if recipientIdentity == nil {
+				log.WithField("recipient", recipient).Warn("Failed to resolve recipient identity for revocation notification, skipping")
+				continue
+			}
+
+			recipientPayload := revokeNotifier.GetPayload(recipientIdentity)
 
 			notifyTasks = append(notifyTasks, notifyTask{
 				Recipient: recipient,
-				CallFunc:  revokeNotifier.GetCallFunction(recipient),
+				CallFunc:  revokeNotifier.GetCallFunction(recipientIdentity),
 				Payload:   recipientPayload,
 				Provider:  revokeNotifier.GetProviderName(),
 			})

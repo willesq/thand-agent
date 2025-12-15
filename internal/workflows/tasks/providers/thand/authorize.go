@@ -151,11 +151,22 @@ func (t *thandTask) executeAuthorization(
 		maps.Copy(modelOutput, validateOutput)
 
 		for _, identity := range elevateRequest.Identities {
-			user := t.resolveUserFromIdentity(identity)
+
+			identityObj := t.resolveIdentity(identity)
+
+			if identityObj == nil {
+				logrus.Warnf("failed to resolve identity: %s", identity)
+				continue
+			}
+
+			if identityObj.GetUser() == nil {
+				logrus.Warnf("resolved identity has no user: %s", identity)
+				continue
+			}
 
 			authReq := models.AuthorizeRoleRequest{
 				RoleRequest: &models.RoleRequest{
-					User:     user,
+					User:     identityObj.GetUser(),
 					Role:     elevateRequest.Role,
 					Duration: &duration,
 				},
@@ -546,11 +557,19 @@ func (t *thandTask) makeAuthorizationNotifications(
 		// Build notification tasks for each recipient
 		for _, recipient := range recipients {
 
-			recipientPayload := authorizeNotifier.GetPayload(recipient)
+			recipientIdentity := t.resolveIdentity(recipient)
+
+			if recipientIdentity == nil {
+				log.WithField("recipient", recipient).
+					Error("Failed to resolve recipient identity")
+				continue
+			}
+
+			recipientPayload := authorizeNotifier.GetPayload(recipientIdentity)
 
 			notifyTasks = append(notifyTasks, notifyTask{
 				Recipient: recipient,
-				CallFunc:  authorizeNotifier.GetCallFunction(recipient),
+				CallFunc:  authorizeNotifier.GetCallFunction(recipientIdentity),
 				Payload:   recipientPayload,
 				Provider:  authorizeNotifier.GetProviderName(),
 			})

@@ -3,7 +3,6 @@ package thand
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -79,6 +78,13 @@ func (t *thandTask) executeApprovalsTask(
 	if !approvalsTask.IsValid() {
 		return nil, errors.New("invalid notification request")
 	}
+
+	availableIdentities := elevationRequest.ResolveIdentities(
+		workflowTask.GetContext(),
+		t.config.GetProvidersByCapability(
+			models.ProviderCapabilityIdentities,
+		),
+	)
 
 	if common.IsNilOrZero(input) {
 
@@ -193,7 +199,7 @@ func (t *thandTask) executeApprovalsTask(
 			}
 
 			// Check if approver is one of the identities being elevated
-			if slices.Contains(elevationRequest.Identities, userIdentity) {
+			if availableIdentities[userIdentity] != nil {
 				logrus.WithFields(logrus.Fields{
 					"taskName":     taskName,
 					"userIdentity": userIdentity,
@@ -367,11 +373,23 @@ func (t *thandTask) makeApprovalNotifications(
 		// Build notification tasks for each recipient
 		for _, recipient := range recipients {
 
-			recipientPayload := approvalNotifier.GetPayload(recipient)
+			recipientIdentity := t.resolveIdentity(
+				recipient,
+			)
+
+			if recipientIdentity == nil {
+				logrus.WithFields(logrus.Fields{
+					"recipient":   recipient,
+					"providerKey": providerKey,
+				}).Warn("Failed to resolve recipient identity; skipping notification for this recipient")
+				continue
+			}
+
+			recipientPayload := approvalNotifier.GetPayload(recipientIdentity)
 
 			notifyTasks = append(notifyTasks, notifyTask{
 				Recipient: recipient,
-				CallFunc:  approvalNotifier.GetCallFunction(recipient),
+				CallFunc:  approvalNotifier.GetCallFunction(recipientIdentity),
 				Payload:   recipientPayload,
 				Provider:  approvalNotifier.GetProviderName(),
 			})
