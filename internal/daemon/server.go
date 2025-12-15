@@ -36,6 +36,9 @@ import (
 	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/ulule/limiter/v3"
+	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
+	"github.com/ulule/limiter/v3/drivers/store/memory"
 	_ "github.com/thand-io/agent/docs" // Import generated swagger docs
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
@@ -68,16 +71,28 @@ func NewServer(cfg *config.Config) *Server {
 		logrus.WithError(err).Fatal("Failed to parse templates")
 	}
 
-	// Initialize rate limiter for SAML callbacks
+	// Initialize rate limiter for SAML callbacks using ulule/limiter
+	// Rate: 5 requests per second with burst of 10 (configurable)
 	samlRate := 5.0 // Default: 5 requests/second
-	samlBurst := 10 // Default: 10 burst capacity
+	samlBurst := 10 // Default: 10 burst capacity (unused in this implementation, kept for config compatibility)
 	if cfg.Server.Limits.SAMLRateLimit != 0 {
 		samlRate = cfg.Server.Limits.SAMLRateLimit
 	}
 	if cfg.Server.Limits.SAMLBurst != 0 {
 		samlBurst = cfg.Server.Limits.SAMLBurst
 	}
-	rateLimiter := NewRateLimiter(samlRate, samlBurst)
+
+	// Create rate limiter with in-memory store
+	// Format: "{requests}-S" means X requests per second
+	rate := limiter.Rate{
+		Period: 1 * time.Second,
+		Limit:  int64(samlRate),
+	}
+	store := memory.NewStore()
+	rateLimiterInstance := limiter.New(store, rate)
+
+	// Create Gin middleware that limits by client IP
+	rateLimiterMiddleware := mgin.NewMiddleware(rateLimiterInstance)
 
 	// Initialize assertion cache for SAML replay protection
 	cacheTTL := 5 * time.Minute      // Default: 5 minutes
@@ -90,28 +105,20 @@ func NewServer(cfg *config.Config) *Server {
 	}
 	assertionCache := NewAssertionCache(cacheTTL, cacheCleanup)
 
-	// CSRF protection - default to true for security
-	// To disable, explicitly set server.security.saml.csrf_enabled: false in config
-	csrfEnabled := true
-	// Read from config if set (note: Go doesn't distinguish between false and unset for bool)
-	// For now, CSRF is always enabled for security. Can be made configurable later if needed.
-
 	logrus.WithFields(logrus.Fields{
 		"saml_rate_limit":      samlRate,
 		"saml_burst":           samlBurst,
 		"assertion_cache_ttl":  cacheTTL,
-		"csrf_enabled":         csrfEnabled,
 	}).Info("Security components initialized")
 
 	// Create a new server instance with the provided configuration
 	server := &Server{
-		Config:          cfg,
-		TemplateEngine:  tmpl,
-		Workflows:       workflows,
-		StartTime:       time.Now().UTC(),
-		rateLimiter:     rateLimiter,
-		assertionCache:  assertionCache,
-		csrfEnabled:     csrfEnabled,
+		Config:                cfg,
+		TemplateEngine:        tmpl,
+		Workflows:             workflows,
+		StartTime:             time.Now().UTC(),
+		rateLimiterMiddleware: rateLimiterMiddleware,
+		assertionCache:        assertionCache,
 	}
 
 	return server
@@ -128,9 +135,8 @@ type Server struct {
 	server          *http.Server
 
 	// Security components
-	rateLimiter     *RateLimiter     // IP-based rate limiting for SAML callbacks
-	assertionCache  *AssertionCache  // SAML assertion ID replay protection
-	csrfEnabled     bool             // Whether CSRF protection is enabled for IdP-initiated flows
+	rateLimiterMiddleware gin.HandlerFunc   // Rate limiting middleware (ulule/limiter)
+	assertionCache        *AssertionCache   // SAML assertion ID replay protection
 }
 
 func (s *Server) GetConfig() *config.Config {
@@ -481,8 +487,8 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 
 			api.GET("/auth/request/:provider", s.getAuthRequest)
 			// Apply rate limiting to callback routes to prevent DoS attacks
-			api.GET("/auth/callback/:provider", s.rateLimiter.Middleware(), s.getAuthCallback)   // OAuth2 callbacks
-			api.POST("/auth/callback/:provider", s.rateLimiter.Middleware(), s.postAuthCallback) // SAML callbacks
+			api.GET("/auth/callback/:provider", s.rateLimiterMiddleware, s.getAuthCallback)   // OAuth2 callbacks
+			api.POST("/auth/callback/:provider", s.rateLimiterMiddleware, s.postAuthCallback) // SAML callbacks
 			api.GET("/auth/logout/:provider", s.getLogoutPage)
 			api.GET("/auth/logout", s.getLogoutPage)
 

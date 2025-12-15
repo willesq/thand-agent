@@ -249,21 +249,13 @@ func (s *Server) postAuthCallback(c *gin.Context) {
 				"flow":       "idp-initiated",
 			}).Warn("Processing IdP-initiated SAML authentication (allow_idp_initiated=true)")
 
-			// CSRF protection for IdP-initiated flows (if enabled)
-			if s.csrfEnabled {
-				csrfToken := c.PostForm("csrf_token")
-				if !validateAndClearCSRFToken(c, csrfToken) {
-					log.WithFields(logrus.Fields{
-						"provider":   providerName,
-						"source_ip":  c.ClientIP(),
-						"user_agent": c.Request.UserAgent(),
-						"event":      "csrf_validation_failed",
-					}).Warn("CSRF validation failed for IdP-initiated SAML flow")
-					s.getErrorPage(c, http.StatusForbidden, "Invalid CSRF token")
-					return
-				}
-				log.Debug("CSRF token validated for IdP-initiated SAML flow")
-			}
+			// Note: CSRF protection is NOT applicable for IdP-initiated SAML flows
+			// because the flow starts at the IdP, not our application. The user never
+			// visits our site first to get a CSRF token. Instead, security relies on:
+			// 1. SAML Response signature validation (cryptographically signed by IdP)
+			// 2. Assertion validation (audience, destination, timestamps)
+			// 3. Assertion ID replay protection (prevents reuse)
+			// These protections are implemented in the SAML provider's CreateSession method.
 
 			authWrapper := models.AuthWrapper{
 				Callback: "", // No callback for IdP-initiated
