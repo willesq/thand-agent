@@ -241,7 +241,7 @@
                                         <span style="font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem; display: block;">Identities:</span>
                                         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                                             <template x-for="identity in execution.identities" :key="identity">
-                                                <div class="badge badge-secondary" x-text="identity"></div>
+                                                <div class="badge badge-secondary" x-text="renderIdentity(identity)"></div>
                                             </template>
                                         </div>
                                     </div>
@@ -545,6 +545,35 @@
                         clearInterval(this.refreshInterval);
                         this.refreshInterval = null;
                     }
+                },
+
+                // Render identity object to string
+                renderIdentity(identity) {
+                    if (!identity) return '';
+                    
+                    // Handle string identity (legacy)
+                    if (typeof identity === 'string') return identity;
+
+                    // Handle object identity
+                    if (identity.user) {
+                        const u = identity.user;
+                        if (u.name && u.email) return `${u.name} (${u.email})`;
+                        if (u.name && u.username) return `${u.name} (${u.username})`;
+                        if (u.name) return u.name;
+                        if (u.email) return u.email;
+                        if (u.username) return u.username;
+                    } else if (identity.group) {
+                        const g = identity.group;
+                        if (g.name && g.email) return `${g.name} (${g.email})`;
+                        if (g.name) return g.name;
+                        if (g.email) return g.email;
+                    }
+                    
+                    // Fallback to label or ID if available
+                    if (identity.label) return identity.label;
+                    if (identity.id) return identity.id;
+                    
+                    return '';
                 },
                 
                 // Task helper methods

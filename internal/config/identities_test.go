@@ -186,6 +186,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 		user          *models.User
 		identityType  IdentityType
 		filter        []string
+		query         string
 		providers     map[string]*MockIdentityProvider
 		expectedCount int
 		expectedIDs   []string
@@ -418,7 +419,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 				Name:  "Admin User",
 			},
 			identityType: IdentityTypeGroup,
-			filter:       []string{"dev"},
+			filter:       []string{"developers"},
+			query:        "developers",
 			providers: map[string]*MockIdentityProvider{
 				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
 					{
@@ -466,7 +468,14 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 			}
 
 			// Call GetIdentitiesWithFilter
-			results, err := config.GetIdentitiesWithFilter(tt.user, tt.identityType, tt.filter...)
+			var searchReq *models.SearchRequest
+			if len(tt.filter) > 0 || tt.query != "" {
+				searchReq = &models.SearchRequest{
+					Terms: tt.filter,
+					Query: tt.query,
+				}
+			}
+			results, err := config.GetIdentitiesWithFilter(tt.user, tt.identityType, searchReq)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -482,7 +491,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 			// Verify expected IDs are present
 			resultIDs := make([]string, len(results))
 			for i, r := range results {
-				resultIDs[i] = r.ID
+				resultIDs[i] = r.Result.ID
 			}
 			assert.ElementsMatch(t, tt.expectedIDs, resultIDs)
 		})
@@ -497,11 +506,11 @@ type SpyIdentityProvider struct {
 	name      string
 }
 
-func (s *SpyIdentityProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
+func (s *SpyIdentityProvider) ListIdentities(ctx context.Context, searchRequest *models.SearchRequest) ([]models.SearchResult[models.Identity], error) {
 	s.mu.Lock()
 	*s.callOrder = append(*s.callOrder, s.name)
 	s.mu.Unlock()
-	return s.MockIdentityProvider.ListIdentities(ctx, filters...)
+	return s.MockIdentityProvider.ListIdentities(ctx, searchRequest)
 }
 
 // TestGetIdentitiesWithFilter_ConcurrentProviders tests that multiple providers are queried in parallel
@@ -587,7 +596,7 @@ func TestGetIdentitiesWithFilter_ConcurrentProviders(t *testing.T) {
 		Name:  "Admin",
 	}
 
-	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
+	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser, nil)
 	require.NoError(t, err)
 
 	// All 3 providers should have been called
@@ -602,7 +611,7 @@ type ErrorIdentityProvider struct {
 	*MockIdentityProvider
 }
 
-func (e *ErrorIdentityProvider) ListIdentities(ctx context.Context, filters ...string) ([]models.Identity, error) {
+func (e *ErrorIdentityProvider) ListIdentities(ctx context.Context, searchRequest *models.SearchRequest) ([]models.SearchResult[models.Identity], error) {
 	return nil, fmt.Errorf("provider error")
 }
 
@@ -631,10 +640,10 @@ func TestGetIdentitiesWithFilter_ProviderError(t *testing.T) {
 		Name:  "Admin",
 	}
 
-	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
+	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser, nil)
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
-	assert.Equal(t, user.Email, results[0].ID)
+	assert.Equal(t, user.Email, results[0].Result.ID)
 }
 
 // TestGetIdentitiesWithFilter_MixedUserAndGroup tests filtering by identity type
@@ -695,27 +704,27 @@ func TestGetIdentitiesWithFilter_MixedUserAndGroup(t *testing.T) {
 	}
 
 	t.Run("filter by IdentityTypeUser", func(t *testing.T) {
-		results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
+		results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser, nil)
 		require.NoError(t, err)
 		assert.Len(t, results, 2)
 		for _, r := range results {
-			assert.NotNil(t, r.User)
-			assert.Nil(t, r.Group)
+			assert.NotNil(t, r.Result.User)
+			assert.Nil(t, r.Result.Group)
 		}
 	})
 
 	t.Run("filter by IdentityTypeGroup", func(t *testing.T) {
-		results, err := config.GetIdentitiesWithFilter(user, IdentityTypeGroup)
+		results, err := config.GetIdentitiesWithFilter(user, IdentityTypeGroup, nil)
 		require.NoError(t, err)
 		assert.Len(t, results, 2)
 		for _, r := range results {
-			assert.Nil(t, r.User)
-			assert.NotNil(t, r.Group)
+			assert.Nil(t, r.Result.User)
+			assert.NotNil(t, r.Result.Group)
 		}
 	})
 
 	t.Run("filter by IdentityTypeAll", func(t *testing.T) {
-		results, err := config.GetIdentitiesWithFilter(user, IdentityTypeAll)
+		results, err := config.GetIdentitiesWithFilter(user, IdentityTypeAll, nil)
 		require.NoError(t, err)
 		assert.Len(t, results, 4)
 	})
@@ -923,7 +932,7 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 		Name:  "Admin",
 	}
 
-	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
+	results, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser, nil)
 	require.NoError(t, err)
 
 	// Should have 4 unique identities: shared@example.com + 3 unique ones
@@ -932,7 +941,7 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 	// Count how many times shared@example.com appears
 	sharedCount := 0
 	for _, r := range results {
-		if r.ID == "shared@example.com" {
+		if r.Result.ID == "shared@example.com" {
 			sharedCount++
 		}
 	}
@@ -941,7 +950,7 @@ func TestGetIdentitiesWithFilter_DeduplicationAcrossProviders(t *testing.T) {
 	// Verify all unique identities are present
 	resultIDs := make(map[string]bool)
 	for _, r := range results {
-		resultIDs[r.ID] = true
+		resultIDs[r.Result.ID] = true
 	}
 	assert.True(t, resultIDs["shared@example.com"])
 	assert.True(t, resultIDs["unique1@example.com"])
@@ -975,12 +984,12 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		p.SetClient(provider)
 		config.Providers.Definitions["test"] = p
 
-		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser)
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, nil)
 		require.NoError(t, err)
 
 		// Should return current user as fallback
 		assert.Len(t, results, 1)
-		assert.Equal(t, currentUser.Email, results[0].ID)
+		assert.Equal(t, currentUser.Email, results[0].Result.ID)
 	})
 
 	t.Run("user returned when provider returns empty results - IdentityTypeAll", func(t *testing.T) {
@@ -1001,12 +1010,12 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		p.SetClient(provider)
 		config.Providers.Definitions["test"] = p
 
-		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeAll)
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeAll, nil)
 		require.NoError(t, err)
 
 		// Should return current user as fallback
 		assert.Len(t, results, 1)
-		assert.Equal(t, currentUser.Email, results[0].ID)
+		assert.Equal(t, currentUser.Email, results[0].Result.ID)
 	})
 
 	t.Run("user NOT returned when provider has results", func(t *testing.T) {
@@ -1035,12 +1044,12 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		p.SetClient(provider)
 		config.Providers.Definitions["test"] = p
 
-		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser)
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, nil)
 		require.NoError(t, err)
 
 		// Should only have the provider result, not current user
 		assert.Len(t, results, 1)
-		assert.Equal(t, "other@example.com", results[0].ID)
+		assert.Equal(t, "other@example.com", results[0].Result.ID)
 	})
 
 	t.Run("user NOT returned when IdentityTypeGroup even with empty results", func(t *testing.T) {
@@ -1060,7 +1069,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		p.SetClient(provider)
 		config.Providers.Definitions["test"] = p
 
-		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeGroup)
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeGroup, nil)
 		require.NoError(t, err)
 
 		// Should be empty, not the current user
@@ -1084,7 +1093,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		p.SetClient(provider)
 		config.Providers.Definitions["test"] = p
 
-		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, "nonexistent")
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, &models.SearchRequest{Terms: []string{"nonexistent"}})
 		require.NoError(t, err)
 
 		// Should be empty because filter was provided
@@ -1109,12 +1118,12 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		config.Providers.Definitions["test"] = p
 
 		// Pass an empty string as filter - this simulates ?q= in the URL
-		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, "")
+		results, err := config.GetIdentitiesWithFilter(currentUser, IdentityTypeUser, &models.SearchRequest{Terms: []string{""}})
 		require.NoError(t, err)
 
 		// Should return current user as fallback because "" filter should be ignored
 		assert.Len(t, results, 1)
-		assert.Equal(t, currentUser.Email, results[0].ID)
+		assert.Equal(t, currentUser.Email, results[0].Result.ID)
 	})
 
 	t.Run("nil user - no fallback, empty results", func(t *testing.T) {
@@ -1135,7 +1144,7 @@ func TestGetIdentitiesWithFilter_CurrentUserFallback(t *testing.T) {
 		config.Providers.Definitions["test"] = p
 
 		// This should not panic and should return empty
-		results, err := config.GetIdentitiesWithFilter(nil, IdentityTypeUser)
+		results, err := config.GetIdentitiesWithFilter(nil, IdentityTypeUser, nil)
 		require.NoError(t, err)
 		assert.Len(t, results, 0)
 	})
@@ -1185,7 +1194,7 @@ func BenchmarkGetIdentitiesWithFilter_MultipleProviders(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser)
+		_, err := config.GetIdentitiesWithFilter(user, IdentityTypeUser, nil)
 		if err != nil {
 			b.Fatal(err)
 		}

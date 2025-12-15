@@ -44,6 +44,7 @@ func (p *thandProvider) Initialize(identifier string, provider models.Provider) 
 		identifier,
 		provider,
 		models.ProviderCapabilityAuthorizer,
+		models.ProviderCapabilityIdentities,
 	)
 
 	thandConfig := p.GetConfig()
@@ -97,17 +98,26 @@ func (p *thandProvider) CreateSession(ctx context.Context, authRequest *models.A
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
 
+	user := &models.User{
+		ID:       userInfo.Sub,
+		Email:    userInfo.Email,
+		Username: userInfo.PreferredUsername,
+		Name:     userInfo.Name,
+		Source:   ThandProviderName,
+	}
+
 	session := models.Session{
-		UUID: uuid.New(),
-		User: &models.User{
-			ID:       userInfo.Sub,
-			Email:    userInfo.Email,
-			Username: userInfo.PreferredUsername,
-			Name:     userInfo.Name,
-			Source:   ThandProviderName,
-		},
+		UUID:   uuid.New(),
+		User:   user,
 		Expiry: time.Now().Add(1 * time.Hour), // Set session expiry to 1 hour
 	}
+
+	// Add session to identities pool
+	p.AddIdentities(models.Identity{
+		ID:    user.ID,
+		Label: user.Name,
+		User:  user,
+	})
 
 	return &session, nil
 }

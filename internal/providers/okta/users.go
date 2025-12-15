@@ -15,7 +15,7 @@ func (p *oktaProvider) CanSynchronizeUsers() bool {
 }
 
 // SynchronizeUsers fetches and caches user identities from Okta
-func (p *oktaProvider) SynchronizeUsers(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
+func (p *oktaProvider) SynchronizeUsers(ctx context.Context, req *models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

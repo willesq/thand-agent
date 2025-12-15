@@ -108,6 +108,7 @@ func loadPermissions(stage string) ([]models.ProviderPermission, error) {
 		}
 
 		permission := models.ProviderPermission{
+			ID:          strings.ToLower(fmt.Sprintf("%s-%s", perm.Stage, perm.Name)),
 			Name:        perm.Name,
 			Title:       perm.Title,
 			Description: perm.Description,

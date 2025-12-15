@@ -20,7 +20,7 @@ func (p *githubProvider) CanSynchronizeUsers() bool {
 }
 
 // Sync fetches and caches user and team identities from GitHub
-func (p *githubProvider) SynchronizeUsers(ctx context.Context, req models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
+func (p *githubProvider) SynchronizeUsers(ctx context.Context, req *models.SynchronizeUsersRequest) (*models.SynchronizeUsersResponse, error) {
 	startTime := time.Now()
 	defer func() {
 		elapsed := time.Since(startTime)

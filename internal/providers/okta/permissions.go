@@ -1,6 +1,8 @@
 package okta
 
 import (
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/thand-io/agent/internal/models"
 )
@@ -137,6 +139,7 @@ func (p *oktaProvider) getStaticPermissions() []models.ProviderPermission {
 	// Convert to slice
 	for name, description := range oktaPermissions {
 		perm := models.ProviderPermission{
+			ID:          strings.ToLower(name),
 			Name:        name,
 			Description: description,
 		}
