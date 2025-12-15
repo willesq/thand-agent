@@ -198,12 +198,14 @@ func (s *Server) getAuthCallback(c *gin.Context) {
 //	@Failure		400				{object}	map[string]any	"Bad request"
 //	@Router			/auth/callback/{provider} [post]
 func (s *Server) postAuthCallback(c *gin.Context) {
+	log := LogWithCorrelation(c)
+
 	// SAML flow: RelayState and SAMLResponse come in form parameters (POST)
 	relayState := c.PostForm("RelayState")
 	samlResponse := c.PostForm("SAMLResponse")
 
-	// Debug logging
-	logrus.WithFields(logrus.Fields{
+	// Debug logging with correlation ID
+	log.WithFields(logrus.Fields{
 		"method":       c.Request.Method,
 		"relay_state":  relayState,
 		"has_response": len(samlResponse) > 0,
@@ -240,11 +242,28 @@ func (s *Server) postAuthCallback(c *gin.Context) {
 			}
 
 			// Security logging for IdP-initiated flows (for audit/monitoring)
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(logrus.Fields{
 				"provider":   providerName,
 				"source_ip":  c.ClientIP(),
 				"user_agent": c.Request.UserAgent(),
-			}).Info("Processing IdP-initiated SAML authentication (allow_idp_initiated=true)")
+				"flow":       "idp-initiated",
+			}).Warn("Processing IdP-initiated SAML authentication (allow_idp_initiated=true)")
+
+			// CSRF protection for IdP-initiated flows (if enabled)
+			if s.csrfEnabled {
+				csrfToken := c.PostForm("csrf_token")
+				if !validateAndClearCSRFToken(c, csrfToken) {
+					log.WithFields(logrus.Fields{
+						"provider":   providerName,
+						"source_ip":  c.ClientIP(),
+						"user_agent": c.Request.UserAgent(),
+						"event":      "csrf_validation_failed",
+					}).Warn("CSRF validation failed for IdP-initiated SAML flow")
+					s.getErrorPage(c, http.StatusForbidden, "Invalid CSRF token")
+					return
+				}
+				log.Debug("CSRF token validated for IdP-initiated SAML flow")
+			}
 
 			authWrapper := models.AuthWrapper{
 				Callback: "", // No callback for IdP-initiated
@@ -393,6 +412,7 @@ type AuthCallbackPageData struct {
 }
 
 func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
+	log := LogWithCorrelation(c)
 
 	// Get the provider and pull back the user session into
 	// the context
@@ -400,6 +420,7 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 	provider, err := s.Config.GetProviderByName(auth.Provider)
 
 	if err != nil {
+		log.WithError(err).WithField("provider", auth.Provider).Error("Invalid provider")
 		s.getErrorPage(c, http.StatusBadRequest, "Invalid provider", err)
 		return
 	}
@@ -416,19 +437,31 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 		code = c.PostForm("SAMLResponse")
 	}
 
-	session, err := provider.GetClient().CreateSession(c, &models.AuthorizeUser{
+	// Inject assertion cache into context for SAML replay protection
+	ctx := context.WithValue(c.Request.Context(), "assertion_cache", s.assertionCache)
+
+	session, err := provider.GetClient().CreateSession(ctx, &models.AuthorizeUser{
 		State:       state,
 		Code:        code,
 		RedirectUri: s.GetConfig().GetAuthCallbackUrl(auth.Provider),
 	})
 
 	if err != nil {
+		log.WithError(err).WithField("provider", auth.Provider).Error("Failed to create session")
 		s.getErrorPage(c, http.StatusBadRequest, "Failed to create session", err)
 		return
 	}
 
 	if session == nil {
+		log.WithField("provider", auth.Provider).Error("Session is nil after creation")
 		s.getErrorPage(c, http.StatusInternalServerError, "Session is nil")
+		return
+	}
+
+	// SECURITY: Regenerate session to prevent session fixation attacks
+	if err := s.regenerateSession(c, auth.Provider); err != nil {
+		log.WithError(err).WithField("provider", auth.Provider).Error("Failed to regenerate session")
+		s.getErrorPage(c, http.StatusInternalServerError, "Session regeneration failed", err)
 		return
 	}
 
@@ -449,9 +482,15 @@ func (s *Server) getAuthCallbackPage(c *gin.Context, auth models.AuthWrapper) {
 	}
 
 	if err := s.setAuthCookie(c, auth.Provider, localSession); err != nil {
+		log.WithError(err).WithField("provider", auth.Provider).Error("Failed to set auth cookie")
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to set auth cookie", err)
 		return
 	}
+
+	log.WithFields(logrus.Fields{
+		"provider":   auth.Provider,
+		"session_id": session.UUID.String(),
+	}).Info("Authentication successful, session created")
 
 	if len(auth.Callback) == 0 {
 		// Use HTTP 303 (See Other) for POST-to-GET redirects - correct REST semantic
@@ -541,4 +580,34 @@ func (s *Server) getLogoutPage(c *gin.Context) {
 		})
 	}
 
+}
+
+// regenerateSession prevents session fixation attacks by clearing old sessions before authentication.
+// This should be called after successful authentication but before setting the authenticated session cookie.
+func (s *Server) regenerateSession(c *gin.Context, providerName string) error {
+	log := LogWithCorrelation(c)
+
+	// Clear any existing session cookie for this provider
+	cookieName := CreateCookieName(providerName)
+	oldSession := sessions.DefaultMany(c, cookieName)
+	if oldSession != nil {
+		oldSession.Clear()
+		if err := oldSession.Save(); err != nil {
+			log.WithError(err).WithField("provider", providerName).Error("Failed to clear old provider session")
+			return fmt.Errorf("failed to clear old session: %w", err)
+		}
+	}
+
+	// Also clear main thand cookie
+	mainSession := sessions.DefaultMany(c, ThandCookieName)
+	if mainSession != nil {
+		mainSession.Clear()
+		if err := mainSession.Save(); err != nil {
+			log.WithError(err).Error("Failed to clear main session")
+			return fmt.Errorf("failed to clear main session: %w", err)
+		}
+	}
+
+	log.WithField("provider", providerName).Debug("Sessions regenerated successfully")
+	return nil
 }
