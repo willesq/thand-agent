@@ -13,8 +13,12 @@ import (
 
 type ExecutionStatePageData struct {
 	config.TemplateData `json:"-"`
-	Execution           *models.WorkflowExecutionInfo `json:"execution"`
-	Workflow            *model.Workflow               `json:"workflow"`
+	ExecutionStatePageResponse
+}
+
+type ExecutionStatePageResponse struct {
+	Execution *models.WorkflowExecutionInfo `json:"execution"`
+	Workflow  *model.Workflow               `json:"workflow"`
 }
 
 type WorkflowPageData struct {

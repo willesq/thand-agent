@@ -517,10 +517,12 @@ func (s *Server) resumeWorkflow(c *gin.Context, workflow *models.WorkflowTask) {
 
 		data := ExecutionStatePageData{
 			TemplateData: s.GetTemplateData(c),
-			Execution: &models.WorkflowExecutionInfo{
-				WorkflowID: workflowTask.WorkflowID,
+			ExecutionStatePageResponse: ExecutionStatePageResponse{
+				Execution: &models.WorkflowExecutionInfo{
+					WorkflowID: workflowTask.WorkflowID,
+				},
+				Workflow: workflowTask.GetWorkflowDef(),
 			},
-			Workflow: workflowTask.GetWorkflowDef(),
 		}
 
 		s.renderHtml(c, "execution.html", data)

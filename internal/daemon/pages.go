@@ -64,6 +64,7 @@ func (s *Server) getErrorPage(c *gin.Context, code int, message string, err ...e
 		s.renderHtml(c, "error.html", data)
 
 	} else {
+
 		c.JSON(code, errReponse)
 	}
 
