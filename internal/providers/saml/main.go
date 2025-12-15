@@ -18,10 +18,15 @@ import (
 	"github.com/crewjam/saml/samlsp"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/thand-io/agent/internal/daemon"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
 )
+
+// AssertionCache defines the interface for assertion ID replay protection.
+// This interface avoids circular dependencies by not importing internal/daemon.
+type AssertionCache interface {
+	CheckAndAdd(assertionID string) bool
+}
 
 const SamlProviderName = "saml"
 
@@ -229,7 +234,7 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 	// 1. Assertion ID replay protection (CRITICAL)
 	if assertion.ID != "" {
 		// Try to get assertion cache from context
-		if cache, ok := ctx.Value("assertion_cache").(*daemon.AssertionCache); ok && cache != nil {
+		if cache, ok := ctx.Value("assertion_cache").(AssertionCache); ok && cache != nil {
 			if !cache.CheckAndAdd(assertion.ID) {
 				logrus.WithFields(logrus.Fields{
 					"assertion_id": assertion.ID,
@@ -243,26 +248,14 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		}
 	}
 
-	// 2. Validate Destination URL matches ACS URL
-	if assertion.Destination != "" {
-		expectedDestination := p.middleware.ServiceProvider.AcsURL.String()
-		if assertion.Destination != expectedDestination {
-			logrus.WithFields(logrus.Fields{
-				"expected":   expectedDestination,
-				"received":   assertion.Destination,
-				"event":      "destination_mismatch",
-			}).Error("SAML assertion Destination mismatch")
-			return nil, fmt.Errorf("assertion Destination does not match ACS URL")
-		}
-	}
-
-	// 3. Validate SubjectConfirmation
+	// 2. Validate SubjectConfirmation
+	// Note: Destination URL validation is already performed by ParseResponse in the SAML library
 	if err := p.validateSubjectConfirmation(assertion); err != nil {
 		logrus.WithError(err).Error("SAML SubjectConfirmation validation failed")
 		return nil, fmt.Errorf("SubjectConfirmation validation failed: %w", err)
 	}
 
-	// 4. Check for OneTimeUse condition (informational - already enforced by replay protection)
+	// 3. Check for OneTimeUse condition (informational - already enforced by replay protection)
 	if p.hasOneTimeUseCondition(assertion) {
 		logrus.Debug("OneTimeUse condition present in assertion (enforced by replay protection)")
 	}
@@ -666,13 +659,7 @@ func (p *samlProvider) hasOneTimeUseCondition(assertion *saml.Assertion) bool {
 	}
 
 	// Check for OneTimeUse condition
-	for _, condition := range assertion.Conditions.Conditions {
-		if condition.OneTimeUse != nil {
-			return true
-		}
-	}
-
-	return false
+	return assertion.Conditions.OneTimeUse != nil
 }
 
 func init() {
