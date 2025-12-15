@@ -99,7 +99,7 @@ func BleveListSearch[T any](
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
 
-	// Convert search results back to permissions
+	// Convert search results back to typed items
 	var matched []SearchResult[T]
 	for _, hit := range searchResults.Hits {
 		for _, item := range items {

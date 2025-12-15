@@ -112,7 +112,7 @@ func (p *thandProvider) CreateSession(ctx context.Context, authRequest *models.A
 		Expiry: time.Now().Add(1 * time.Hour), // Set session expiry to 1 hour
 	}
 
-	// Add session to idenities pool
+	// Add session to identities pool
 	p.AddIdentities(models.Identity{
 		ID:    user.ID,
 		Label: user.Name,

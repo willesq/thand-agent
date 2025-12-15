@@ -201,7 +201,7 @@ func (c *Config) ReloadRoleIndexes() error {
 
 		// No use provided so we can get the entire role. HOWEVER, if
 		// a role is scoped then we won't resolve the entire role.
-		// Just what is avaliable to ALL users.
+		// Just what is available to ALL users.
 		compositeRole, err := c.GetCompositeRole(nil, &role)
 
 		if err != nil {

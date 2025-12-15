@@ -238,8 +238,8 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Lastly, add all the users from the found sessions to the identities pool
-		// The identitiy, should already been in the pool. However, if the server has
-		// restarted or this in an older session, we need to re-add them
+		// The identity, should already be in the pool. However, if the server has
+		// restarted or this is an older session, we need to re-add them
 		for providerId, session := range foundSessions {
 			foundProvider, err := s.Config.GetProviderByName(providerId)
 

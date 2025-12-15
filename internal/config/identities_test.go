@@ -186,6 +186,7 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 		user          *models.User
 		identityType  IdentityType
 		filter        []string
+		query         string
 		providers     map[string]*MockIdentityProvider
 		expectedCount int
 		expectedIDs   []string
@@ -418,7 +419,8 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 				Name:  "Admin User",
 			},
 			identityType: IdentityTypeGroup,
-			filter:       []string{"dev"},
+			filter:       []string{"developers"},
+			query:        "developers",
 			providers: map[string]*MockIdentityProvider{
 				"gsuite": NewMockIdentityProvider("gsuite", []models.Identity{
 					{
@@ -467,8 +469,11 @@ func TestGetIdentitiesWithFilter(t *testing.T) {
 
 			// Call GetIdentitiesWithFilter
 			var searchReq *models.SearchRequest
-			if len(tt.filter) > 0 {
-				searchReq = &models.SearchRequest{Terms: tt.filter}
+			if len(tt.filter) > 0 || tt.query != "" {
+				searchReq = &models.SearchRequest{
+					Terms: tt.filter,
+					Query: tt.query,
+				}
 			}
 			results, err := config.GetIdentitiesWithFilter(tt.user, tt.identityType, searchReq)
 

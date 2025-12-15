@@ -157,7 +157,7 @@ func (p *oauth2Provider) CreateSession(ctx context.Context, authRequest *models.
 		Expiry:       token.Expiry,
 	}
 
-	// Add session to idenities pool
+	// Add session to identities pool
 	p.AddIdentities(models.Identity{
 		ID:    user.ID,
 		Label: user.Name,
