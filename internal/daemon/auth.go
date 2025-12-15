@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -64,12 +63,22 @@ func (s *Server) getAuthRequest(c *gin.Context) {
 		loginServerURL, loginServerErr := url.Parse(config.GetLoginServerUrl())
 
 		if callbackErr == nil && loginServerErr == nil {
-			// Block if it's the same host and the callback would loop back to auth endpoints
+			// Block if it's the same host, path, and query as the current request (i.e., would cause a loop)
+			currentPath := c.Request.URL.Path
+
+			// Remove the "callback" parameter from the current query for comparison
+			currentQueryVals := c.Request.URL.Query()
+			currentQueryVals.Del("callback")
+			currentQuery := currentQueryVals.Encode()
+			callbackPath := callbackURL.Path
+			callbackQueryVals := callbackURL.Query()
+			callbackQueryVals.Del("callback")
+			callbackQuery := callbackQueryVals.Encode()
+
 			if callbackURL.Host == loginServerURL.Host &&
-				(strings.HasPrefix(callbackURL.Path, "/api/v1/auth/request") ||
-					strings.HasPrefix(callbackURL.Path, "/api/v1/auth/callback")) {
-				s.getErrorPage(c, http.StatusBadRequest, "Callback cannot be the auth request or callback endpoint - this would create an infinite loop")
-				return
+				callbackPath == currentPath &&
+				callbackQuery == currentQuery {
+				s.getErrorPage(c, http.StatusBadRequest, "Callback cannot be the same as the current auth request endpoint - this would create an infinite loop")
 			}
 		} else {
 			// If we can't parse the URLs, log the error but allow the request to proceed
