@@ -18,6 +18,7 @@ import (
 	"github.com/crewjam/saml/samlsp"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/thand-io/agent/internal/daemon"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/providers"
 )
@@ -102,8 +103,8 @@ func (p *samlProvider) Initialize(identifier string, provider models.Provider) e
 		AcsURL:            acsURL,
 		IDPMetadata:       idpMetadata,
 		AuthnNameIDFormat: saml.EmailAddressNameIDFormat,
-		// Allow IDP-initiated flows (Okta can initiate)
-		AllowIDPInitiated: true,
+		// Allow IDP-initiated flows only if explicitly configured (security)
+		AllowIDPInitiated: config.AllowIDPInitiated,
 	}
 
 	// Create middleware wrapper
@@ -165,6 +166,12 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		return nil, fmt.Errorf("no SAML response provided")
 	}
 
+	// Input validation: SAMLResponse size limit (100KB)
+	if len(authRequest.Code) > 100000 {
+		logrus.Warn("SAMLResponse exceeds maximum length (100KB)")
+		return nil, fmt.Errorf("SAMLResponse exceeds maximum allowed length")
+	}
+
 	// Log minimal debugging information without sensitive data
 	logrus.WithFields(logrus.Fields{
 		"entityID": p.middleware.ServiceProvider.EntityID,
@@ -215,6 +222,49 @@ func (p *samlProvider) CreateSession(ctx context.Context, authRequest *models.Au
 		// 3. Audience restriction mismatch
 
 		return nil, fmt.Errorf("failed to parse SAML response: %w", err)
+	}
+
+	// Security validations for the assertion
+
+	// 1. Assertion ID replay protection (CRITICAL)
+	if assertion.ID != "" {
+		// Try to get assertion cache from context
+		if cache, ok := ctx.Value("assertion_cache").(*daemon.AssertionCache); ok && cache != nil {
+			if !cache.CheckAndAdd(assertion.ID) {
+				logrus.WithFields(logrus.Fields{
+					"assertion_id": assertion.ID,
+					"event":        "replay_attack",
+				}).Error("SAML assertion replay attack detected")
+				return nil, fmt.Errorf("assertion replay detected: ID %s has already been used", assertion.ID)
+			}
+		} else {
+			// Log warning if cache not available (shouldn't happen in production)
+			logrus.Warn("Assertion cache not available in context - replay protection disabled")
+		}
+	}
+
+	// 2. Validate Destination URL matches ACS URL
+	if assertion.Destination != "" {
+		expectedDestination := p.middleware.ServiceProvider.AcsURL.String()
+		if assertion.Destination != expectedDestination {
+			logrus.WithFields(logrus.Fields{
+				"expected":   expectedDestination,
+				"received":   assertion.Destination,
+				"event":      "destination_mismatch",
+			}).Error("SAML assertion Destination mismatch")
+			return nil, fmt.Errorf("assertion Destination does not match ACS URL")
+		}
+	}
+
+	// 3. Validate SubjectConfirmation
+	if err := p.validateSubjectConfirmation(assertion); err != nil {
+		logrus.WithError(err).Error("SAML SubjectConfirmation validation failed")
+		return nil, fmt.Errorf("SubjectConfirmation validation failed: %w", err)
+	}
+
+	// 4. Check for OneTimeUse condition (informational - already enforced by replay protection)
+	if p.hasOneTimeUseCondition(assertion) {
+		logrus.Debug("OneTimeUse condition present in assertion (enforced by replay protection)")
 	}
 
 	// Extract user information from SAML assertion
@@ -269,11 +319,11 @@ func (p *samlProvider) RenewSession(ctx context.Context, session *models.Session
 		return nil, fmt.Errorf("cannot renew expired session: %w", err)
 	}
 
-	// Create a new session with extended expiry
+	// Create a new session with extended expiry (using configured session duration)
 	newSession := &models.Session{
 		UUID:   uuid.New(),
 		User:   session.User,
-		Expiry: time.Now().Add(24 * time.Hour),
+		Expiry: time.Now().Add(p.sessionDuration),
 	}
 
 	logrus.Infof("Renewed SAML session for user: %s", session.User.Username)
@@ -568,6 +618,61 @@ func (p *samlProvider) parseSAMLConfig(config *models.BasicConfig) (*SAMLConfig,
 	}
 
 	return samlConfig, nil
+}
+
+// validateSubjectConfirmation validates the SAML SubjectConfirmation element.
+// This ensures that the assertion was intended for this service provider and is still valid.
+func (p *samlProvider) validateSubjectConfirmation(assertion *saml.Assertion) error {
+	if assertion.Subject == nil || len(assertion.Subject.SubjectConfirmations) == 0 {
+		return fmt.Errorf("no SubjectConfirmation found in assertion")
+	}
+
+	// Check for at least one valid Bearer confirmation
+	for _, sc := range assertion.Subject.SubjectConfirmations {
+		// We expect Bearer confirmation method for web SSO
+		if sc.Method == "urn:oasis:names:tc:SAML:2.0:cm:bearer" {
+			if sc.SubjectConfirmationData != nil {
+				// Validate Recipient matches our ACS URL
+				if sc.SubjectConfirmationData.Recipient != "" {
+					expectedRecipient := p.middleware.ServiceProvider.AcsURL.String()
+					if sc.SubjectConfirmationData.Recipient != expectedRecipient {
+						return fmt.Errorf("SubjectConfirmation Recipient mismatch: expected %s, got %s",
+							expectedRecipient, sc.SubjectConfirmationData.Recipient)
+					}
+				}
+
+				// Validate NotOnOrAfter (if present)
+				if !sc.SubjectConfirmationData.NotOnOrAfter.IsZero() {
+					if time.Now().After(sc.SubjectConfirmationData.NotOnOrAfter) {
+						return fmt.Errorf("SubjectConfirmation expired (NotOnOrAfter: %s)",
+							sc.SubjectConfirmationData.NotOnOrAfter.Format(time.RFC3339))
+					}
+				}
+			}
+
+			// Found valid Bearer confirmation
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no valid Bearer SubjectConfirmation found")
+}
+
+// hasOneTimeUseCondition checks if the assertion has a OneTimeUse condition.
+// This is informational since we already enforce one-time use through assertion ID replay protection.
+func (p *samlProvider) hasOneTimeUseCondition(assertion *saml.Assertion) bool {
+	if assertion.Conditions == nil {
+		return false
+	}
+
+	// Check for OneTimeUse condition
+	for _, condition := range assertion.Conditions.Conditions {
+		if condition.OneTimeUse != nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 func init() {
