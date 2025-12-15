@@ -371,31 +371,32 @@ func (t *thandTask) makeApprovalNotifications(
 		}).Info("Processing approval notifier")
 
 		// Build notification tasks for each recipient
-		for _, recipient := range recipients {
+		for _, recipientId := range recipients {
 
 			recipientIdentity := t.resolveIdentity(
-				recipient,
+				recipientId,
 			)
 
 			if recipientIdentity == nil {
 				logrus.WithFields(logrus.Fields{
-					"recipient":   recipient,
+					"recipient":   recipientId,
 					"providerKey": providerKey,
 				}).Warn("Failed to resolve recipient identity; skipping notification for this recipient")
 				continue
 			}
 
+			recipientIdentity.ID = recipientId
 			recipientPayload := approvalNotifier.GetPayload(recipientIdentity)
 
 			notifyTasks = append(notifyTasks, notifyTask{
-				Recipient: recipient,
+				Recipient: recipientId,
 				CallFunc:  approvalNotifier.GetCallFunction(recipientIdentity),
 				Payload:   recipientPayload,
 				Provider:  approvalNotifier.GetProviderName(),
 			})
 
 			logrus.WithFields(logrus.Fields{
-				"recipient":   recipient,
+				"recipient":   recipientId,
 				"provider":    approvalNotifier.GetProviderName(),
 				"providerKey": providerKey,
 			}).Debug("Prepared approval notification task")

@@ -48,6 +48,8 @@ func (a *approvalsNotifier) createApprovalEmailBody() (string, string) {
 
 	if len(elevationReq.Identities) > 0 {
 
+		plainText.WriteString("\nTarget Identities:\n")
+
 		// Resolve all identities to get nice display names
 		resolvedIdentities := elevationReq.ResolveIdentities(
 			context.Background(),
@@ -55,7 +57,6 @@ func (a *approvalsNotifier) createApprovalEmailBody() (string, string) {
 				models.ProviderCapabilityIdentities,
 			))
 
-		plainText.WriteString("\nTarget Identities:\n")
 		for _, identity := range elevationReq.Identities {
 
 			if resolved, ok := resolvedIdentities[identity]; ok {

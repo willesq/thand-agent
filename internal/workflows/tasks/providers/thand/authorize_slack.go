@@ -149,6 +149,8 @@ func (a *authorizerNotifier) addProviderAccessButton(
 			continue
 		}
 
+		// See if the user ids or emails match in the auth requests/responses
+
 		authRequest, foundReq := a.authRequests[toIdentity.GetId()]
 		authResponse, foundAuth := a.authResponses[toIdentity.GetId()]
 
@@ -181,10 +183,14 @@ func (a *authorizerNotifier) addProviderAccessButton(
 
 	}
 
-	*blocks = append(*blocks, slack.NewActionBlock(
-		"provider_access_actions",
-		buttonElements...,
-	))
+	if len(buttonElements) > 0 {
+
+		*blocks = append(*blocks, slack.NewActionBlock(
+			"provider_access_actions",
+			buttonElements...,
+		))
+
+	}
 }
 
 // addClosingMessageSection adds a closing message

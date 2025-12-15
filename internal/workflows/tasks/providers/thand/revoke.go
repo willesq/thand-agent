@@ -367,26 +367,27 @@ func (t *thandTask) makeRevocationNotifications(
 		recipients := revokeNotifier.GetRecipients()
 
 		// Build notification tasks for each recipient
-		for _, recipient := range recipients {
+		for _, recipientId := range recipients {
 
-			recipientIdentity := t.resolveIdentity(recipient)
+			recipientIdentity := t.resolveIdentity(recipientId)
 
 			if recipientIdentity == nil {
-				log.WithField("recipient", recipient).Warn("Failed to resolve recipient identity for revocation notification, skipping")
+				log.WithField("recipient", recipientId).Warn("Failed to resolve recipient identity for revocation notification, skipping")
 				continue
 			}
 
+			recipientIdentity.ID = recipientId
 			recipientPayload := revokeNotifier.GetPayload(recipientIdentity)
 
 			notifyTasks = append(notifyTasks, notifyTask{
-				Recipient: recipient,
+				Recipient: recipientId,
 				CallFunc:  revokeNotifier.GetCallFunction(recipientIdentity),
 				Payload:   recipientPayload,
 				Provider:  revokeNotifier.GetProviderName(),
 			})
 
 			log.WithFields(models.Fields{
-				"recipient":   recipient,
+				"recipient":   recipientId,
 				"provider":    revokeNotifier.GetProviderName(),
 				"providerKey": providerKey,
 			}).Debug("Prepared revocation notification task")

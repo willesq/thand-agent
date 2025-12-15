@@ -150,20 +150,21 @@ func (t *thandTask) executeAuthorization(
 
 		maps.Copy(modelOutput, validateOutput)
 
-		for _, identity := range elevateRequest.Identities {
+		for _, identityId := range elevateRequest.Identities {
 
-			identityObj := t.resolveIdentity(identity)
+			identityObj := t.resolveIdentity(identityId)
 
 			if identityObj == nil {
-				logrus.Warnf("failed to resolve identity: %s", identity)
+				logrus.Warnf("failed to resolve identity: %s", identityId)
 				continue
 			}
 
 			if identityObj.GetUser() == nil {
-				logrus.Warnf("resolved identity has no user: %s", identity)
+				logrus.Warnf("resolved identity has no user: %s", identityId)
 				continue
 			}
 
+			identityObj.ID = identityId
 			authReq := models.AuthorizeRoleRequest{
 				RoleRequest: &models.RoleRequest{
 					User:     identityObj.GetUser(),
@@ -179,7 +180,7 @@ func (t *thandTask) executeAuthorization(
 
 			authTasks = append(authTasks, authTask{
 				ProviderName: providerName,
-				Identity:     identity,
+				Identity:     identityId,
 				AuthRequest:  authReq,
 				ThandAuthReq: thandAuthReq,
 			})
@@ -555,27 +556,28 @@ func (t *thandTask) makeAuthorizationNotifications(
 		recipients := authorizeNotifier.GetRecipients()
 
 		// Build notification tasks for each recipient
-		for _, recipient := range recipients {
+		for _, recipientId := range recipients {
 
-			recipientIdentity := t.resolveIdentity(recipient)
+			recipientIdentity := t.resolveIdentity(recipientId)
 
 			if recipientIdentity == nil {
-				log.WithField("recipient", recipient).
+				log.WithField("recipient", recipientId).
 					Error("Failed to resolve recipient identity")
 				continue
 			}
 
+			recipientIdentity.ID = recipientId
 			recipientPayload := authorizeNotifier.GetPayload(recipientIdentity)
 
 			notifyTasks = append(notifyTasks, notifyTask{
-				Recipient: recipient,
+				Recipient: recipientId,
 				CallFunc:  authorizeNotifier.GetCallFunction(recipientIdentity),
 				Payload:   recipientPayload,
 				Provider:  authorizeNotifier.GetProviderName(),
 			})
 
 			log.WithFields(models.Fields{
-				"recipient":   recipient,
+				"recipient":   recipientId,
 				"provider":    authorizeNotifier.GetProviderName(),
 				"providerKey": providerKey,
 			}).Debug("Prepared authorization notification task")

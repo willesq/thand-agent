@@ -110,27 +110,28 @@ func (t *thandTask) executeNotify(
 
 	// Build notification tasks for each recipient
 	var notifyTasks []notifyTask
-	for _, recipient := range recipients {
+	for _, recipientId := range recipients {
 
-		recipientIdentity := t.resolveIdentity(recipient)
+		recipientIdentity := t.resolveIdentity(recipientId)
 
 		if recipientIdentity == nil {
-			log.WithField("recipient", recipient).
+			log.WithField("recipient", recipientId).
 				Error("Failed to resolve recipient identity")
 			continue
 		}
 
+		recipientIdentity.ID = recipientId
 		recipientPayload := notify.GetPayload(recipientIdentity)
 
 		notifyTasks = append(notifyTasks, notifyTask{
-			Recipient: recipient,
+			Recipient: recipientId,
 			CallFunc:  notify.GetCallFunction(recipientIdentity),
 			Payload:   recipientPayload,
 			Provider:  notify.GetProviderName(),
 		})
 
 		log.WithFields(models.Fields{
-			"recipient": recipient,
+			"recipient": recipientId,
 			"provider":  notify.GetProviderName(),
 		}).Debug("Prepared notification task")
 	}
