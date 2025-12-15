@@ -203,6 +203,7 @@
                 shouldSort: false,
                 searchResultLimit: 50,
                 searchFields: ['label', 'value'],
+                duplicateItemsAllowed: false,
             });
 
             // Set up search event listener using Choices.js event
@@ -250,26 +251,10 @@
                     }
 
                     const newChoices = parseIdentitiesResponse(data);
-                    
-                    // Get current selection to preserve it
-                    const currentSelection = identityChoicesInstance.getValue();
-                    
-                    // Add currently selected items to the new choices if they aren't already there
-                    currentSelection.forEach(item => {
-                        const existingChoice = newChoices.find(c => c.value === item.value);
-                        if (!existingChoice) {
-                            newChoices.push({
-                                value: item.value,
-                                label: item.label,
-                                selected: true,
-                                customProperties: item.customProperties
-                            });
-                        } else {
-                            existingChoice.selected = true;
-                        }
-                    });
 
                     // Replace choices
+                    // replaceChoices: true (4th arg) - removes existing choices
+                    // replaceItems: false (default/6th arg) - preserves selected items
                     identityChoicesInstance.setChoices(newChoices, 'value', 'label', true);
                     
                     if (!query) {

@@ -237,6 +237,45 @@ func (s *Server) AuthMiddleware() gin.HandlerFunc {
 			c.Set(SessionContextKey, foundSessions)
 		}
 
+		// Lastly, add all the users from the found sessions to the identities pool
+		// The identitiy, should already been in the pool. However, if the server has
+		// restarted or this in an older session, we need to re-add them
+		for providerId, session := range foundSessions {
+			foundProvider, err := s.Config.GetProviderByName(providerId)
+
+			if err != nil {
+				logrus.WithError(err).
+					WithField("provider", providerId).
+					Warnln("Failed to get provider for identity addition")
+				continue
+			}
+
+			providerClient := foundProvider.GetClient()
+
+			if providerClient == nil {
+				logrus.WithField("provider", providerId).
+					Warnln("Provider client is nil for identity addition")
+				continue
+			}
+
+			sessionUser := session.User
+
+			if sessionUser == nil {
+				logrus.WithField("provider", providerId).
+					Warnln("Session user is nil for identity addition")
+				continue
+			}
+
+			providerClient.AddIdentities(models.Identity{
+				ID:    sessionUser.ID,
+				Label: sessionUser.Name,
+				User:  sessionUser,
+				Providers: map[string]string{
+					foundProvider.Name: providerId,
+				},
+			})
+		}
+
 		c.Next()
 	}
 }

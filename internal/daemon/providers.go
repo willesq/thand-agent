@@ -98,11 +98,22 @@ func (s *Server) getProviderRoles(c *gin.Context) {
 		return
 	}
 
-	filter := c.Query("q")
+	query := c.Query("q")
 
-	roles, err := provider.GetClient().ListRoles(context.Background(), &models.SearchRequest{
-		Terms: []string{filter},
-	})
+	searchRequest := &models.SearchRequest{
+		Limit: 10,
+	}
+
+	if len(query) > 0 {
+		searchRequest.Terms = []string{query}
+		if !strings.HasSuffix(query, "*") {
+			searchRequest.Query = query + "*"
+		} else {
+			searchRequest.Query = query
+		}
+	}
+
+	roles, err := provider.GetClient().ListRoles(context.Background(), searchRequest)
 
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list roles")
@@ -181,11 +192,22 @@ func (s *Server) getProviderPermissions(c *gin.Context) {
 		return
 	}
 
-	filter := c.Query("q")
+	query := c.Query("q")
 
-	permissions, err := provider.GetClient().ListPermissions(context.Background(), &models.SearchRequest{
-		Terms: []string{filter},
-	})
+	searchRequest := &models.SearchRequest{
+		Limit: 10,
+	}
+
+	if len(query) > 0 {
+		searchRequest.Terms = []string{query}
+		if !strings.HasSuffix(query, "*") {
+			searchRequest.Query = query + "*"
+		} else {
+			searchRequest.Query = query
+		}
+	}
+
+	permissions, err := provider.GetClient().ListPermissions(context.Background(), searchRequest)
 
 	if err != nil {
 		s.getErrorPage(c, http.StatusInternalServerError, "Failed to list permissions", err)

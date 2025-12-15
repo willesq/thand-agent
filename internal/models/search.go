@@ -13,6 +13,7 @@ import (
 type SearchRequest struct {
 	Query string   `json:"query"`
 	Terms []string `json:"terms"`
+	Limit int      `json:"limit,omitempty"`
 }
 
 func (sr *SearchRequest) IsEmpty() bool {
@@ -62,6 +63,7 @@ func BleveListSearch[T any](
 	}
 
 	var queryBuilder query.Query
+	var queries []query.Query
 
 	if len(searchReq.Terms) > 0 {
 		// Build a conjunction query from the terms
@@ -69,14 +71,28 @@ func BleveListSearch[T any](
 		for _, term := range searchReq.Terms {
 			termQueries = append(termQueries, bleve.NewMatchQuery(term))
 		}
-		queryBuilder = bleve.NewConjunctionQuery(termQueries...)
-	} else {
+		queries = append(queries, bleve.NewConjunctionQuery(termQueries...))
+	}
+
+	if len(searchReq.Query) > 0 {
 		// Use the main query string
-		queryBuilder = bleve.NewQueryStringQuery(searchReq.Query)
+		queries = append(queries, bleve.NewQueryStringQuery(searchReq.Query))
+	}
+
+	if len(queries) == 0 {
+		return ReturnSearchResults(items), nil
+	} else {
+		queryBuilder = bleve.NewDisjunctionQuery(queries...)
+	}
+
+	limitResults := 10
+
+	if searchReq.Limit > 0 {
+		limitResults = searchReq.Limit
 	}
 
 	searchRequest := bleve.NewSearchRequest(queryBuilder)
-	searchRequest.Size = len(items) // Return all matches
+	searchRequest.Size = limitResults // Return all matches
 
 	searchResults, err := searchIndex.Search(searchRequest)
 	if err != nil {
