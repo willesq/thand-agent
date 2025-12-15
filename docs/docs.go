@@ -2073,6 +2073,14 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "thand": {
+                    "description": "This is ONLY if the agent is running in server mode\nand you want to use https://www.thand.io hosted services",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.ThandConfig"
+                        }
+                    ]
+                },
                 "workflows": {
                     "description": "These are workflows to run for role associated workflows",
                     "allOf": [
@@ -2399,10 +2407,6 @@ const docTemplate = `{
         "github_com_thand-io_agent_internal_models.LoginConfig": {
             "type": "object",
             "properties": {
-                "api_key": {
-                    "description": "API key for authenticating with the login server",
-                    "type": "string"
-                },
                 "base": {
                     "description": "Base path for login endpoint e.g. /",
                     "type": "string",
@@ -2496,6 +2500,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Role"
                         }
                     ]
+                },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
                 }
             }
         },
@@ -2520,6 +2527,23 @@ const docTemplate = `{
                 "path": {
                     "type": "string",
                     "default": "/ready"
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.Resources": {
+            "type": "object",
+            "properties": {
+                "allow": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "deny": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2578,7 +2602,7 @@ const docTemplate = `{
                     "description": "resource access rules, apis, files, systems etc",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.Resources"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Resources"
                         }
                     ]
                 },
@@ -2589,6 +2613,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_thand-io_agent_internal_models.RoleScopes"
                         }
                     ]
+                },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
                 },
                 "workflows": {
                     "description": "The workflows to execute",
@@ -2627,6 +2654,9 @@ const docTemplate = `{
             "properties": {
                 "cors": {
                     "$ref": "#/definitions/github_com_thand-io_agent_internal_models.CORSConfig"
+                },
+                "saml": {
+                    "$ref": "#/definitions/models.SAMLSecurityConfig"
                 }
             }
         },
@@ -2670,6 +2700,13 @@ const docTemplate = `{
                 },
                 "requests_per_minute": {
                     "type": "integer"
+                },
+                "saml_burst": {
+                    "type": "integer"
+                },
+                "saml_rate_limit": {
+                    "description": "SAML-specific rate limiting",
+                    "type": "number"
                 },
                 "write_timeout": {
                     "$ref": "#/definitions/time.Duration"
@@ -2718,6 +2755,29 @@ const docTemplate = `{
                             "$ref": "#/definitions/models.ServiceConfig"
                         }
                     ]
+                }
+            }
+        },
+        "github_com_thand-io_agent_internal_models.ThandConfig": {
+            "type": "object",
+            "properties": {
+                "api_key": {
+                    "description": "The API key for authenticating with Thand.io",
+                    "type": "string"
+                },
+                "base": {
+                    "description": "Base path for login endpoint e.g. /",
+                    "type": "string",
+                    "default": "/"
+                },
+                "endpoint": {
+                    "type": "string",
+                    "default": "https://app.thand.io/"
+                },
+                "sync": {
+                    "description": "Whether to enable synchronization with Thand.io",
+                    "type": "boolean",
+                    "default": true
                 }
             }
         },
@@ -2771,6 +2831,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
+                },
                 "workflow": {
                     "$ref": "#/definitions/model.Workflow"
                 }
@@ -2804,7 +2867,7 @@ const docTemplate = `{
                 "identities": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Identity"
                     }
                 },
                 "input": {
@@ -3801,7 +3864,21 @@ const docTemplate = `{
                 "identities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Identity"
+                        "type": "object",
+                        "properties": {
+                            "_id": {
+                                "type": "string"
+                            },
+                            "_reason": {
+                                "type": "string"
+                            },
+                            "_score": {
+                                "type": "number"
+                            },
+                            "_source": {
+                                "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Identity"
+                            }
+                        }
                     }
                 },
                 "provider": {
@@ -3818,6 +3895,9 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "id": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -3832,7 +3912,21 @@ const docTemplate = `{
                 "permissions": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.ProviderPermission"
+                        "type": "object",
+                        "properties": {
+                            "_id": {
+                                "type": "string"
+                            },
+                            "_reason": {
+                                "type": "string"
+                            },
+                            "_score": {
+                                "type": "number"
+                            },
+                            "_source": {
+                                "$ref": "#/definitions/models.ProviderPermission"
+                            }
+                        }
                     }
                 },
                 "provider": {
@@ -3851,6 +3945,9 @@ const docTemplate = `{
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -3887,7 +3984,21 @@ const docTemplate = `{
                 "roles": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/models.ProviderRole"
+                        "type": "object",
+                        "properties": {
+                            "_id": {
+                                "type": "string"
+                            },
+                            "_reason": {
+                                "type": "string"
+                            },
+                            "_score": {
+                                "type": "number"
+                            },
+                            "_source": {
+                                "$ref": "#/definitions/models.ProviderRole"
+                            }
+                        }
                     }
                 },
                 "version": {
@@ -3906,23 +4017,6 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
-                }
-            }
-        },
-        "models.Resources": {
-            "type": "object",
-            "properties": {
-                "allow": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "deny": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
                 }
             }
         },
@@ -3981,7 +4075,7 @@ const docTemplate = `{
                     "description": "resource access rules, apis, files, systems etc",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/models.Resources"
+                            "$ref": "#/definitions/github_com_thand-io_agent_internal_models.Resources"
                         }
                     ]
                 },
@@ -3992,6 +4086,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_thand-io_agent_internal_models.RoleScopes"
                         }
                     ]
+                },
+                "version": {
+                    "$ref": "#/definitions/version.Version"
                 },
                 "workflows": {
                     "description": "The workflows to execute",
@@ -4013,6 +4110,23 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "models.SAMLSecurityConfig": {
+            "type": "object",
+            "properties": {
+                "assertion_cache_cleanup": {
+                    "$ref": "#/definitions/time.Duration"
+                },
+                "assertion_cache_ttl": {
+                    "$ref": "#/definitions/time.Duration"
+                },
+                "csrf_enabled": {
+                    "type": "boolean"
+                },
+                "session_duration": {
+                    "$ref": "#/definitions/time.Duration"
                 }
             }
         },
@@ -4152,6 +4266,9 @@ const docTemplate = `{
                 "Minute",
                 "Hour"
             ]
+        },
+        "version.Version": {
+            "type": "object"
         }
     },
     "securityDefinitions": {

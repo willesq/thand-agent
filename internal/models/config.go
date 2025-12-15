@@ -22,6 +22,10 @@ type ServerLimitsConfig struct {
 	IdleTimeout       time.Duration `json:"idle_timeout" yaml:"idle_timeout" mapstructure:"idle_timeout"`
 	RequestsPerMinute int           `json:"requests_per_minute" yaml:"requests_per_minute" mapstructure:"requests_per_minute"`
 	Burst             int           `json:"burst" yaml:"burst" mapstructure:"burst"`
+
+	// SAML-specific rate limiting
+	SAMLRateLimit float64 `json:"saml_rate_limit" yaml:"saml_rate_limit" mapstructure:"saml_rate_limit"`
+	SAMLBurst     int     `json:"saml_burst" yaml:"saml_burst" mapstructure:"saml_burst"`
 }
 
 type LoginConfig struct {
@@ -71,7 +75,15 @@ type ReadyConfig struct {
 }
 
 type SecurityConfig struct {
-	CORS CORSConfig `json:"cors" yaml:"cors" mapstructure:"cors"`
+	CORS CORSConfig         `json:"cors" yaml:"cors" mapstructure:"cors"`
+	SAML SAMLSecurityConfig `json:"saml" yaml:"saml" mapstructure:"saml"`
+}
+
+type SAMLSecurityConfig struct {
+	CSRFEnabled           bool          `json:"csrf_enabled" yaml:"csrf_enabled" mapstructure:"csrf_enabled"`
+	AssertionCacheTTL     time.Duration `json:"assertion_cache_ttl" yaml:"assertion_cache_ttl" mapstructure:"assertion_cache_ttl"`
+	AssertionCacheCleanup time.Duration `json:"assertion_cache_cleanup" yaml:"assertion_cache_cleanup" mapstructure:"assertion_cache_cleanup"`
+	SessionDuration       time.Duration `json:"session_duration" yaml:"session_duration" mapstructure:"session_duration"`
 }
 
 type CORSConfig struct {

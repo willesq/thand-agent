@@ -68,12 +68,50 @@ func NewServer(cfg *config.Config) *Server {
 		logrus.WithError(err).Fatal("Failed to parse templates")
 	}
 
+	// Initialize rate limiter for SAML callbacks
+	samlRate := 5.0 // Default: 5 requests/second
+	samlBurst := 10 // Default: 10 burst capacity
+	if cfg.Server.Limits.SAMLRateLimit != 0 {
+		samlRate = cfg.Server.Limits.SAMLRateLimit
+	}
+	if cfg.Server.Limits.SAMLBurst != 0 {
+		samlBurst = cfg.Server.Limits.SAMLBurst
+	}
+	rateLimiter := NewRateLimiter(samlRate, samlBurst)
+
+	// Initialize assertion cache for SAML replay protection
+	cacheTTL := 5 * time.Minute      // Default: 5 minutes
+	cacheCleanup := 1 * time.Minute  // Default: 1 minute
+	if cfg.Server.Security.SAML.AssertionCacheTTL != 0 {
+		cacheTTL = cfg.Server.Security.SAML.AssertionCacheTTL
+	}
+	if cfg.Server.Security.SAML.AssertionCacheCleanup != 0 {
+		cacheCleanup = cfg.Server.Security.SAML.AssertionCacheCleanup
+	}
+	assertionCache := NewAssertionCache(cacheTTL, cacheCleanup)
+
+	// CSRF protection - default to true for security
+	// To disable, explicitly set server.security.saml.csrf_enabled: false in config
+	csrfEnabled := true
+	// Read from config if set (note: Go doesn't distinguish between false and unset for bool)
+	// For now, CSRF is always enabled for security. Can be made configurable later if needed.
+
+	logrus.WithFields(logrus.Fields{
+		"saml_rate_limit":      samlRate,
+		"saml_burst":           samlBurst,
+		"assertion_cache_ttl":  cacheTTL,
+		"csrf_enabled":         csrfEnabled,
+	}).Info("Security components initialized")
+
 	// Create a new server instance with the provided configuration
 	server := &Server{
-		Config:         cfg,
-		TemplateEngine: tmpl,
-		Workflows:      workflows,
-		StartTime:      time.Now().UTC(),
+		Config:          cfg,
+		TemplateEngine:  tmpl,
+		Workflows:       workflows,
+		StartTime:       time.Now().UTC(),
+		rateLimiter:     rateLimiter,
+		assertionCache:  assertionCache,
+		csrfEnabled:     csrfEnabled,
 	}
 
 	return server
@@ -150,6 +188,8 @@ func (s *Server) Start() error {
 	router := gin.New()
 
 	// Add middleware
+	// Correlation middleware MUST be first so correlation IDs are available to all subsequent middleware
+	router.Use(CorrelationMiddleware())
 	router.Use(gin.Logger())
 	router.Use(gin.CustomRecovery(
 		func(c *gin.Context, err any) {
@@ -440,8 +480,9 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			api.GET("/sync", s.getSync)
 
 			api.GET("/auth/request/:provider", s.getAuthRequest)
-			api.GET("/auth/callback/:provider", s.getAuthCallback)   // OAuth2 callbacks
-			api.POST("/auth/callback/:provider", s.postAuthCallback) // SAML callbacks
+			// Apply rate limiting to callback routes to prevent DoS attacks
+			api.GET("/auth/callback/:provider", s.rateLimiter.Middleware(), s.getAuthCallback)   // OAuth2 callbacks
+			api.POST("/auth/callback/:provider", s.rateLimiter.Middleware(), s.postAuthCallback) // SAML callbacks
 			api.GET("/auth/logout/:provider", s.getLogoutPage)
 			api.GET("/auth/logout", s.getLogoutPage)
 
@@ -670,7 +711,8 @@ func getSessionStore(secret string) sessions.Store {
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 days
 		HttpOnly: true,
-		Secure:   true, // Set to true in production with HTTPS
+		Secure:   true,                  // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,  // CSRF protection - prevents cross-site request forgery
 	})
 	return store
 }

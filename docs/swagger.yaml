@@ -106,6 +106,12 @@ definitions:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.ServicesConfig'
         description: External services / non-core services
+      thand:
+        allOf:
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.ThandConfig'
+        description: |-
+          This is ONLY if the agent is running in server mode
+          and you want to use https://www.thand.io hosted services
       workflows:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_config.WorkflowConfig'
@@ -330,9 +336,6 @@ definitions:
     type: object
   github_com_thand-io_agent_internal_models.LoginConfig:
     properties:
-      api_key:
-        description: API key for authenticating with the login server
-        type: string
       base:
         default: /
         description: Base path for login endpoint e.g. /
@@ -404,6 +407,8 @@ definitions:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Role'
         description: The base role for this provider
+      version:
+        $ref: '#/definitions/version.Version'
     type: object
   github_com_thand-io_agent_internal_models.RateLimitConfig:
     properties:
@@ -420,6 +425,17 @@ definitions:
       path:
         default: /ready
         type: string
+    type: object
+  github_com_thand-io_agent_internal_models.Resources:
+    properties:
+      allow:
+        items:
+          type: string
+        type: array
+      deny:
+        items:
+          type: string
+        type: array
     type: object
   github_com_thand-io_agent_internal_models.Role:
     properties:
@@ -457,12 +473,14 @@ definitions:
         type: array
       resources:
         allOf:
-        - $ref: '#/definitions/models.Resources'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Resources'
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
+      version:
+        $ref: '#/definitions/version.Version'
       workflows:
         description: The workflows to execute
         items:
@@ -488,6 +506,8 @@ definitions:
     properties:
       cors:
         $ref: '#/definitions/github_com_thand-io_agent_internal_models.CORSConfig'
+      saml:
+        $ref: '#/definitions/models.SAMLSecurityConfig'
     type: object
   github_com_thand-io_agent_internal_models.ServerConfig:
     properties:
@@ -516,6 +536,11 @@ definitions:
         $ref: '#/definitions/time.Duration'
       requests_per_minute:
         type: integer
+      saml_burst:
+        type: integer
+      saml_rate_limit:
+        description: SAML-specific rate limiting
+        type: number
       write_timeout:
         $ref: '#/definitions/time.Duration'
     type: object
@@ -541,6 +566,23 @@ definitions:
         allOf:
         - $ref: '#/definitions/models.ServiceConfig'
         description: Vault - used for storing sensitive data
+    type: object
+  github_com_thand-io_agent_internal_models.ThandConfig:
+    properties:
+      api_key:
+        description: The API key for authenticating with Thand.io
+        type: string
+      base:
+        default: /
+        description: Base path for login endpoint e.g. /
+        type: string
+      endpoint:
+        default: https://app.thand.io/
+        type: string
+      sync:
+        default: true
+        description: Whether to enable synchronization with Thand.io
+        type: boolean
     type: object
   github_com_thand-io_agent_internal_models.User:
     properties:
@@ -580,6 +622,8 @@ definitions:
         type: boolean
       name:
         type: string
+      version:
+        $ref: '#/definitions/version.Version'
       workflow:
         $ref: '#/definitions/model.Workflow'
     type: object
@@ -603,7 +647,7 @@ definitions:
         type: string
       identities:
         items:
-          type: string
+          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Identity'
         type: array
       input:
         description: Context
@@ -1275,7 +1319,16 @@ definitions:
     properties:
       identities:
         items:
-          $ref: '#/definitions/github_com_thand-io_agent_internal_models.Identity'
+          properties:
+            _id:
+              type: string
+            _reason:
+              type: string
+            _score:
+              type: number
+            _source:
+              $ref: '#/definitions/github_com_thand-io_agent_internal_models.Identity'
+          type: object
         type: array
       provider:
         type: string
@@ -1286,6 +1339,8 @@ definitions:
     properties:
       description:
         type: string
+      id:
+        type: string
       name:
         type: string
       title:
@@ -1295,7 +1350,16 @@ definitions:
     properties:
       permissions:
         items:
-          $ref: '#/definitions/models.ProviderPermission'
+          properties:
+            _id:
+              type: string
+            _reason:
+              type: string
+            _score:
+              type: number
+            _source:
+              $ref: '#/definitions/models.ProviderPermission'
+          type: object
         type: array
       provider:
         type: string
@@ -1308,6 +1372,8 @@ definitions:
         type: string
       enabled:
         type: boolean
+      id:
+        type: string
       name:
         type: string
       provider:
@@ -1331,7 +1397,16 @@ definitions:
         type: string
       roles:
         items:
-          $ref: '#/definitions/models.ProviderRole'
+          properties:
+            _id:
+              type: string
+            _reason:
+              type: string
+            _score:
+              type: number
+            _source:
+              $ref: '#/definitions/models.ProviderRole'
+          type: object
         type: array
       version:
         type: string
@@ -1344,17 +1419,6 @@ definitions:
         type: object
       version:
         type: string
-    type: object
-  models.Resources:
-    properties:
-      allow:
-        items:
-          type: string
-        type: array
-      deny:
-        items:
-          type: string
-        type: array
     type: object
   models.RoleResponse:
     properties:
@@ -1392,12 +1456,14 @@ definitions:
         type: array
       resources:
         allOf:
-        - $ref: '#/definitions/models.Resources'
+        - $ref: '#/definitions/github_com_thand-io_agent_internal_models.Resources'
         description: resource access rules, apis, files, systems etc
       scopes:
         allOf:
         - $ref: '#/definitions/github_com_thand-io_agent_internal_models.RoleScopes'
         description: scope of who can be assigned this role
+      version:
+        $ref: '#/definitions/version.Version'
       workflows:
         description: The workflows to execute
         items:
@@ -1412,6 +1478,17 @@ definitions:
         type: object
       version:
         type: string
+    type: object
+  models.SAMLSecurityConfig:
+    properties:
+      assertion_cache_cleanup:
+        $ref: '#/definitions/time.Duration'
+      assertion_cache_ttl:
+        $ref: '#/definitions/time.Duration'
+      csrf_enabled:
+        type: boolean
+      session_duration:
+        $ref: '#/definitions/time.Duration'
     type: object
   models.ServiceConfig:
     properties:
@@ -1513,6 +1590,8 @@ definitions:
     - Second
     - Minute
     - Hour
+  version.Version:
+    type: object
 host: localhost:8080
 info:
   contact:
