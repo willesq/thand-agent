@@ -36,14 +36,14 @@ import (
 	"github.com/sirupsen/logrus"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/ulule/limiter/v3"
-	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
-	"github.com/ulule/limiter/v3/drivers/store/memory"
 	_ "github.com/thand-io/agent/docs" // Import generated swagger docs
 	"github.com/thand-io/agent/internal/common"
 	"github.com/thand-io/agent/internal/config"
 	"github.com/thand-io/agent/internal/models"
 	"github.com/thand-io/agent/internal/workflows/manager"
+	"github.com/ulule/limiter/v3"
+	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
+	"github.com/ulule/limiter/v3/drivers/store/memory"
 	"go.temporal.io/api/workflowservice/v1"
 )
 
@@ -95,8 +95,8 @@ func NewServer(cfg *config.Config) *Server {
 	rateLimiterMiddleware := mgin.NewMiddleware(rateLimiterInstance)
 
 	// Initialize assertion cache for SAML replay protection
-	cacheTTL := 5 * time.Minute      // Default: 5 minutes
-	cacheCleanup := 1 * time.Minute  // Default: 1 minute
+	cacheTTL := 5 * time.Minute     // Default: 5 minutes
+	cacheCleanup := 1 * time.Minute // Default: 1 minute
 	if cfg.Server.Security.SAML.AssertionCacheTTL != 0 {
 		cacheTTL = cfg.Server.Security.SAML.AssertionCacheTTL
 	}
@@ -106,9 +106,9 @@ func NewServer(cfg *config.Config) *Server {
 	assertionCache := NewAssertionCache(cacheTTL, cacheCleanup)
 
 	logrus.WithFields(logrus.Fields{
-		"saml_rate_limit":      samlRate,
-		"saml_burst":           samlBurst,
-		"assertion_cache_ttl":  cacheTTL,
+		"saml_rate_limit":     samlRate,
+		"saml_burst":          samlBurst,
+		"assertion_cache_ttl": cacheTTL,
 	}).Info("Security components initialized")
 
 	// Create a new server instance with the provided configuration
@@ -135,8 +135,8 @@ type Server struct {
 	server          *http.Server
 
 	// Security components
-	rateLimiterMiddleware gin.HandlerFunc   // Rate limiting middleware (ulule/limiter)
-	assertionCache        *AssertionCache   // SAML assertion ID replay protection
+	rateLimiterMiddleware gin.HandlerFunc // Rate limiting middleware (ulule/limiter)
+	assertionCache        *AssertionCache // SAML assertion ID replay protection
 }
 
 func (s *Server) GetConfig() *config.Config {
@@ -245,6 +245,11 @@ func (s *Server) Start() error {
 		cookieNames,
 		sessionStore,
 	))
+
+	// Add CSRF protection using gorilla/csrf (cookie-based, no session dependency)
+	// This protects SP-initiated SAML flows where users start authentication at Thand server
+	// IdP-initiated flows are protected by SAML signature validation and assertion replay protection
+	router.Use(CSRFMiddleware([]byte(s.GetConfig().GetSecret()), true))
 
 	// Set HTML template engine
 	router.SetHTMLTemplate(s.TemplateEngine)
@@ -485,10 +490,12 @@ func (s *Server) setupRoutes(router *gin.Engine) {
 			// Sync endpoints
 			api.GET("/sync", s.getSync)
 
+			// SAML/OAuth2 authentication routes
+			// CSRF protection: gorilla/csrf middleware protects all POST requests automatically
+			// Rate limiting: Applied to callbacks to prevent DoS attacks
 			api.GET("/auth/request/:provider", s.getAuthRequest)
-			// Apply rate limiting to callback routes to prevent DoS attacks
-			api.GET("/auth/callback/:provider", s.rateLimiterMiddleware, s.getAuthCallback)   // OAuth2 callbacks
-			api.POST("/auth/callback/:provider", s.rateLimiterMiddleware, s.postAuthCallback) // SAML callbacks
+			api.GET("/auth/callback/:provider", s.rateLimiterMiddleware, s.getAuthCallback)   // OAuth2 callbacks (GET)
+			api.POST("/auth/callback/:provider", s.rateLimiterMiddleware, s.postAuthCallback) // SAML callbacks (POST, CSRF-protected)
 			api.GET("/auth/logout/:provider", s.getLogoutPage)
 			api.GET("/auth/logout", s.getLogoutPage)
 
@@ -717,8 +724,8 @@ func getSessionStore(secret string) sessions.Store {
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 days
 		HttpOnly: true,
-		Secure:   true,                  // Set to true in production with HTTPS
-		SameSite: http.SameSiteLaxMode,  // CSRF protection - prevents cross-site request forgery
+		Secure:   true,                 // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode, // CSRF protection - prevents cross-site request forgery
 	})
 	return store
 }
